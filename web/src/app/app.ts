@@ -18,19 +18,14 @@ import { Toast } from './toast';
           </svg>
           <div>
             <b>{{ i18n.t('app.name') }}</b
-            ><small>{{ i18n.t('app.parish') }}</small>
+            ><small>{{ i18n.t('app.tagline') }}</small>
           </div>
         </div>
         <nav class="steps">
-          <a routerLink="/vote" routerLinkActive="on" ariaCurrentWhenActive="page"
-            ><span class="n">1</span>{{ i18n.t('nav.vote') }}</a
-          >
-          <a routerLink="/admin" routerLinkActive="on" ariaCurrentWhenActive="page"
-            ><span class="n">2</span>{{ i18n.t('nav.admin') }}</a
-          >
-          <a routerLink="/results" routerLinkActive="on" ariaCurrentWhenActive="page"
-            ><span class="n">3</span>{{ i18n.t('nav.results') }}</a
-          >
+          <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">{{
+            i18n.t('nav.vote')
+          }}</a>
+          <a routerLink="/admin" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('nav.admin') }}</a>
           <button type="button" class="lang" (click)="i18n.toggle()">
             {{ i18n.t('lang.switch') }}
           </button>

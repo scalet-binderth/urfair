@@ -2,9 +2,36 @@ using UrFairSlot.Core;
 
 namespace UrFairSlot.Api.Data;
 
+/// <summary>Lifecycle of a FairSlot.</summary>
+public enum Phase { Draft, Open, Closed, Published }
+
+/// <summary>One allocation round, e.g. "Confirmation preparation 2026/27", with its own rules, activities and ballots.</summary>
+public class FairSlotEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public Phase Phase { get; set; } = Phase.Draft;
+    public DateTime? RegistrationDeadline { get; set; }
+    public int PointBudget { get; set; } = 100;
+    public int MinActivities { get; set; } = 5;
+    public int MaxPerActivity { get; set; } = 40;
+    public int PerParticipant { get; set; } = 3;
+    public int Seed { get; set; } = 2027;
+    public int SampleCount { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<ActivityEntity> Activities { get; set; } = [];
+    public List<BallotEntity> Ballots { get; set; } = [];
+
+    public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant);
+
+    public void Apply(Rules r) =>
+        (PointBudget, MinActivities, MaxPerActivity, PerParticipant) = (r.PointBudget, r.MinActivities, r.MaxPerActivity, r.PerParticipant);
+}
+
 public class ActivityEntity
 {
-    public string Id { get; set; } = "";
+    public string Id { get; set; } = Ids.New();
+    public Guid FairSlotId { get; set; }
     public string Title { get; set; } = "";
     public string? RestrictedTo { get; set; }
     public int Popularity { get; set; } = 5;
@@ -18,7 +45,7 @@ public class ActivityEntity
 
 public class SessionEntity
 {
-    public string Id { get; set; } = "";
+    public string Id { get; set; } = Ids.New();
     public string ActivityId { get; set; } = "";
     public DateTime Start { get; set; }
     public DateTime? End { get; set; }
@@ -30,6 +57,7 @@ public class SessionEntity
 public class BallotEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
     public string Name { get; set; } = "";
     public string? Gender { get; set; }
     public bool IsSample { get; set; }
@@ -49,17 +77,15 @@ public class BallotPoints
     public int Points { get; set; }
 }
 
-/// <summary>Single-row table with the organiser's settings.</summary>
-public class SettingsEntity
+/// <summary>Single row recording the schema version (see <see cref="Database"/>).</summary>
+public class MetaEntity
 {
     public int Id { get; set; } = 1;
-    public int PointBudget { get; set; } = 100;
-    public int MinActivities { get; set; } = 5;
-    public int MaxPerActivity { get; set; } = 40;
-    public int PerParticipant { get; set; } = 3;
-    public int Seed { get; set; } = 2027;
-    public int SampleCount { get; set; } = 140;
-    public DateTime? RegistrationDeadline { get; set; }
+    public int SchemaVersion { get; set; }
+}
 
-    public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant);
+public static class Ids
+{
+    /// <summary>Short random id for activities and sessions.</summary>
+    public static string New() => Guid.NewGuid().ToString("N")[..12];
 }
