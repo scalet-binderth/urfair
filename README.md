@@ -24,7 +24,7 @@ system assigns the seats:
 | `src/UrFairSlot.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
 | `tests/UrFairSlot.Core.Tests` | xUnit tests for the allocation rules |
 | `web` | Angular app (vote, organisation, allocation; German/English) |
-| `index.html` | First static prototype (published via GitHub Pages) |
+| `index.html` | Redirect from the former GitHub Pages demo to the hosted app (the first prototype is in the git history) |
 
 ## Run locally
 
