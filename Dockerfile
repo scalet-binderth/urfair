@@ -1,7 +1,7 @@
 # One container: the ASP.NET Core API also serves the built Angular app.
 
 # 1. Build the Angular app (outputs into src/PointAllocation.Api/wwwroot)
-FROM node:22-alpine AS web
+FROM node:24-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund

@@ -23,7 +23,7 @@ system assigns the seats:
 
 ## Run locally
 
-Requirements: .NET SDK 10, Node.js 22. Docker is not needed locally.
+Requirements: .NET SDK 10, Node.js 24. Docker is not needed locally.
 
 ```
 cd web && npm ci && npx ng build        # builds the UI into src/PointAllocation.Api/wwwroot
