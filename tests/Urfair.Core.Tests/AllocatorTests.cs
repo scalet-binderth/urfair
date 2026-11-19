@@ -87,7 +87,8 @@ public class AllocatorTests
     public void Demo_fair_slots_have_valid_rules_and_ballots()
     {
         foreach (var (rules, activities) in new[] {
-            (DemoData.ExcursionRules, DemoData.Excursion()), (DemoData.HolidayRules, DemoData.HolidayProgramme()), (DemoData.CampRules, DemoData.Camp()) })
+            (DemoData.ExcursionRules, DemoData.Excursion()), (DemoData.HolidayRules, DemoData.HolidayProgramme()),
+            (DemoData.CampRules, DemoData.Camp()), (DemoData.FestivalRules, DemoData.ParishFestival()) })
         {
             Assert.Empty(Validation.Check(rules));
             Assert.All(activities, a => Assert.Empty(Validation.Check(a)));

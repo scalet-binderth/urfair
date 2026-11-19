@@ -12,7 +12,7 @@ public static class Database
     /// Bump when the model changes. While the app only holds demo data, a version mismatch resets the
     /// database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
     /// </summary>
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4; // 4: demo seed changed (Pfarrfest)
 
     /// <summary>
     /// Chooses the database: PostgreSQL if DATABASE_URL (as provided by Neon, Render, Koyeb…) or
@@ -80,8 +80,9 @@ public static class Database
     }
 
     /// <summary>
-    /// Four demo FairSlots for presentations. Demo people: A sees nothing, B one open FairSlot,
-    /// C one open and one published, D one open, one closed and one published.
+    /// Five demo FairSlots for presentations. Demo people: A sees nothing, B two open FairSlots,
+    /// C two open and one published, D two open, one closed and one published.
+    /// "Pfarrfest" has no ballots at all, to try voting live.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
@@ -94,6 +95,8 @@ public static class Database
             DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d]);
         await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
             DemoData.CampRules, DemoData.Camp(), 0, []);
+        await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
+            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [b, c, d]);
     }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>

@@ -5,7 +5,7 @@ public static class DemoData
 {
     public sealed record Person(string Key, string Name);
 
-    /// <summary>A: no FairSlot, B: one open, C: one open + one published, D: one open + one closed + one published.</summary>
+    /// <summary>A: no FairSlot, B: two open, C: two open + one published, D: two open + one closed + one published.</summary>
     public static readonly Person A = new("A", "Anna Ammer");
     public static readonly Person B = new("B", "Ben Berger");
     public static readonly Person C = new("C", "Clara Czerny");
@@ -15,6 +15,16 @@ public static class DemoData
     public static readonly Rules ExcursionRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 70, PerParticipant: 1);
     public static readonly Rules HolidayRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2);
     public static readonly Rules CampRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 60, PerParticipant: 1);
+    public static readonly Rules FestivalRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2);
+
+    /// <summary>Open vote without any ballots, to try voting live in a presentation.</summary>
+    public static IReadOnlyList<Activity> ParishFestival() => Build("fest",
+        // Shifts one after another, so that two activities per person can fit.
+        ("Aufbau am Vortag", 4, ("2027-06-12T15:00", "2027-06-12T19:00", "Pfarrgarten St. Markus", 10)),
+        ("Grillstand", 8, ("2027-06-13T10:00", "2027-06-13T13:00", "Pfarrgarten St. Markus", 6)),
+        ("Kinderschminken", 7, ("2027-06-13T13:00", "2027-06-13T15:00", "Pfarrsaal St. Markus", 4)),
+        ("Kuchenbuffet", 6, ("2027-06-13T15:00", "2027-06-13T17:00", "Pfarrsaal St. Markus", 5)),
+        ("Musik und Ton am Abend", 5, ("2027-06-13T17:00", "2027-06-13T21:00", "Bühne Pfarrgarten", 3)));
 
     public static IReadOnlyList<Activity> Excursion() => Build("mini",
         ("Tiergarten Walding", 9, ("2026-10-03T09:00", "2026-10-03T16:00", "Tiergarten Walding", 25)),
