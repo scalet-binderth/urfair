@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Activity, Api, Slot } from './api';
 import { I18n } from './i18n';
+import { SessionService } from './session';
 import { Toast } from './toast';
 
 /** Voting page of one FairSlot. */
 @Component({
   selector: 'app-vote',
-  imports: [FormsModule],
+  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     @if (slot(); as c) {
@@ -73,14 +74,13 @@ import { Toast } from './toast';
             } @else { <p class="muted small">{{ i18n.t('vote.rankingEmpty') }}</p> }
           </div>
           <div class="card stack">
-            <div class="field">
-              <label for="name">{{ i18n.t('vote.name') }}</label>
-              <input id="name" autocomplete="off" [placeholder]="i18n.t('vote.namePlaceholder')" [ngModel]="name()" (ngModelChange)="name.set($event)" />
-            </div>
+            <p class="small">{{ i18n.t('vote.as', { name: name() }) }}</p>
+            @if (loadedPrevious()) { <p class="small muted">{{ i18n.t('vote.loaded') }}</p> }
             @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
             <button class="btn" type="button" [disabled]="!canSubmit() || busy() || c.phase !== 'Open'" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
             <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button>
             <p class="muted small">{{ i18n.t('vote.note') }}</p>
+            <a routerLink="/slots" class="small">{{ i18n.t('vote.back') }}</a>
           </div>
         </aside>
       </div>
@@ -132,7 +132,9 @@ export class VotePage implements OnInit {
   protected loadError = signal(false);
   protected points = signal<Record<string, number>>({});
   protected unavailable = signal(new Set<string>());
-  protected name = signal('');
+  private session = inject(SessionService);
+  protected name = computed(() => this.session.participantName() ?? '');
+  protected loadedPrevious = signal(false);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
 
@@ -155,6 +157,13 @@ export class VotePage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.slot(this.slotId()), this.api.activities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
+      // Demo: show the earlier ballot of this name so it can be changed.
+      const previous = await this.api.lookupBallot(this.slotId(), this.name());
+      if (previous) {
+        this.points.set(previous.points);
+        this.unavailable.set(new Set(previous.unavailableSessions));
+        this.loadedPrevious.set(true);
+      }
     } catch {
       this.loadError.set(true);
     }

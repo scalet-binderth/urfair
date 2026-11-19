@@ -10,6 +10,7 @@ public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? Regist
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
+public record LookupRequest(string Name);
 
 /// <summary>Endpoints for participants.</summary>
 public static class Endpoints
@@ -18,11 +19,43 @@ public static class Endpoints
     {
         var api = app.MapGroup("/api");
 
-        // FairSlots currently accepting votes (until personal links exist, the start page lists them).
-        api.MapGet("/slots", async (AppDbContext db) =>
-            await db.FairSlots.Where(s => s.Phase == Phase.Open).OrderBy(s => s.CreatedAt)
+        // Tells the start page whether the organisation area needs an access key.
+        api.MapGet("/info", (IConfiguration cfg) => new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]) });
+
+        // Demo: reload a previously submitted ballot by name so it can be changed. Replaced by personal links later.
+        api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db) =>
+        {
+            var name = (req.Name ?? "").Trim().ToLower();
+            var ballot = await db.Ballots.Include(b => b.Points).AsNoTracking()
+                .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name)
+                .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
+            return ballot is null
+                ? Results.NotFound()
+                : Results.Ok(new { points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions });
+        });
+
+        // FairSlots this person is listed in (drafts stay hidden). Demo: the person is identified by name.
+        api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db) =>
+        {
+            var name = (req.Name ?? "").Trim().ToLower();
+            return await db.FairSlots
+                .Where(s => s.Phase != Phase.Draft && s.Participants.Any(p => p.Name.ToLower() == name))
+                .OrderBy(s => s.Phase).ThenBy(s => s.RegistrationDeadline)
                 .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
-                .ToListAsync());
+                .ToListAsync();
+        });
+
+        // The own allocation once the organisers have published it.
+        api.MapPost("/slots/{id:guid}/my-result", async (Guid id, LookupRequest req, AppDbContext db) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            var name = (req.Name ?? "").Trim();
+            if (slot is null || !await Database.IsParticipantAsync(db, id, name)) return Results.NotFound();
+            if (slot.Phase != Phase.Published) return Errors("notPublished");
+            var result = await AdminEndpoints.AllocateAsync(db, slot);
+            var mine = result.Participants.FirstOrDefault(p => !p.IsSample && p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return Results.Ok(new { voted = mine is not null, assignments = mine?.Assignments ?? [] });
+        });
 
         api.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg) =>
             await ToDto(db, id, cfg) is { } dto ? Results.Ok(dto) : Results.NotFound());
@@ -35,9 +68,10 @@ public static class Endpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             if (slot.Phase != Phase.Open) return Errors("registrationClosed");
+            var name = (req.Name ?? "").Trim();
+            if (!await Database.IsParticipantAsync(db, id, name)) return Errors("notListed");
 
             var activities = await Database.LoadActivitiesAsync(db, id);
-            var name = (req.Name ?? "").Trim();
             var points = (req.Points ?? []).Where(p => p.Value != 0).ToDictionary();
             var unavailable = (req.UnavailableSessions ?? []).ToHashSet();
             var errors = Validation.Check(new Ballot("new", name, points, unavailable), slot.ToRules(), activities);

@@ -9,6 +9,7 @@ public record UpdateSlotRequest(string Name, Phase Phase, DateTime? Registration
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
+public record ParticipantListDto(Guid Id, string Name, bool HasVoted);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
 public record AssignmentDto(string ActivityId, string Title, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points, bool IsFallback);
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments);
@@ -138,27 +139,58 @@ public static class AdminEndpoints
         });
 
         admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
+            await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
+
+        // ---------- Participant list ----------
+
+        admin.MapGet("/slots/{id:guid}/participants", async (Guid id, AppDbContext db) =>
         {
-            var slot = await db.FairSlots.FindAsync(id);
-            if (slot is null) return Results.NotFound();
-            var activities = await Database.LoadActivitiesAsync(db, id);
-            var entities = await Database.LoadBallotsAsync(db, id);
-            var ballots = entities.Select(b => b.ToModel()).ToList();
-            var k = slot.PerParticipant;
-
-            var pointBased = Allocator.PointBased(activities, ballots, k, slot.Seed);
-            var fcfs = Allocator.FirstComeFirstServed(activities, ballots, k, slot.Seed);
-            var titles = activities.ToDictionary(a => a.Id, a => a.Title);
-            var isSample = entities.ToDictionary(b => b.Id.ToString(), b => b.IsSample);
-
-            var participants = ballots.Select(b => new ParticipantDto(b.Id, b.Name, isSample[b.Id], pointBased.Satisfaction(b, k),
-                pointBased.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
-                    x.Session.ActivityId, titles[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
-                    x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback)).ToList())).ToList();
-
-            var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, pointBased.Load);
-            return Results.Ok(new AllocationDto(slot.Seed, k, pointBased.Evaluate(k), fcfs.Evaluate(k), load, participants));
+            var voted = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample).Select(b => b.Name.ToLower()).ToListAsync();
+            return (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Name).ToListAsync())
+                .Select(p => new ParticipantListDto(p.Id, p.Name, voted.Contains(p.Name.ToLower())));
         });
+
+        admin.MapPost("/slots/{id:guid}/participants", async (Guid id, LookupRequest req, AppDbContext db) =>
+        {
+            var name = (req.Name ?? "").Trim();
+            if (name.Length == 0) return Endpoints.Errors("nameRequired");
+            if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
+            if (await Database.IsParticipantAsync(db, id, name)) return Endpoints.Errors("alreadyListed");
+            db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = name });
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        admin.MapDelete("/participants/{participantId:guid}", async (Guid participantId, AppDbContext db) =>
+        {
+            var p = await db.Participants.FindAsync(participantId);
+            if (p is null) return Results.NotFound();
+            db.Participants.Remove(p);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+    }
+
+    /// <summary>Runs both allocation procedures for a FairSlot and shapes the result for the UI.</summary>
+    public static async Task<AllocationDto> AllocateAsync(AppDbContext db, FairSlotEntity slot)
+    {
+        var activities = await Database.LoadActivitiesAsync(db, slot.Id);
+        var entities = await Database.LoadBallotsAsync(db, slot.Id);
+        var ballots = entities.Select(b => b.ToModel()).ToList();
+        var k = slot.PerParticipant;
+
+        var pointBased = Allocator.PointBased(activities, ballots, k, slot.Seed);
+        var fcfs = Allocator.FirstComeFirstServed(activities, ballots, k, slot.Seed);
+        var titles = activities.ToDictionary(a => a.Id, a => a.Title);
+        var isSample = entities.ToDictionary(b => b.Id.ToString(), b => b.IsSample);
+
+        var participants = ballots.Select(b => new ParticipantDto(b.Id, b.Name, isSample[b.Id], pointBased.Satisfaction(b, k),
+            pointBased.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
+                x.Session.ActivityId, titles[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
+                x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback)).ToList())).ToList();
+
+        var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, pointBased.Load);
+        return new AllocationDto(slot.Seed, k, pointBased.Evaluate(k), fcfs.Evaluate(k), load, participants);
     }
 
     /// <summary>Copies a request onto an activity entity (sessions are matched by id). Returns an error result if invalid.</summary>

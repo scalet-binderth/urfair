@@ -13,6 +13,7 @@ export interface Activity { id: string; title: string; restrictedTo: string | nu
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; }
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; }
+export interface ListedParticipant { id: string; name: string; hasVoted: boolean; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
@@ -40,8 +41,23 @@ export class Api {
     try { sessionStorage.setItem('adminKey', key); } catch { /* ignore */ }
   }
 
+  // ---------- general ----------
+  info() { return this.call(this.http.get<{ adminProtected: boolean }>('/api/info')); }
+
   // ---------- participants ----------
-  openSlots() { return this.call(this.http.get<SlotSummary[]>('/api/slots')); }
+  /** Previously submitted ballot of this name, or null. */
+  async lookupBallot(id: string, name: string): Promise<{ points: Record<string, number>; unavailableSessions: string[] } | null> {
+    try {
+      return await firstValueFrom(this.http.post<{ points: Record<string, number>; unavailableSessions: string[] }>(`/api/slots/${id}/ballots/lookup`, { name }));
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && e.status === 404) return null;
+      throw new ApiFailure([{ code: 'generic' }]);
+    }
+  }
+  mySlots(name: string) { return this.call(this.http.post<SlotSummary[]>('/api/my-slots', { name })); }
+  myResult(id: string, name: string) {
+    return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }));
+  }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }
   submitBallot(id: string, body: { name: string; points: Record<string, number>; unavailableSessions: string[] }) {
@@ -66,6 +82,9 @@ export class Api {
   resetDemo(id: string, body: { sampleCount: number; newSeed: boolean; removeRealBallots: boolean }) {
     return this.call(this.http.post(`/api/admin/slots/${id}/reset-demo`, body, this.admin()));
   }
+  participants(id: string) { return this.call(this.http.get<ListedParticipant[]>(`/api/admin/slots/${id}/participants`, this.admin())); }
+  addParticipant(id: string, name: string) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, { name }, this.admin())); }
+  removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
 
   private admin() { return { headers: new HttpHeaders(this.adminKey() ? { 'X-Admin-Key': this.adminKey() } : {}) }; }

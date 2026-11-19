@@ -3,12 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
 import { AdminKeyPrompt } from './admin-key';
-import { Activity, Api, ApiFailure, Demand, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
+import { Activity, Api, ApiFailure, Demand, ListedParticipant, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
 
-type Tab = 'settings' | 'activities' | 'demand' | 'results' | 'demo';
+type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | 'demo';
 
 /** Organisation view of one FairSlot. */
 @Component({
@@ -114,6 +114,38 @@ type Tab = 'settings' | 'activities' | 'demand' | 'results' | 'demo';
           </div>
         }
 
+        @case ('participants') {
+          <div class="card stack">
+            <p class="muted small">{{ i18n.t('admin.participantsNote') }}</p>
+            <form class="row" (submit)="$event.preventDefault(); addParticipant()">
+              <div class="field grow"><label for="p-new">{{ i18n.t('admin.participantName') }}</label>
+                <input id="p-new" name="pnew" [(ngModel)]="newParticipant" [placeholder]="i18n.t('vote.namePlaceholder')" /></div>
+              <button class="btn" type="submit" [disabled]="!newParticipant.trim() || busy()">{{ i18n.t('admin.addParticipant') }}</button>
+            </form>
+            @if (participants().length) {
+              <div class="tbl-wrap"><table>
+                <thead><tr><th>{{ i18n.t('admin.col.name') }}</th><th>{{ i18n.t('admin.col.voted') }}</th><th></th></tr></thead>
+                <tbody>
+                  @for (p of participants(); track p.id) {
+                    <tr>
+                      <td>{{ p.name }}</td>
+                      <td>@if (p.hasVoted) { <span class="phase" data-phase="Open">{{ i18n.t('admin.voted') }}</span> } @else { <span class="muted small">{{ i18n.t('admin.notVoted') }}</span> }</td>
+                      <td class="num">
+                        @if (confirmDelete() === p.id) {
+                          <button class="btn danger small" type="button" (click)="removeParticipant(p.id)">{{ i18n.t('common.delete') }}</button>
+                          <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
+                        } @else {
+                          <button class="btn ghost small" type="button" (click)="confirmDelete.set(p.id)">{{ i18n.t('common.delete') }}</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table></div>
+            } @else { <p class="muted">{{ i18n.t('admin.noParticipants') }}</p> }
+          </div>
+        }
+
         @case ('demand') {
           <div class="card stack">
             <p class="muted small">{{ i18n.t('admin.demandNote') }}</p>
@@ -190,7 +222,9 @@ export class AdminSlotPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
 
-  protected readonly tabs: Tab[] = ['settings', 'activities', 'demand', 'results', 'demo'];
+  protected readonly tabs: Tab[] = ['settings', 'activities', 'participants', 'demand', 'results', 'demo'];
+  protected participants = signal<ListedParticipant[]>([]);
+  protected newParticipant = '';
   protected readonly phases = PHASES;
   protected tab = signal<Tab>('activities');
   protected slot = signal<Slot | null>(null);
@@ -219,6 +253,7 @@ export class AdminSlotPage implements OnInit {
       this.sampleCount = slot.sampleCount;
       this.needsKey.set(false);
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
+      if (this.tab() === 'participants') this.participants.set(await this.api.participants(this.slotId()));
     } catch (e) {
       this.handle(e);
     }
@@ -227,9 +262,26 @@ export class AdminSlotPage implements OnInit {
   protected async show(t: Tab): Promise<void> {
     this.tab.set(t);
     this.editing.set(null);
-    if (t === 'demand') {
-      try { this.demand.set(await this.api.demand(this.slotId())); } catch (e) { this.handle(e); }
-    }
+    try {
+      if (t === 'demand') this.demand.set(await this.api.demand(this.slotId()));
+      if (t === 'participants') this.participants.set(await this.api.participants(this.slotId()));
+    } catch (e) { this.handle(e); }
+  }
+
+  protected addParticipant(): Promise<void> {
+    return this.run(async () => {
+      await this.api.addParticipant(this.slotId(), this.newParticipant.trim());
+      this.newParticipant = '';
+      this.participants.set(await this.api.participants(this.slotId()));
+    });
+  }
+
+  protected removeParticipant(id: string): Promise<void> {
+    return this.run(async () => {
+      await this.api.removeParticipant(id);
+      this.confirmDelete.set(null);
+      this.participants.set(await this.api.participants(this.slotId()));
+    });
   }
 
   protected participantUrl(): string { return `${location.origin}/s/${this.slotId()}`; }

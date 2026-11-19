@@ -84,6 +84,19 @@ public class AllocatorTests
     }
 
     [Fact]
+    public void Demo_fair_slots_have_valid_rules_and_ballots()
+    {
+        foreach (var (rules, activities) in new[] {
+            (DemoData.ExcursionRules, DemoData.Excursion()), (DemoData.HolidayRules, DemoData.HolidayProgramme()), (DemoData.CampRules, DemoData.Camp()) })
+        {
+            Assert.Empty(Validation.Check(rules));
+            Assert.All(activities, a => Assert.Empty(Validation.Check(a)));
+            foreach (var b in SampleData.Participants(50, rules, activities, 7))
+                Assert.Empty(Validation.Check(b, rules, activities));
+        }
+    }
+
+    [Fact]
     public void Invalid_activity_is_rejected_with_codes()
     {
         var start = new DateTime(2027, 3, 1, 18, 0, 0);
