@@ -18,6 +18,8 @@ public class FairSlotEntity
     public int PerParticipant { get; set; } = 3;
     public int Seed { get; set; } = 2027;
     public int SampleCount { get; set; }
+    /// <summary>Anyone who signs in may see and vote, without being on the participant list (demo playground, later self-registration).</summary>
+    public bool OpenToAll { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];

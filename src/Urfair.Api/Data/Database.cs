@@ -12,7 +12,7 @@ public static class Database
     /// Bump when the model changes. While the app only holds demo data, a version mismatch resets the
     /// database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
     /// </summary>
-    private const int SchemaVersion = 4; // 4: demo seed changed (Pfarrfest)
+    private const int SchemaVersion = 5; // 5: OpenToAll, larger Pfarrfest demo
 
     /// <summary>
     /// Chooses the database: PostgreSQL if DATABASE_URL (as provided by Neon, Render, Koyeb…) or
@@ -96,7 +96,7 @@ public static class Database
         await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
             DemoData.CampRules, DemoData.Camp(), 0, []);
         await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [b, c, d]);
+            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], openToAll: true);
     }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
@@ -105,9 +105,9 @@ public static class Database
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
-        IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null)
+        IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false)
     {
-        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline };
+        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll };
         slot.Apply(rules);
         var order = 0;
         foreach (var a in activities)
@@ -140,6 +140,14 @@ public static class Database
             await db.SaveChangesAsync();
         }
         return slot;
+    }
+
+    /// <summary>Whether a person may see and vote in a FairSlot: listed, or the FairSlot is open to all (demo person A excluded).</summary>
+    public static async Task<bool> CanTakePartAsync(AppDbContext db, Guid slotId, string name)
+    {
+        var n = name.Trim().ToLower();
+        if (n.Length > 0 && n != DemoData.NobodyName && await db.FairSlots.AnyAsync(s => s.Id == slotId && s.OpenToAll)) return true;
+        return await IsParticipantAsync(db, slotId, name);
     }
 
     /// <summary>Whether a person (by name) is on the participant list of a FairSlot.</summary>

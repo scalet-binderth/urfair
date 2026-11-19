@@ -7,12 +7,12 @@ export const PHASES: Phase[] = ['Draft', 'Open', 'Closed', 'Published'];
 
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; }
-export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; }
+export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; rules: Rules; }
 export interface ListedParticipant { id: string; name: string; hasVoted: boolean; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
