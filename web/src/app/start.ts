@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Api } from './api';
 import { I18n } from './i18n';
 import { SessionService } from './session';
@@ -8,7 +8,7 @@ import { SessionService } from './session';
 /** Demo start page: enter as participant (with a name) or as organiser. */
 @Component({
   selector: 'app-start',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="head">
@@ -48,10 +48,16 @@ import { SessionService } from './session';
         @if (error()) { <ul class="errors"><li>{{ error() }}</li></ul> }
         <button class="btn" type="submit" [disabled]="busy()">{{ i18n.t('start.adminGo') }}</button>
       </form>
+
+      <div class="card tile stack">
+        <h2>{{ i18n.t('start.plan') }}</h2>
+        <p class="muted">{{ i18n.t('start.planText') }}</p>
+        <a class="btn ghost" routerLink="/plan">{{ i18n.t('start.planGo') }}</a>
+      </div>
     </div>
   `,
   styles: `
-    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px }
     .tile { align-content: start }
     .tile .btn { justify-self: start }
     .demo-people { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px }

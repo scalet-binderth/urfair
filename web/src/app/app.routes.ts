@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { StartPage } from './start';
+import { PlanPage } from './plan';
 import { HomePage } from './home';
 import { VotePage } from './vote';
 import { MyResultPage } from './my-result';
@@ -9,6 +10,7 @@ import { adminGuard, participantGuard } from './session';
 
 export const routes: Routes = [
   { path: '', component: StartPage },
+  { path: 'plan', component: PlanPage },
   { path: 'slots', component: HomePage, canActivate: [participantGuard] },
   { path: 's/:slotId', component: VotePage, canActivate: [participantGuard] },
   { path: 's/:slotId/result', component: MyResultPage, canActivate: [participantGuard] },
