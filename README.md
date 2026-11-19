@@ -21,3 +21,8 @@ teilt das System die Plätze zu:
 
 `index.html` im Browser öffnen, oder über GitHub Pages veröffentlichen
 (Repository → Settings → Pages → Branch `main`, Ordner `/ (root)`).
+
+## Lizenz
+
+MIT-Lizenz, siehe [LICENSE](LICENSE). Die Nutzung ist kostenlos und ohne Gewährleistung oder Haftung.
+© 2026 Thomas Scalet-Binder
