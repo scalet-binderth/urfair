@@ -1,6 +1,6 @@
-using UrFairSlot.Core;
+using Urfair.Core;
 
-namespace UrFairSlot.Api.Data;
+namespace Urfair.Api.Data;
 
 /// <summary>Lifecycle of a FairSlot.</summary>
 public enum Phase { Draft, Open, Closed, Published }

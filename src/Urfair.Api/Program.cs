@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
-using UrFairSlot.Api;
-using UrFairSlot.Api.Data;
+using Urfair.Api;
+using Urfair.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,4 +1,4 @@
-namespace UrFairSlot.Core;
+namespace Urfair.Core;
 
 /// <summary>A concrete date of an activity. Capacity null = unlimited.</summary>
 public sealed record Session(

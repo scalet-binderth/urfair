@@ -1,4 +1,4 @@
-# UrFairSlot
+# Urfair
 
 Fair seat allocation for limited activities: workshops, project weeks, holiday programmes,
 confirmation preparation.
@@ -20,26 +20,27 @@ system assigns the seats:
 
 | Path | Content |
 |---|---|
-| `src/UrFairSlot.Core` | Allocation algorithm, validation, sample data (no dependencies) |
-| `src/UrFairSlot.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
-| `tests/UrFairSlot.Core.Tests` | xUnit tests for the allocation rules |
-| `web` | Angular app (German/English): start page, voting per FairSlot, organisation area |
+| `src/Urfair.Core` | Allocation algorithm, validation, sample data (no dependencies) |
+| `src/Urfair.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
+| `tests/Urfair.Core.Tests` | xUnit tests for the allocation rules |
+| `web` | Angular app (German/English): start page, voting, organisation area |
+| `index.html` | Redirect from the former GitHub Pages demo to the hosted app (the first prototype is in the git history) |
 
 ## Concepts
 
-- **FairSlot**: one allocation round (e.g. "Confirmation preparation 2026/27") with its own rules, activities, dates and registrations.
-- **Phase**: Draft → Open (participants can vote) → Closed → Published.
-- **Organisation area** (`/admin`): create FairSlots, edit activities and dates, settings and rules, demand, allocation, sample data.
-- **Voting page** (`/s/{id}`): the link participants receive.
-| `index.html` | Redirect from the former GitHub Pages demo to the hosted app (the first prototype is in the git history) |
+- **Vote** (in code: `FairSlot`): one allocation round (e.g. "Confirmation preparation 2026/27") with its own rules, activities, dates, participant list and registrations.
+- **Phase**: Draft → Open (participants can vote) → Closed → Published (participants see their own result).
+- **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
+- **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
+- **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.
 
 ## Run locally
 
 Requirements: .NET SDK 10, Node.js 24. Docker is not needed locally.
 
 ```
-cd web && npm ci && npx ng build        # builds the UI into src/UrFairSlot.Api/wwwroot
-cd ../src/UrFairSlot.Api && dotnet run
+cd web && npm ci && npx ng build        # builds the UI into src/Urfair.Api/wwwroot
+cd ../src/Urfair.Api && dotnet run
 ```
 
 Open http://localhost:5080. A local SQLite file is created with a demo FairSlot.
@@ -49,7 +50,7 @@ database instead of migrating it. Switch to EF Core migrations before real regis
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
 
-Tests: `dotnet test UrFairSlot.slnx`
+Tests: `dotnet test Urfair.slnx`
 
 ## Configuration
 

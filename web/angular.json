@@ -53,7 +53,7 @@
               "src/styles.css"
             ],
             "outputPath": {
-              "base": "../src/UrFairSlot.Api/wwwroot",
+              "base": "../src/Urfair.Api/wwwroot",
               "browser": ""
             }
           },

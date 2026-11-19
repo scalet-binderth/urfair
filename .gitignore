@@ -5,4 +5,4 @@ obj/
 *.db
 *.db-shm
 *.db-wal
-src/UrFairSlot.Api/wwwroot/
+src/Urfair.Api/wwwroot/

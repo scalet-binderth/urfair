@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using UrFairSlot.Api.Data;
-using UrFairSlot.Core;
+using Urfair.Api.Data;
+using Urfair.Core;
 
-namespace UrFairSlot.Api;
+namespace Urfair.Api;
 
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions);

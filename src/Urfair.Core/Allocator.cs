@@ -1,4 +1,4 @@
-namespace UrFairSlot.Core;
+namespace Urfair.Core;
 
 /// <summary>
 /// Assigns participants to sessions.

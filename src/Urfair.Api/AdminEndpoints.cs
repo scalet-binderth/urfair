@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using UrFairSlot.Api.Data;
-using UrFairSlot.Core;
+using Urfair.Api.Data;
+using Urfair.Core;
 
-namespace UrFairSlot.Api;
+namespace Urfair.Api;
 
 public record CreateSlotRequest(string Name, bool WithSampleData);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules);

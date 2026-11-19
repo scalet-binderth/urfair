@@ -1,6 +1,6 @@
-using UrFairSlot.Core;
+using Urfair.Core;
 
-namespace UrFairSlot.Core.Tests;
+namespace Urfair.Core.Tests;
 
 public class AllocatorTests
 {
