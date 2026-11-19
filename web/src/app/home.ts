@@ -1,24 +1,29 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, SlotSummary } from './api';
 import { I18n } from './i18n';
+import { SessionService } from './session';
 
-/** Start page: lists the FairSlots that currently accept votes. */
+/** Participant overview: the FairSlots this person is listed in, open ones first. */
 @Component({
   selector: 'app-home',
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
-      <h1>{{ i18n.t('home.title') }}</h1>
+      <h1>{{ i18n.t('home.hello', { name: session.participantName() ?? '' }) }}</h1>
       <p>{{ i18n.t('home.lead') }}</p>
     </div>
     @if (slots(); as list) {
-      @if (list.length) {
+      @if (!list.length) {
+        <p class="card">{{ i18n.t('home.empty') }}</p>
+      }
+      @if (open().length) {
+        <h2 class="section">{{ i18n.t('home.open') }}</h2>
         <div class="slots">
-          @for (s of list; track s.id) {
+          @for (s of open(); track s.id) {
             <a class="card slot" [routerLink]="['/s', s.id]">
-              <h2>{{ s.name }}</h2>
+              <h3>{{ s.name }}</h3>
               <p class="muted small">
                 {{ i18n.t('home.activities', { n: s.activityCount }) }}
                 @if (s.registrationDeadline) { · {{ i18n.t('common.deadline', { date: i18n.date(s.registrationDeadline) }) }} }
@@ -27,8 +32,22 @@ import { I18n } from './i18n';
             </a>
           }
         </div>
-      } @else {
-        <p class="muted">{{ i18n.t('home.empty') }}</p>
+      }
+      @if (done().length) {
+        <h2 class="section">{{ i18n.t('home.done') }}</h2>
+        <div class="slots">
+          @for (s of done(); track s.id) {
+            <div class="card slot">
+              <h3>{{ s.name }} <span class="phase" [attr.data-phase]="s.phase">{{ i18n.t('phase.' + s.phase) }}</span></h3>
+              @if (s.phase === 'Published') {
+                <p class="muted small">{{ i18n.t('home.published') }}</p>
+                <a class="btn ghost" [routerLink]="['/s', s.id, 'result']">{{ i18n.t('home.seeResult') }}</a>
+              } @else {
+                <p class="muted small">{{ i18n.t('home.closed') }}</p>
+              }
+            </div>
+          }
+        </div>
       }
     } @else if (error()) {
       <p class="muted">{{ i18n.t('common.loadError') }}</p>
@@ -37,19 +56,24 @@ import { I18n } from './i18n';
     }
   `,
   styles: `
+    .section { margin: 18px 0 10px }
     .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 12px }
-    .slot { display: grid; gap: 10px; text-decoration: none; color: var(--ink) }
-    .slot:hover { border-color: var(--accent) }
+    .slot { display: grid; gap: 10px; align-content: start; text-decoration: none; color: var(--ink) }
+    a.slot:hover { border-color: var(--accent) }
     .slot .btn { justify-self: start }
+    .slot .phase { margin-left: 6px; vertical-align: middle }
   `,
 })
 export class HomePage {
   protected i18n = inject(I18n);
+  protected session = inject(SessionService);
   private api = inject(Api);
   protected slots = signal<SlotSummary[] | null>(null);
   protected error = signal(false);
+  protected open = computed(() => (this.slots() ?? []).filter(s => s.phase === 'Open'));
+  protected done = computed(() => (this.slots() ?? []).filter(s => s.phase !== 'Open'));
 
   constructor() {
-    this.api.openSlots().then(s => this.slots.set(s), () => this.error.set(true));
+    this.api.mySlots(this.session.participantName() ?? '').then(s => this.slots.set(s), () => this.error.set(true));
   }
 }

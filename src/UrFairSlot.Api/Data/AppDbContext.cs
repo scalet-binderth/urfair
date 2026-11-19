@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ActivityEntity> Activities => Set<ActivityEntity>();
     public DbSet<SessionEntity> Sessions => Set<SessionEntity>();
     public DbSet<BallotEntity> Ballots => Set<BallotEntity>();
+    public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<MetaEntity> Meta => Set<MetaEntity>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -19,6 +20,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(20);
             e.HasMany(x => x.Activities).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Ballots).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Participants).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<ParticipantEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.HasIndex(x => new { x.FairSlotId, x.Name });
         });
         b.Entity<ActivityEntity>(e =>
         {

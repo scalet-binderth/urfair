@@ -12,7 +12,7 @@ public static class Database
     /// Bump when the model changes. While the app only holds demo data, a version mismatch resets the
     /// database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
     /// </summary>
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     /// <summary>
     /// Chooses the database: PostgreSQL if DATABASE_URL (as provided by Neon, Render, Koyeb…) or
@@ -76,8 +76,74 @@ public static class Database
             await db.SaveChangesAsync();
         }
 
-        if (!await db.FairSlots.AnyAsync())
-            await CreateDemoSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, 140);
+        if (!await db.FairSlots.AnyAsync()) await SeedDemoAsync(db);
+    }
+
+    /// <summary>
+    /// Four demo FairSlots for presentations. Demo people: A sees nothing, B one open FairSlot,
+    /// C one open and one published, D one open, one closed and one published.
+    /// </summary>
+    private static async Task SeedDemoAsync(AppDbContext db)
+    {
+        var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
+        await CreateSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, new DateTime(2026, 11, 18, 23, 59, 0),
+            new Rules(), SampleData.Activities(), 140, [b, c, d]);
+        await CreateSlotAsync(db, "Ministrantenausflug Herbst 2026", Phase.Published, new DateTime(2026, 9, 15, 23, 59, 0),
+            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d]);
+        await CreateSlotAsync(db, "Ferienprogramm Sommer 2026", Phase.Closed, new DateTime(2026, 6, 30, 23, 59, 0),
+            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d]);
+        await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
+            DemoData.CampRules, DemoData.Camp(), 0, []);
+    }
+
+    /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
+    public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
+        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), new Rules(), SampleData.Activities(), sampleCount, []);
+
+    /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
+    private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
+        IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null)
+    {
+        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline };
+        slot.Apply(rules);
+        var order = 0;
+        foreach (var a in activities)
+        {
+            var activity = new ActivityEntity { FairSlotId = slot.Id, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity, SortOrder = order++ };
+            activity.Sessions = a.Sessions.Select(s => new SessionEntity
+            {
+                ActivityId = activity.Id, Start = s.Start, End = s.End, Location = s.Location, Capacity = s.Capacity, Flexible = s.Flexible,
+            }).ToList();
+            slot.Activities.Add(activity);
+        }
+        slot.Participants = participants.Select(p => new ParticipantEntity { FairSlotId = slot.Id, Name = p }).ToList();
+        db.FairSlots.Add(slot);
+        await db.SaveChangesAsync();
+        await ResetSamplesAsync(db, slot.Id);
+
+        if (withBallots is { Length: > 0 })
+        {
+            var models = await LoadActivitiesAsync(db, slot.Id);
+            var generated = SampleData.Participants(withBallots.Length, slot.ToRules(), models, slot.Seed + 1);
+            for (var i = 0; i < withBallots.Length; i++)
+            {
+                db.Ballots.Add(new BallotEntity
+                {
+                    FairSlotId = slot.Id, Name = withBallots[i],
+                    Points = generated[i].Points.Select(p => new BallotPoints { ActivityId = p.Key, Points = p.Value }).ToList(),
+                    UnavailableSessions = generated[i].UnavailableSessions.ToList(),
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+        return slot;
+    }
+
+    /// <summary>Whether a person (by name) is on the participant list of a FairSlot.</summary>
+    public static Task<bool> IsParticipantAsync(AppDbContext db, Guid slotId, string name)
+    {
+        var n = name.Trim().ToLower();
+        return db.Participants.AnyAsync(p => p.FairSlotId == slotId && p.Name.ToLower() == n);
     }
 
     private static async Task<int?> CurrentVersionAsync(AppDbContext db)
@@ -92,30 +158,6 @@ public static class Database
             await db.Database.ExecuteSqlRawAsync("DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
         else
             await db.Database.EnsureDeletedAsync();
-    }
-
-    /// <summary>Creates a FairSlot filled with the Urfahr sample activities and sample participants.</summary>
-    public static async Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount)
-    {
-        var slot = new FairSlotEntity
-        {
-            Name = name, Phase = phase, SampleCount = sampleCount,
-            RegistrationDeadline = new DateTime(2026, 11, 18, 23, 59, 0),
-        };
-        var order = 0;
-        foreach (var a in SampleData.Activities())
-        {
-            var activity = new ActivityEntity { FairSlotId = slot.Id, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity, SortOrder = order++ };
-            activity.Sessions = a.Sessions.Select(s => new SessionEntity
-            {
-                ActivityId = activity.Id, Start = s.Start, End = s.End, Location = s.Location, Capacity = s.Capacity, Flexible = s.Flexible,
-            }).ToList();
-            slot.Activities.Add(activity);
-        }
-        db.FairSlots.Add(slot);
-        await db.SaveChangesAsync();
-        await ResetSamplesAsync(db, slot.Id);
-        return slot;
     }
 
     /// <summary>Replaces the sample ballots of a FairSlot according to its current rules.</summary>

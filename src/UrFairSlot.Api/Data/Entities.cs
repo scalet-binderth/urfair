@@ -21,6 +21,7 @@ public class FairSlotEntity
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
+    public List<ParticipantEntity> Participants { get; set; } = [];
 
     public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant);
 
@@ -68,6 +69,14 @@ public class BallotEntity
     public Ballot ToModel() => new(Id.ToString(), Name,
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
         UnavailableSessions.ToHashSet(), Gender);
+}
+
+/// <summary>A person allowed to vote in a FairSlot. Identified by name in the demo; e-mail and personal links follow.</summary>
+public class ParticipantEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public string Name { get; set; } = "";
 }
 
 /// <summary>Points a ballot gives to one activity (owned by <see cref="BallotEntity"/>).</summary>

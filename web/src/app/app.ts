@@ -1,6 +1,7 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { I18n } from './i18n';
+import { SessionService } from './session';
 import { Toast } from './toast';
 
 @Component({
@@ -17,15 +18,19 @@ import { Toast } from './toast';
             />
           </svg>
           <div>
-            <b>{{ i18n.t('app.name') }}</b
+            <a routerLink="/" class="home"><b>{{ i18n.t('app.name') }}</b></a
             ><small>{{ i18n.t('app.tagline') }}</small>
           </div>
         </div>
         <nav class="steps">
-          <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">{{
-            i18n.t('nav.vote')
-          }}</a>
-          <a routerLink="/admin" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('nav.admin') }}</a>
+          @if (session.participantName(); as n) {
+            <a routerLink="/slots" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('session.as', { name: n }) }}</a>
+          } @else if (session.isAdmin()) {
+            <a routerLink="/admin" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('nav.admin') }}</a>
+          }
+          @if (session.role()) {
+            <button type="button" class="lang" (click)="signOut()">{{ i18n.t('session.signOut') }}</button>
+          }
           <button type="button" class="lang" (click)="i18n.toggle()">
             {{ i18n.t('lang.switch') }}
           </button>
@@ -57,6 +62,10 @@ import { Toast } from './toast';
       display: flex;
       align-items: center;
       gap: 10px;
+    }
+    .home {
+      color: var(--ink);
+      text-decoration: none;
     }
     .brand b {
       font-size: 18px;
@@ -128,4 +137,11 @@ import { Toast } from './toast';
 export class App {
   protected i18n = inject(I18n);
   protected toast = inject(Toast);
+  protected session = inject(SessionService);
+  private router = inject(Router);
+
+  protected signOut(): void {
+    this.session.signOut();
+    this.router.navigate(['/']);
+  }
 }
