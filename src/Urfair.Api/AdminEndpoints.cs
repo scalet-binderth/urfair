@@ -5,7 +5,7 @@ using Urfair.Core;
 namespace Urfair.Api;
 
 public record CreateSlotRequest(string Name, bool WithSampleData);
-public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules);
+public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -61,7 +61,7 @@ public static class AdminEndpoints
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             var rulesChanged = slot.ToRules() != rules;
-            (slot.Name, slot.Phase, slot.RegistrationDeadline) = (name, req.Phase, req.RegistrationDeadline);
+            (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
             slot.Apply(rules);
             await db.SaveChangesAsync();
             if (rulesChanged) await Database.ResetSamplesAsync(db, id); // sample ballots must follow the new rules

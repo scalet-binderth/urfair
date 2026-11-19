@@ -7,7 +7,7 @@ namespace Urfair.Api;
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
-public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected);
+public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
@@ -39,7 +39,7 @@ public static class Endpoints
         {
             var name = (req.Name ?? "").Trim().ToLower();
             return await db.FairSlots
-                .Where(s => s.Phase != Phase.Draft && s.Participants.Any(p => p.Name.ToLower() == name))
+                .Where(s => s.Phase != Phase.Draft && (s.Participants.Any(p => p.Name.ToLower() == name) || (s.OpenToAll && name != DemoData.NobodyName)))
                 .OrderBy(s => s.Phase).ThenBy(s => s.RegistrationDeadline)
                 .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
                 .ToListAsync();
@@ -50,7 +50,7 @@ public static class Endpoints
         {
             var slot = await db.FairSlots.FindAsync(id);
             var name = (req.Name ?? "").Trim();
-            if (slot is null || !await Database.IsParticipantAsync(db, id, name)) return Results.NotFound();
+            if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase != Phase.Published) return Errors("notPublished");
             var result = await AdminEndpoints.AllocateAsync(db, slot);
             var mine = result.Participants.FirstOrDefault(p => !p.IsSample && p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
@@ -69,7 +69,7 @@ public static class Endpoints
             if (slot is null) return Results.NotFound();
             if (slot.Phase != Phase.Open) return Errors("registrationClosed");
             var name = (req.Name ?? "").Trim();
-            if (!await Database.IsParticipantAsync(db, id, name)) return Errors("notListed");
+            if (!await Database.CanTakePartAsync(db, id, name)) return Errors("notListed");
 
             var activities = await Database.LoadActivitiesAsync(db, id);
             var points = (req.Points ?? []).Where(p => p.Value != 0).ToDictionary();
@@ -96,7 +96,7 @@ public static class Endpoints
         await db.FairSlots.Where(s => s.Id == id)
             .Select(s => new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline,
                 new Rules(s.PointBudget, s.MinActivities, s.MaxPerActivity, s.PerParticipant, 5),
-                s.Ballots.Count, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"])))
+                s.Ballots.Count, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll))
             .SingleOrDefaultAsync();
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,

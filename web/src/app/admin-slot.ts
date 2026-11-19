@@ -51,6 +51,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
                   <input id="s-deadline" type="datetime-local" [(ngModel)]="form.deadline" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.phaseHint') }}</p>
+              <label class="check"><input type="checkbox" [(ngModel)]="form.openToAll" />{{ i18n.t('admin.openToAll') }}</label>
+              <p class="muted small">{{ i18n.t('admin.openToAllHint') }}</p>
               <h2>{{ i18n.t('admin.rules') }}</h2>
               <div class="rules">
                 <div class="field"><label for="r-budget">{{ i18n.t('admin.budget') }}</label><input id="r-budget" type="number" step="5" [(ngModel)]="form.rules.pointBudget" /></div>
@@ -185,6 +187,19 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
               <button class="btn" type="button" [disabled]="busy()" (click)="resetDemo()">{{ i18n.t('admin.reset') }}</button>
             </div>
           </div>
+          <div class="card stack">
+            <h2>{{ i18n.t('admin.clearAll') }}</h2>
+            <p class="muted small">{{ i18n.t('admin.clearAllHint') }}</p>
+            @if (confirmClear()) {
+              <div class="row">
+                <span>{{ i18n.t('common.reallyDelete') }}</span>
+                <button class="btn danger" type="button" [disabled]="busy()" (click)="clearAll()">{{ i18n.t('admin.clearAll') }}</button>
+                <button class="btn ghost" type="button" (click)="confirmClear.set(false)">{{ i18n.t('common.cancel') }}</button>
+              </div>
+            } @else {
+              <div><button class="btn ghost" type="button" (click)="confirmClear.set(true)">{{ i18n.t('admin.clearAll') }}</button></div>
+            }
+          </div>
         }
       }
     } @else if (!needsKey() && !errors().length) {
@@ -236,8 +251,9 @@ export class AdminSlotPage implements OnInit {
   protected needsKey = signal(false);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5 } };
+  protected confirmClear = signal(false);
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5 } };
   protected sampleCount = 0;
   protected removeReal = false;
 
@@ -249,7 +265,7 @@ export class AdminSlotPage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), rules: { ...slot.rules } };
+      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, rules: { ...slot.rules } };
       this.sampleCount = slot.sampleCount;
       this.needsKey.set(false);
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
@@ -295,7 +311,7 @@ export class AdminSlotPage implements OnInit {
   protected saveSettings(): Promise<void> {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
-        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), rules: this.form.rules,
+        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, rules: this.form.rules,
       });
       this.toast.show(this.i18n.t('common.saved'));
       await this.load();
@@ -321,6 +337,16 @@ export class AdminSlotPage implements OnInit {
       await this.api.deleteActivity(id);
       this.confirmDelete.set(null);
       this.toast.show(this.i18n.t('common.deleted'));
+      await this.load();
+    });
+  }
+
+  /** Removes every ballot (sample and real), e.g. to start a live demo from scratch. */
+  protected clearAll(): Promise<void> {
+    return this.run(async () => {
+      await this.api.resetDemo(this.slotId(), { sampleCount: 0, newSeed: false, removeRealBallots: true });
+      this.confirmClear.set(false);
+      this.toast.show(this.i18n.t('admin.cleared'));
       await this.load();
     });
   }
