@@ -4,8 +4,8 @@ Fair seat allocation for limited activities: workshops, project weeks, holiday p
 confirmation preparation.
 
 The name combines **Urfahr**, the district of Linz where the tool was born, with Austrian
-"ur fair" ("really fair"). It was first built for the confirmation preparation of the parish
-Urfahr – St. Junia, after all seats were gone minutes after registration opened.
+"ur fair" ("really fair"). It was first built for the confirmation preparation of the
+Pfarre Urfahr St. Junia, after all seats were gone minutes after registration opened.
 
 Instead of "whoever clicks first gets the seat", every participant spreads a point budget
 (e.g. 100 points) over the activities that matter to them. After registration closes the
