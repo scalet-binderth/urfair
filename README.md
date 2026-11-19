@@ -1,28 +1,60 @@
 # Punktewahl Firmung
 
-Klickbarer Prototyp für eine faire Anmeldung zu den Veranstaltungen der Firmvorbereitung.
+Fair registration for the activities of a parish confirmation preparation.
 
-Statt „Wer zuerst klickt, bekommt den Platz“ verteilt jeder Firmling ein Punktekonto
-(z. B. 100 Punkte) auf die Veranstaltungen, die ihm wichtig sind. Nach dem Anmeldeschluss
-teilt das System die Plätze zu:
+Instead of "whoever clicks first gets the seat", every participant spreads a point budget
+(e.g. 100 points) over the activities that matter to them. After registration closes the
+system assigns the seats:
 
-1. Es wird in Runden verteilt: jede Runde bekommt jeder Firmling eine Veranstaltung.
-2. Innerhalb einer Runde hat Vorrang, wer mehr Punkte gesetzt hat. Bei Gleichstand entscheidet das Los.
-3. Volle Veranstaltungen und Terminüberschneidungen werden übersprungen.
-4. Zum Schluss wird getauscht, wenn zwei Firmlinge dadurch beide nicht schlechter dastehen.
+1. Seats are handed out in rounds; in each round every participant gets one activity.
+2. Within a round, more points win. Ties are decided by lot, never by time.
+3. Full activities and clashing dates are skipped; if nothing with points is left, a fallback activity with free seats is assigned.
+4. Finally, participants swap whenever neither ends up worse off.
 
-## Stand
+## Structure
 
-- Reine Demo: eine einzige Datei `index.html`, kein Server, keine Datenbank.
-- Veranstaltungen: Firmvorbereitung Urfahr 2026/27. Alle Anmeldungen außer der eigenen sind erfundene Beispieldaten.
-- Eigene Anmeldungen werden nur im jeweiligen Browser gespeichert.
+| Path | Content |
+|---|---|
+| `src/PointAllocation.Core` | Allocation algorithm, validation, sample data (no dependencies) |
+| `src/PointAllocation.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
+| `tests/PointAllocation.Core.Tests` | xUnit tests for the allocation rules |
+| `web` | Angular app (vote, organisation, allocation; German/English) |
+| `index.html` | First static prototype (published via GitHub Pages) |
 
-## Ansehen
+## Run locally
 
-`index.html` im Browser öffnen, oder über GitHub Pages veröffentlichen
-(Repository → Settings → Pages → Branch `main`, Ordner `/ (root)`).
+Requirements: .NET SDK 10, Node.js 22. Docker is not needed locally.
 
-## Lizenz
+```
+cd web && npm ci && npx ng build        # builds the UI into src/PointAllocation.Api/wwwroot
+cd ../src/PointAllocation.Api && dotnet run
+```
 
-MIT-Lizenz, siehe [LICENSE](LICENSE). Die Nutzung ist kostenlos und ohne Gewährleistung oder Haftung.
+Open http://localhost:5080. A local SQLite file is created and filled with sample data.
+
+For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
+
+Tests: `dotnet test PointAllocation.slnx`
+
+## Configuration
+
+| Setting | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
+| `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
+| `Admin__Key` | If set, the organisation area requires this key. Leave empty for open demos. |
+
+## Deployment
+
+The `Dockerfile` builds one container (UI + API, port 8080). GitHub Actions runs the tests and builds
+the image on every push and pull request.
+
+## Dependencies and licences
+
+Only permissively licensed, free components: .NET / ASP.NET Core / EF Core (MIT), Npgsql (PostgreSQL licence),
+SQLite (public domain), Angular (MIT). No external fonts, CDNs or trackers.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). Free to use, without warranty or liability.
 © 2026 Thomas Scalet-Binder

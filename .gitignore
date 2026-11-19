@@ -1,1 +1,8 @@
 .claude/
+bin/
+obj/
+.vs/
+*.db
+*.db-shm
+*.db-wal
+src/PointAllocation.Api/wwwroot/

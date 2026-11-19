@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PointAllocation.Api/PointAllocation.Api.csproj" />
+    <Project Path="src/PointAllocation.Core/PointAllocation.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PointAllocation.Core.Tests/PointAllocation.Core.Tests.csproj" />
+  </Folder>
+</Solution>
