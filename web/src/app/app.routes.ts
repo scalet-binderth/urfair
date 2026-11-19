@@ -1,12 +1,13 @@
 import { Routes } from '@angular/router';
+import { HomePage } from './home';
 import { VotePage } from './vote';
-import { AdminPage } from './admin';
-import { ResultsPage } from './results';
+import { AdminListPage } from './admin-list';
+import { AdminSlotPage } from './admin-slot';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'vote', pathMatch: 'full' },
-  { path: 'vote', component: VotePage },
-  { path: 'admin', component: AdminPage },
-  { path: 'results', component: ResultsPage },
-  { path: '**', redirectTo: 'vote' },
+  { path: '', component: HomePage },
+  { path: 's/:slotId', component: VotePage },
+  { path: 'admin', component: AdminListPage },
+  { path: 'admin/s/:slotId', component: AdminSlotPage },
+  { path: '**', redirectTo: '' },
 ];

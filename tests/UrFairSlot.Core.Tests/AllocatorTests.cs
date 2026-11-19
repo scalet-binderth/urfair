@@ -84,6 +84,16 @@ public class AllocatorTests
     }
 
     [Fact]
+    public void Invalid_activity_is_rejected_with_codes()
+    {
+        var start = new DateTime(2027, 3, 1, 18, 0, 0);
+        var a = new Activity("x", " ", [new Session("s", "x", start, start.AddHours(-1), "Hall", 0)], "x");
+        var codes = Validation.Check(a).Select(e => e.Code).ToList();
+        Assert.Equal(["titleRequired", "restrictionInvalid", "capacityInvalid", "endBeforeStart"], codes);
+        Assert.Contains("sessionRequired", Validation.Check(new Activity("y", "Y", [])).Select(e => e.Code));
+    }
+
+    [Fact]
     public void Invalid_ballot_is_rejected_with_codes()
     {
         var b = new Ballot("x", "Test", new Dictionary<string, int> { ["kino"] = 50, ["nacht"] = 30 }, new HashSet<string>());

@@ -35,6 +35,21 @@ public static class Validation
         return errors;
     }
 
+    public static List<ValidationError> Check(Activity a)
+    {
+        var errors = new List<ValidationError>();
+        if (string.IsNullOrWhiteSpace(a.Title)) errors.Add(E("titleRequired"));
+        if (a.RestrictedTo is not (null or "m" or "w")) errors.Add(E("restrictionInvalid"));
+        if (a.Sessions.Count == 0) errors.Add(E("sessionRequired"));
+        foreach (var s in a.Sessions)
+        {
+            if (s.Capacity is < 1) errors.Add(E("capacityInvalid"));
+            if (!s.Flexible && s.End is null) errors.Add(E("endRequired"));
+            if (s.End is { } end && end <= s.Start) errors.Add(E("endBeforeStart"));
+        }
+        return errors.Distinct().ToList();
+    }
+
     public static List<ValidationError> Check(Rules r)
     {
         var errors = new List<ValidationError>();

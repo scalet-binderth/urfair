@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, Allocation, Api, ApiFailure, Metrics } from './api';
 import { I18n } from './i18n';
@@ -16,12 +16,10 @@ interface Card {
   selector: 'app-results',
   imports: [FormsModule],
   template: `
-    <div class="head">
-      <h1>{{ i18n.t('results.title') }}</h1>
-      @if (data(); as d) {
-        <p>{{ i18n.t('results.lead', { n: d.pointBased.count, k: d.perParticipant }) }}</p>
-      }
-    </div>
+    @if (data(); as d) {
+      <p class="muted lead">{{ i18n.t('results.lead', { n: d.pointBased.count, k: d.perParticipant }) }}</p>
+      @if (!d.participants.length) { <p class="muted">{{ i18n.t('results.empty') }}</p> }
+    }
     @if (error()) {
       <ul class="errors">
         <li>{{ error() }}</li>
@@ -114,7 +112,7 @@ interface Card {
               </thead>
               <tbody>
                 @for (p of visible(); track p.ballotId) {
-                  <tr [class.me]="p.ballotId === api.myBallotId()">
+                  <tr>
                     <td>
                       {{ p.name }}
                       @if (!p.isSample) {
@@ -157,6 +155,10 @@ interface Card {
   `,
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
+    .lead {
+      margin-bottom: 16px;
+      max-width: 75ch;
+    }
     .cmp {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -281,7 +283,8 @@ interface Card {
     }
   `,
 })
-export class ResultsPage {
+export class ResultsPage implements OnInit {
+  readonly slotId = input.required<string>();
   protected i18n = inject(I18n);
   protected api = inject(Api);
   private toast = inject(Toast);
@@ -328,11 +331,9 @@ export class ResultsPage {
     const q = this.query().trim().toLowerCase();
     const list = this.data()?.participants ?? [];
     if (q) return list.filter((p) => p.name.toLowerCase().includes(q));
-    const mine = this.api.myBallotId();
-    // Own and real ballots first, then the least satisfied.
+    // Real ballots first, then the least satisfied.
     return [...list].sort(
       (a, b) =>
-        Number(b.ballotId === mine) - Number(a.ballotId === mine) ||
         Number(a.isSample) - Number(b.isSample) ||
         a.satisfaction - b.satisfaction,
     );
@@ -342,13 +343,9 @@ export class ResultsPage {
   );
   protected hiddenCount = computed(() => this.filtered().length - this.visible().length);
 
-  constructor() {
-    this.load();
-  }
-
-  private async load(): Promise<void> {
+  async ngOnInit(): Promise<void> {
     try {
-      const [data, activities] = await Promise.all([this.api.allocation(), this.api.activities()]);
+      const [data, activities] = await Promise.all([this.api.allocation(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.data.set(data);
       this.activities.set(activities);
     } catch (e) {
