@@ -1,6 +1,11 @@
-# Punktewahl Firmung
+# UrFairSlot
 
-Fair registration for the activities of a parish confirmation preparation.
+Fair seat allocation for limited activities: workshops, project weeks, holiday programmes,
+confirmation preparation.
+
+The name combines **Urfahr**, the district of Linz where the tool was born, with Austrian
+"ur fair" ("really fair"). It was first built for the confirmation preparation of the parish
+Urfahr – St. Junia, after all seats were gone minutes after registration opened.
 
 Instead of "whoever clicks first gets the seat", every participant spreads a point budget
 (e.g. 100 points) over the activities that matter to them. After registration closes the
@@ -15,9 +20,9 @@ system assigns the seats:
 
 | Path | Content |
 |---|---|
-| `src/PointAllocation.Core` | Allocation algorithm, validation, sample data (no dependencies) |
-| `src/PointAllocation.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
-| `tests/PointAllocation.Core.Tests` | xUnit tests for the allocation rules |
+| `src/UrFairSlot.Core` | Allocation algorithm, validation, sample data (no dependencies) |
+| `src/UrFairSlot.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
+| `tests/UrFairSlot.Core.Tests` | xUnit tests for the allocation rules |
 | `web` | Angular app (vote, organisation, allocation; German/English) |
 | `index.html` | First static prototype (published via GitHub Pages) |
 
@@ -26,15 +31,15 @@ system assigns the seats:
 Requirements: .NET SDK 10, Node.js 24. Docker is not needed locally.
 
 ```
-cd web && npm ci && npx ng build        # builds the UI into src/PointAllocation.Api/wwwroot
-cd ../src/PointAllocation.Api && dotnet run
+cd web && npm ci && npx ng build        # builds the UI into src/UrFairSlot.Api/wwwroot
+cd ../src/UrFairSlot.Api && dotnet run
 ```
 
 Open http://localhost:5080. A local SQLite file is created and filled with sample data.
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
 
-Tests: `dotnet test PointAllocation.slnx`
+Tests: `dotnet test UrFairSlot.slnx`
 
 ## Configuration
 

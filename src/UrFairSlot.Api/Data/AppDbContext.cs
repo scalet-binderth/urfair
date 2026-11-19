@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace PointAllocation.Api.Data;
+namespace UrFairSlot.Api.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {

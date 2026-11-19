@@ -39,6 +39,7 @@ import { Toast } from './toast';
     </header>
     <div class="wrap demo small">{{ i18n.t('app.demo') }}</div>
     <main class="wrap"><router-outlet /></main>
+    <footer class="wrap small">{{ i18n.t('app.madeFor') }}</footer>
     @if (toast.message(); as m) {
       <div class="toast" role="status">{{ m }}</div>
     }
@@ -120,7 +121,12 @@ import { Toast } from './toast';
       padding-block: 10px;
     }
     main {
-      padding-block: 8px 64px;
+      padding-block: 8px 40px;
+    }
+    footer {
+      color: var(--muted);
+      padding-block: 16px 32px;
+      border-top: 1px solid var(--line);
     }
   `,
 })

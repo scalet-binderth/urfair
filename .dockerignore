@@ -3,7 +3,7 @@
 **/node_modules
 **/.angular
 **/*.db
-src/PointAllocation.Api/wwwroot
+src/UrFairSlot.Api/wwwroot
 .git
 .github
 .vs

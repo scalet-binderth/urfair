@@ -1,4 +1,4 @@
-namespace PointAllocation.Core;
+namespace UrFairSlot.Core;
 
 /// <summary>Activities of the confirmation preparation in Linz-Urfahr 2026/27 plus invented sample participants for the demo.</summary>
 public static class SampleData

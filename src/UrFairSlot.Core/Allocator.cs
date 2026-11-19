@@ -1,4 +1,4 @@
-namespace PointAllocation.Core;
+namespace UrFairSlot.Core;
 
 /// <summary>
 /// Assigns participants to sessions.

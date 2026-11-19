@@ -1,6 +1,6 @@
-using PointAllocation.Core;
+using UrFairSlot.Core;
 
-namespace PointAllocation.Api.Data;
+namespace UrFairSlot.Api.Data;
 
 public class ActivityEntity
 {

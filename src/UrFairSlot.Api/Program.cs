@@ -1,5 +1,5 @@
-using PointAllocation.Api;
-using PointAllocation.Api.Data;
+using UrFairSlot.Api;
+using UrFairSlot.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 

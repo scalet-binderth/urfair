@@ -1,6 +1,6 @@
-using PointAllocation.Core;
+using UrFairSlot.Core;
 
-namespace PointAllocation.Core.Tests;
+namespace UrFairSlot.Core.Tests;
 
 public class AllocatorTests
 {

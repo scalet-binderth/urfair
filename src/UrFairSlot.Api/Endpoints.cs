@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using PointAllocation.Api.Data;
-using PointAllocation.Core;
+using UrFairSlot.Api.Data;
+using UrFairSlot.Core;
 
-namespace PointAllocation.Api;
+namespace UrFairSlot.Api;
 
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions);

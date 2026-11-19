@@ -53,7 +53,7 @@
               "src/styles.css"
             ],
             "outputPath": {
-              "base": "../src/PointAllocation.Api/wwwroot",
+              "base": "../src/UrFairSlot.Api/wwwroot",
               "browser": ""
             }
           },

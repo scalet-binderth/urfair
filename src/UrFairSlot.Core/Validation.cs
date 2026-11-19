@@ -1,4 +1,4 @@
-namespace PointAllocation.Core;
+namespace UrFairSlot.Core;
 
 /// <summary>Rule checks. Errors carry codes (not texts) so the UI can show them in any language.</summary>
 public static class Validation

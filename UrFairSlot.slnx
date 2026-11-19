@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/UrFairSlot.Api/UrFairSlot.Api.csproj" />
+    <Project Path="src/UrFairSlot.Core/UrFairSlot.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/UrFairSlot.Core.Tests/UrFairSlot.Core.Tests.csproj" />
+  </Folder>
+</Solution>

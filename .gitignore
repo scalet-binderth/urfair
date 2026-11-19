@@ -5,4 +5,4 @@ obj/
 *.db
 *.db-shm
 *.db-wal
-src/PointAllocation.Api/wwwroot/
+src/UrFairSlot.Api/wwwroot/

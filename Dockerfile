@@ -1,6 +1,6 @@
 # One container: the ASP.NET Core API also serves the built Angular app.
 
-# 1. Build the Angular app (outputs into src/PointAllocation.Api/wwwroot)
+# 1. Build the Angular app (outputs into src/UrFairSlot.Api/wwwroot)
 FROM node:24-alpine AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
@@ -13,15 +13,15 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
 WORKDIR /src
 COPY global.json ./
 COPY src/ src/
-RUN dotnet publish src/PointAllocation.Api -c Release -o /app
-COPY --from=web /src/src/PointAllocation.Api/wwwroot /app/wwwroot
+RUN dotnet publish src/UrFairSlot.Api -c Release -o /app
+COPY --from=web /src/src/UrFairSlot.Api/wwwroot /app/wwwroot
 
 # 3. Runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=api /app .
 ENV ASPNETCORE_HTTP_PORTS=8080 \
-    ConnectionStrings__Default="Data Source=/tmp/pointallocation.db"
+    ConnectionStrings__Default="Data Source=/tmp/urfairslot.db"
 EXPOSE 8080
 USER $APP_UID
-ENTRYPOINT ["dotnet", "PointAllocation.Api.dll"]
+ENTRYPOINT ["dotnet", "UrFairSlot.Api.dll"]

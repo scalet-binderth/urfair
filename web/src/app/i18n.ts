@@ -6,7 +6,8 @@ type Args = Record<string, string | number>;
 /** Minimal translation service: two dictionaries, {placeholder} substitution, choice stored in localStorage. */
 const texts: Record<Lang, Record<string, string>> = {
   de: {
-    'app.name': 'Punktewahl Firmung',
+    'app.name': 'UrFairSlot',
+    'app.madeFor': 'Entwickelt für die Pfarre Urfahr – St. Junia · Open Source (MIT)',
     'app.parish': 'Firmvorbereitung Urfahr 2026/27',
     'app.demo': 'Testversion. Alle Anmeldungen außer deiner eigenen sind erfundene Beispieldaten.',
     'nav.vote': 'Wählen', 'nav.admin': 'Organisation', 'nav.results': 'Zuteilung',
@@ -76,7 +77,8 @@ const texts: Record<Lang, Record<string, string>> = {
     'error.generic': 'Das hat nicht geklappt. Bitte erneut versuchen.',
   },
   en: {
-    'app.name': 'Confirmation Points Vote',
+    'app.name': 'UrFairSlot',
+    'app.madeFor': 'Made for the parish of Urfahr – St. Junia · open source (MIT)',
     'app.parish': 'Confirmation preparation Urfahr 2026/27',
     'app.demo': 'Test version. All registrations except your own are invented sample data.',
     'nav.vote': 'Vote', 'nav.admin': 'Organisation', 'nav.results': 'Allocation',

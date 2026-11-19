@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using PointAllocation.Core;
+using UrFairSlot.Core;
 
-namespace PointAllocation.Api.Data;
+namespace UrFairSlot.Api.Data;
 
 public static class Database
 {
@@ -25,7 +25,7 @@ public static class Database
             if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 o.UseNpgsql(string.IsNullOrEmpty(url) ? connection : FromUrl(url));
             else
-                o.UseSqlite(connection ?? "Data Source=pointallocation.db");
+                o.UseSqlite(connection ?? "Data Source=urfairslot.db");
         });
     }
 
