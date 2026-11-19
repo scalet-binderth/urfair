@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UrFairSlot.Core\UrFairSlot.Core.csproj" />
+    <ProjectReference Include="..\..\src\Urfair.Core\Urfair.Core.csproj" />
   </ItemGroup>
 
 </Project>

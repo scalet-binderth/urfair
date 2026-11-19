@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
-using UrFairSlot.Core;
+using Urfair.Core;
 
-namespace UrFairSlot.Api.Data;
+namespace Urfair.Api.Data;
 
 public static class Database
 {
@@ -33,7 +33,7 @@ public static class Database
             if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 o.UseNpgsql(string.IsNullOrEmpty(url) ? connection : FromUrl(url));
             else
-                o.UseSqlite(connection ?? "Data Source=urfairslot.db");
+                o.UseSqlite(connection ?? "Data Source=urfair.db");
         });
     }
 

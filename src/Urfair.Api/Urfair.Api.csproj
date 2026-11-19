@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\UrFairSlot.Core\UrFairSlot.Core.csproj" />
+    <ProjectReference Include="..\Urfair.Core\Urfair.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

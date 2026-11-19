@@ -3,7 +3,7 @@
 **/node_modules
 **/.angular
 **/*.db
-src/UrFairSlot.Api/wwwroot
+src/Urfair.Api/wwwroot
 .git
 .github
 .vs

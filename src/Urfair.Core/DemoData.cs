@@ -1,4 +1,4 @@
-namespace UrFairSlot.Core;
+namespace Urfair.Core;
 
 /// <summary>Additional invented FairSlots and demo people for presentations.</summary>
 public static class DemoData

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace UrFairSlot.Api.Data;
+namespace Urfair.Api.Data;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
