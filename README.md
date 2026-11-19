@@ -1,28 +1,65 @@
-# Punktewahl Firmung
+# UrFairSlot
 
-Klickbarer Prototyp für eine faire Anmeldung zu den Veranstaltungen der Firmvorbereitung.
+Fair seat allocation for limited activities: workshops, project weeks, holiday programmes,
+confirmation preparation.
 
-Statt „Wer zuerst klickt, bekommt den Platz“ verteilt jeder Firmling ein Punktekonto
-(z. B. 100 Punkte) auf die Veranstaltungen, die ihm wichtig sind. Nach dem Anmeldeschluss
-teilt das System die Plätze zu:
+The name combines **Urfahr**, the district of Linz where the tool was born, with Austrian
+"ur fair" ("really fair"). It was first built for the confirmation preparation of the
+Pfarre Urfahr St. Junia, after all seats were gone minutes after registration opened.
 
-1. Es wird in Runden verteilt: jede Runde bekommt jeder Firmling eine Veranstaltung.
-2. Innerhalb einer Runde hat Vorrang, wer mehr Punkte gesetzt hat. Bei Gleichstand entscheidet das Los.
-3. Volle Veranstaltungen und Terminüberschneidungen werden übersprungen.
-4. Zum Schluss wird getauscht, wenn zwei Firmlinge dadurch beide nicht schlechter dastehen.
+Instead of "whoever clicks first gets the seat", every participant spreads a point budget
+(e.g. 100 points) over the activities that matter to them. After registration closes the
+system assigns the seats:
 
-## Stand
+1. Seats are handed out in rounds; in each round every participant gets one activity.
+2. Within a round, more points win. Ties are decided by lot, never by time.
+3. Full activities and clashing dates are skipped; if nothing with points is left, a fallback activity with free seats is assigned.
+4. Finally, participants swap whenever neither ends up worse off.
 
-- Reine Demo: eine einzige Datei `index.html`, kein Server, keine Datenbank.
-- Veranstaltungen: Firmvorbereitung Urfahr 2026/27. Alle Anmeldungen außer der eigenen sind erfundene Beispieldaten.
-- Eigene Anmeldungen werden nur im jeweiligen Browser gespeichert.
+## Structure
 
-## Ansehen
+| Path | Content |
+|---|---|
+| `src/UrFairSlot.Core` | Allocation algorithm, validation, sample data (no dependencies) |
+| `src/UrFairSlot.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
+| `tests/UrFairSlot.Core.Tests` | xUnit tests for the allocation rules |
+| `web` | Angular app (vote, organisation, allocation; German/English) |
+| `index.html` | Redirect from the former GitHub Pages demo to the hosted app (the first prototype is in the git history) |
 
-`index.html` im Browser öffnen, oder über GitHub Pages veröffentlichen
-(Repository → Settings → Pages → Branch `main`, Ordner `/ (root)`).
+## Run locally
 
-## Lizenz
+Requirements: .NET SDK 10, Node.js 24. Docker is not needed locally.
 
-MIT-Lizenz, siehe [LICENSE](LICENSE). Die Nutzung ist kostenlos und ohne Gewährleistung oder Haftung.
+```
+cd web && npm ci && npx ng build        # builds the UI into src/UrFairSlot.Api/wwwroot
+cd ../src/UrFairSlot.Api && dotnet run
+```
+
+Open http://localhost:5080. A local SQLite file is created and filled with sample data.
+
+For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
+
+Tests: `dotnet test UrFairSlot.slnx`
+
+## Configuration
+
+| Setting | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
+| `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
+| `Admin__Key` | If set, the organisation area requires this key. Leave empty for open demos. |
+
+## Deployment
+
+The `Dockerfile` builds one container (UI + API, port 8080). GitHub Actions runs the tests and builds
+the image on every push and pull request.
+
+## Dependencies and licences
+
+Only permissively licensed, free components: .NET / ASP.NET Core / EF Core (MIT), Npgsql (PostgreSQL licence),
+SQLite (public domain), Angular (MIT). No external fonts, CDNs or trackers.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). Free to use, without warranty or liability.
 © 2026 Thomas Scalet-Binder

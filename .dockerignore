@@ -1,0 +1,10 @@
+**/bin
+**/obj
+**/node_modules
+**/.angular
+**/*.db
+src/UrFairSlot.Api/wwwroot
+.git
+.github
+.vs
+.vscode
