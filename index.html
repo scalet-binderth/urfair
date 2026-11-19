@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Punktewahl Firmung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: Kopfzeile mit 3 Schritten, darunter je Schritt eine Arbeitsfläche; im Wahlschritt Liste links, Punktekonto rechts (sticky). */
+:root{
+  --bg:#F5F5F7; --surface:#FFFFFF; --ink:#1C1D24; --muted:#5D5F6E; --line:#DEDFE6;
+  --accent:#B3262E; --accent-ink:#FFFFFF; --accent-soft:#F7E4E4;
+  --good:#2C7A4D; --good-soft:#E2F2E8; --warn:#9A6200; --warn-soft:#FBF0D9;
+  --bar:#E9E9EF;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14151A; --surface:#1D1F26; --ink:#ECECF1; --muted:#A3A5B3; --line:#31333D;
+  --accent:#EE6A70; --accent-ink:#1A0B0C; --accent-soft:#3B2023;
+  --good:#6CC891; --good-soft:#1B3326; --warn:#E3B24C; --warn-soft:#3A2E14; --bar:#2A2C35; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14151A; --surface:#1D1F26; --ink:#ECECF1; --muted:#A3A5B3; --line:#31333D;
+  --accent:#EE6A70; --accent-ink:#1A0B0C; --accent-soft:#3B2023;
+  --good:#6CC891; --good-soft:#1B3326; --warn:#E3B24C; --warn-soft:#3A2E14; --bar:#2A2C35; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(26px,4vw,36px);font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:16px;font-weight:500}
+p{margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand svg{flex:none}
+.brand b{font-family:var(--f-display);font-size:19px}
+.brand small{display:block;color:var(--muted);font-size:12px;line-height:1.2}
+nav.steps{display:flex;gap:4px;flex-wrap:wrap}
+nav.steps a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px}
+nav.steps a .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);font-size:12px}
+nav.steps a[aria-current="page"]{background:var(--accent-soft);color:var(--ink)}
+nav.steps a[aria-current="page"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.proto{font-size:13px;color:var(--muted);padding-block:10px}
+.proto b{color:var(--ink);font-weight:600}
+main{padding-block:8px 64px}
+.head{display:grid;gap:8px;margin:12px 0 22px;max-width:70ch}
+.head p{color:var(--muted)}
+.grid-w{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+@media (max-width:860px){.grid-w{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.evlist{display:grid;gap:8px}
+.ev{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center}
+.ev.on{border-color:var(--accent)}
+.ev .meta{color:var(--muted);font-size:13px}
+.ev ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:2px;font-size:13px;color:var(--muted)}
+.ev label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.ev label input{margin-top:3px;accent-color:var(--accent)}
+.ev label.off span{text-decoration:line-through}
+.tag{display:inline-block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--bar);color:var(--muted);margin-left:6px;vertical-align:2px;font-family:var(--f-body);font-weight:600}
+.tag.full{background:var(--warn-soft);color:var(--warn)}
+.stepper{display:flex;align-items:center;gap:4px}
+.stepper button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-size:18px;line-height:1}
+.stepper button:hover:not(:disabled){border-color:var(--accent)}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper output{min-width:44px;text-align:center;font-weight:600;font-size:18px;font-family:var(--f-display)}
+.ev.on .stepper output{color:var(--accent)}
+.side{position:sticky;top:16px;display:grid;gap:14px}
+@media (max-width:860px){.side{position:static}}
+.meter{height:10px;border-radius:5px;background:var(--bar);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.big{font-family:var(--f-display);font-size:34px;font-weight:700;line-height:1}
+.checks{list-style:none;padding:0;margin:0;display:grid;gap:4px;font-size:14px}
+.checks li::before{content:"○";display:inline-block;width:20px;color:var(--muted)}
+.checks li.ok::before{content:"✓";color:var(--good);font-weight:700}
+.rank{margin:0;padding-left:22px;display:grid;gap:2px;font-size:14px}
+.rank li span{color:var(--muted)}
+.field{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.field input{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:15px;width:100%}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer;text-decoration:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--accent)}
+.mini{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;gap:10px;align-items:center}
+@media (max-width:860px){.mini{display:flex}}
+.mini .meter{flex:1}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.rules .field input{max-width:120px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.stack{display:grid;gap:16px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.num,th.num{text-align:right}
+.ratio{display:flex;align-items:center;gap:8px;min-width:150px}
+.ratio .meter{flex:1;height:8px}
+.ratio .meter i.hot{background:var(--warn)}
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.cmp .card{display:grid;gap:6px}
+.cmp .lbl{font-size:13px;color:var(--muted)}
+.cmp .vs{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
+.cmp .vs b{color:var(--ink)}
+.delta{font-size:12px;font-weight:600;padding:1px 6px;border-radius:999px;background:var(--good-soft);color:var(--good)}
+.delta.neg{background:var(--warn-soft);color:var(--warn)}
+.how{margin:0;padding-left:20px;display:grid;gap:6px;max-width:75ch}
+.how li::marker{font-family:var(--f-display);font-weight:700;color:var(--accent)}
+.fill{display:grid;gap:10px}
+.fill .ev-f{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);gap:6px 14px;align-items:center}
+@media (max-width:640px){.fill .ev-f{grid-template-columns:minmax(0,1fr)}}
+.fill .ts{display:flex;flex-wrap:wrap;gap:6px}
+.slot{flex:1 1 110px;min-width:0;font-size:12px;color:var(--muted)}
+.slot .meter{height:8px;margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:13px;padding:2px 8px;border-radius:6px;background:var(--bar);white-space:nowrap}
+.chip b{font-weight:600;color:var(--accent);margin-left:4px}
+.chip.fb{background:var(--warn-soft);color:var(--warn)}
+.chip.fb b{color:var(--warn)}
+.me{background:var(--accent-soft)}
+.sat{display:flex;align-items:center;gap:8px;min-width:120px}
+.sat .meter{flex:1;height:6px}
+.sat .meter i{background:var(--good)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.err{color:var(--warn);font-size:13px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+textarea.csv{width:100%;height:160px;font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3c4 5 8 8.5 8 14a8 8 0 0 1-16 0c0-3.2 1.6-5.4 3.4-7.2.2 2.6 1.4 4.2 3 4.9C12.6 10.5 13.3 6.6 15 3Z" fill="var(--accent)"/></svg>
+      <div><b>Punktewahl Firmung</b><small>Firmvorbereitung Urfahr 2026/27</small></div>
+    </div>
+    <nav class="steps" aria-label="Schritte">
+      <a href="#waehlen" data-v="waehlen"><span class="n">1</span>Wählen</a>
+      <a href="#organisation" data-v="organisation"><span class="n">2</span>Organisation</a>
+      <a href="#zuteilung" data-v="zuteilung"><span class="n">3</span>Zuteilung</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap proto"><b>Prototyp.</b> Die Veranstaltungen stammen aus der Anmeldung zur Firmvorbereitung Urfahr 2026/27. Alle Anmeldungen außer deiner eigenen sind erfundene Beispieldaten.</div>
+
+<main class="wrap">
+
+<!-- 1 WÄHLEN -->
+<section id="v-waehlen">
+  <div class="head">
+    <h1>Wähle deine Veranstaltungen</h1>
+    <p id="lead"></p>
+  </div>
+  <div class="mini" aria-hidden="true"><span class="small" id="mini-txt"></span><div class="meter"><i id="mini-bar"></i></div></div>
+  <div class="grid-w">
+    <div class="evlist" id="evlist"></div>
+    <aside class="side">
+      <div class="card stack">
+        <div>
+          <div class="muted small">Noch zu vergeben</div>
+          <div class="big"><span id="rest"></span> <span class="muted" style="font-size:16px" id="of"></span></div>
+        </div>
+        <div class="meter"><i id="bar"></i></div>
+        <ul class="checks" id="checks"></ul>
+      </div>
+      <div class="card stack">
+        <h3>Deine Reihung</h3>
+        <ol class="rank" id="rank"></ol>
+        <p class="muted small" id="rank-empty">Noch keine Punkte vergeben.</p>
+      </div>
+      <div class="card stack">
+        <div class="field"><label for="name">Dein Name</label><input id="name" autocomplete="off" placeholder="Vorname Nachname"></div>
+        <button class="btn" id="submit" type="button">Wahl abgeben</button>
+        <p class="muted small">Du kannst deine Wahl bis zum Anmeldeschluss ändern. Wann du abgibst, macht keinen Unterschied.</p>
+        <a class="btn ghost" id="see-me" href="#zuteilung" hidden>Meine Zuteilung ansehen</a>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- 2 ORGANISATION -->
+<section id="v-organisation" hidden>
+  <div class="head">
+    <h1>Regeln und Nachfrage</h1>
+    <p>Hier legt das Firmteam die Spielregeln fest und sieht, wie gefragt jede Veranstaltung ist. Nach dem Anmeldeschluss startet ein Klick die Zuteilung.</p>
+  </div>
+  <div class="stack">
+    <div class="card stack">
+      <h2>Regeln</h2>
+      <div class="rules">
+        <div class="field"><label for="r-budget">Punkte pro Firmling</label><input id="r-budget" type="number" min="20" max="500" step="5"></div>
+        <div class="field"><label for="r-min">Mindestens bepunktete Veranstaltungen</label><input id="r-min" type="number" min="1" max="15" step="1"></div>
+        <div class="field"><label for="r-max">Höchstens Punkte auf eine Veranstaltung</label><input id="r-max" type="number" min="5" max="500" step="5"></div>
+        <div class="field"><label for="r-k">Zugeteilte Veranstaltungen pro Firmling</label><input id="r-k" type="number" min="1" max="6" step="1"></div>
+      </div>
+      <p class="err" id="r-err" hidden></p>
+    </div>
+    <div class="card stack">
+      <h2>Anmeldungen</h2>
+      <p id="reg-sum"></p>
+      <div class="row">
+        <div class="field"><label for="n-sim">Anzahl Beispiel-Firmlinge</label><input id="n-sim" type="number" min="10" max="400" step="10" style="max-width:120px"></div>
+        <button class="btn ghost" id="regen" type="button">Neue Beispieldaten erzeugen</button>
+        <button class="btn" id="run" type="button">Zuteilung berechnen</button>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Nachfrage je Veranstaltung</h2>
+      <p class="muted small">Interessierte = Firmlinge, die mindestens 5 Punkte vergeben haben. Der Balken zeigt Interessierte im Verhältnis zu den Plätzen. Orange heißt überbucht.</p>
+      <div class="tbl-wrap"><table id="demand"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 ZUTEILUNG -->
+<section id="v-zuteilung" hidden>
+  <div class="head">
+    <h1>Ergebnis der Zuteilung</h1>
+    <p id="z-lead"></p>
+  </div>
+  <div class="stack">
+    <div class="cmp" id="cmp"></div>
+    <div class="card stack">
+      <h2>So wird zugeteilt</h2>
+      <ol class="how" id="how"></ol>
+    </div>
+    <div class="card stack">
+      <h2>Auslastung</h2>
+      <div class="fill" id="fill"></div>
+    </div>
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between">
+        <h2>Firmlinge</h2>
+        <div class="row">
+          <div class="field"><label for="q">Suchen</label><input id="q" placeholder="Name" style="max-width:200px"></div>
+          <button class="btn ghost" id="copy" type="button">Liste kopieren (CSV)</button>
+        </div>
+      </div>
+      <textarea class="csv" id="csv" hidden readonly aria-label="CSV-Liste"></textarea>
+      <div class="tbl-wrap"><table id="people"></table></div>
+      <button class="btn ghost" id="more" type="button" hidden>Alle anzeigen</button>
+    </div>
+  </div>
+</section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+/* ---------- Daten ---------- */
+const T=(s,e,ort,cap,flex)=>({s,e,ort,cap,flex:!!flex});
+const JA='Grüner Anker, Jugendkirche Linz';
+const EVENTS=[
+ {id:'advent',title:'Bastle deinen eigenen Adventskranz',pop:8,termine:[T('2026-11-21T14:00','2026-11-21T16:00','Pfarrsaal Hl. Geist',7),T('2026-11-28T15:00','2026-11-28T17:00','Pfarrsaal St. Markus',7)]},
+ {id:'krafthafen',title:'KRAFT HAFEN',pop:2,termine:[T('2026-11-28T18:00','2026-11-28T19:30',JA,null),T('2027-01-30T18:00','2027-01-30T19:30',JA,null),T('2027-02-27T18:00','2027-02-27T19:30',JA,null),T('2027-04-24T18:00','2027-04-24T19:30',JA,null)]},
+ {id:'krippe',title:'Kripperlbauen in Lichtenberg',pop:5,termine:[T('2026-12-15T18:00','2026-12-15T20:00','Lichtenberg',10)]},
+ {id:'silvester',title:'Tschüss 2026 und Hallo 2027!',pop:3,termine:[T('2026-12-28T17:00','2026-12-28T19:30','St. Markus',20)]},
+ {id:'nacht',title:'NACHT QUARTIER',pop:9,termine:[T('2027-02-12T17:00','2027-02-13T09:00',JA,25)]},
+ {id:'kitchen',title:'Heavens Kitchen – Himmlische Küche',pop:8,termine:[T('2027-02-19T14:00','2027-02-19T22:00','St. Magdalena',10),T('2027-04-09T14:00','2027-04-09T22:00','Lichtenberg',10)]},
+ {id:'peace',title:'Peace – mit Gott, anderen und mir selbst',pop:2,termine:[T('2027-02-26T18:00','2027-02-26T20:00','Christkönig',25)]},
+ {id:'gehoerlos',title:'Ein-Blick in die Welt der Gehörlosen',pop:3,termine:[T('2027-02-28T09:20','2027-02-28T11:00','Urfahr-St. Josef',null)]},
+ {id:'freigeist',title:'FREI GEIST',pop:6,termine:[T('2027-03-03T17:00','2027-03-03T18:00',JA,25),T('2027-03-17T17:00','2027-03-17T18:00',JA,25)]},
+ {id:'spirinight',title:'Spirinight',pop:3,termine:[T('2027-04-10T15:15','2027-04-10T21:15','Mariendom Linz',20)]},
+ {id:'burschen',title:'„Wann ist ein Mann ein Mann?!“ Burschenwochenende',pop:5,nur:'m',termine:[T('2027-04-16T16:00','2027-04-17T16:00','Lichtenberg',15)]},
+ {id:'radl',title:'Radltour zu Heiligen Orten',pop:3,termine:[T('2027-04-20T16:00','2027-04-20T20:00','Treffpunkt St. Markus',25)]},
+ {id:'brot',title:'Brot und Rosen – Rundgang durch das obdachlose Linz',pop:5,termine:[T('2027-04-23T15:00','2027-04-23T17:00','Kirche Hl. Familie',12)]},
+ {id:'maedels',title:'Mädelswochenende',pop:5,nur:'w',termine:[T('2027-04-30T17:00','2027-05-02T13:00','Ort folgt',25)]},
+ {id:'hochseil',title:'„Ich will hoch hinaus!“ Hochseilgarten mit Pate/Patin',pop:9,termine:[T('2027-05-01T09:00','2027-05-01T12:30','Kirchschlag',12),T('2027-05-01T14:00','2027-05-01T17:30','Kirchschlag',12),T('2027-05-08T09:00','2027-05-08T12:30','Kirchschlag',12),T('2027-05-08T14:00','2027-05-08T17:30','Kirchschlag',12)]},
+ {id:'misterx',title:'MISTER X',pop:6,termine:[T('2027-05-04T10:00','2027-05-04T12:00','Ort folgt',30)]},
+ {id:'kino',title:'GANZ GROSSES KINO!',pop:10,termine:[T('2027-05-10T17:00','2027-05-10T21:00','Cineplexx, Movimiento oder City-Kino',60)]},
+ {id:'geisterfahrer',title:'GeistErfahrer',pop:3,termine:[T('2027-05-11T18:00','2027-05-11T20:00','Christkönig',20)]},
+ {id:'magdaman',title:'MAGDAMAN – Hackln für den guten Zweck',pop:3,termine:[T('2027-05-15T00:00',null,'Pfarrheim St. Magdalena',null,1)]},
+ {id:'espoto',title:'Espoto',pop:2,termine:[T('2027-06-30T00:00',null,'Pfarrkirche St. Magdalena',null,1)]},
+ {id:'altenheim',title:'Besuch im Altenheim',pop:4,termine:[T('2027-06-30T00:00',null,'SZ Franz Hillinger',15,1)]},
+];
+const EV=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
+EVENTS.forEach(e=>e.termine.forEach((t,i)=>{t.id=e.id+'#'+i;t.ev=e;t.sd=new Date(t.s);t.ed=t.e?new Date(t.e):null;}));
+const capOf=e=>e.termine.some(t=>t.cap==null)?null:e.termine.reduce((a,t)=>a+t.cap,0);
+
+/* ---------- Helfer ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const fD=new Intl.DateTimeFormat('de-AT',{weekday:'short',day:'numeric',month:'numeric'});
+const fY=new Intl.DateTimeFormat('de-AT',{day:'numeric',month:'numeric',year:'numeric'});
+const fT=new Intl.DateTimeFormat('de-AT',{hour:'2-digit',minute:'2-digit'});
+function when(t){
+  if(t.flex) return (t.ev.id==='magdaman'?fY.format(t.sd)+', Uhrzeit folgt':'bis '+fY.format(t.sd)+', nach Vereinbarung');
+  const sameDay=t.sd.toDateString()===t.ed.toDateString();
+  return fD.format(t.sd)+' '+fT.format(t.sd)+'–'+(sameDay?'':fD.format(t.ed)+' ')+fT.format(t.ed);
+}
+const overlap=(a,b)=>!(a.flex||b.flex)&&a.sd<b.ed&&b.sd<a.ed;
+const pct=x=>Math.round(x*100)+' %';
+function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),3200)}
+const store={get(k,d){try{const v=localStorage.getItem('pw:'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('pw:'+k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- Zustand ---------- */
+let cfg=Object.assign({budget:100,minEvents:5,maxPer:40,K:3,nSim:140,seed:2027},store.get('cfg',{}));
+const STEP=5;
+let draft={pts:{nacht:40,kino:25,hochseil:20,kitchen:10,advent:5},unav:['hochseil#0']};
+let draftName='';
+let mine=store.get('mine',[]).map(b=>({...b,unav:new Set(b.unav)}));
+let sims=[], result=null, showAll=false, highlight=null;
+
+/* ---------- Beispiel-Firmlinge ---------- */
+const NW='Anna Lena Sophie Marie Hannah Lea Laura Sarah Julia Emma Mia Valentina Katharina Magdalena Theresa Johanna Clara Elena Nina Paula Selina Viktoria'.split(' ');
+const NM='Lukas David Jakob Tobias Felix Maximilian Elias Paul Jonas Simon Florian Moritz Leon Fabian Matthias Noah Valentin Raphael Samuel Benedikt Luca Niklas'.split(' ');
+function genSims(){
+  const r=mulberry32(cfg.seed), out=[];
+  const units=cfg.budget/STEP, capU=Math.max(1,cfg.maxPer/STEP);
+  for(let i=0;i<cfg.nSim;i++){
+    const g=r()<.5?'w':'m';
+    const name=(g==='w'?NW:NM)[Math.floor(r()*NW.length)]+' '+'ABDEFGHKLMNPRSTWZ'[Math.floor(r()*17)]+'.';
+    const pool=EVENTS.filter(e=>!e.nur||e.nur===g);
+    const kmin=Math.max(cfg.minEvents,Math.ceil(units/capU));
+    const k=Math.min(pool.length,kmin+Math.floor(r()*3));
+    const chosen=pool.map(e=>({e,s:Math.pow(r(),1/e.pop)})).sort((a,b)=>b.s-a.s).slice(0,k).map(x=>x.e);
+    const u=chosen.map(()=>1); let rem=units-k;
+    while(rem>0){
+      const w=u.map((v,j)=>v<capU?1/Math.pow(j+1,1.1):0), tot=w.reduce((a,b)=>a+b,0);
+      if(!tot)break; let x=r()*tot,j=0; while(x>w[j]){x-=w[j];j++} u[j]++; rem--;
+    }
+    const pts={}; chosen.forEach((e,j)=>pts[e.id]=u[j]*STEP);
+    const unav=new Set();
+    chosen.forEach(e=>{ if(e.termine.length>1){ e.termine.forEach(t=>{if(r()<.22)unav.add(t.id)}); if(e.termine.every(t=>unav.has(t.id)))unav.delete(e.termine[Math.floor(r()*e.termine.length)].id);} });
+    out.push({id:'s'+i,name,pts,unav,sim:true});
+  }
+  return out;
+}
+
+/* ---------- Zuteilung ---------- */
+function makeState(ballots){
+  const load=new Map(), A=new Map(ballots.map(b=>[b.id,[]]));
+  const used=t=>load.get(t.id)||0;
+  const free=t=>t.cap==null?Infinity:t.cap-used(t);
+  const okT=(b,t,except)=>{ if(b.unav.has(t.id))return false; for(const a of A.get(b.id)){ if(a===except)continue; if(a.ev===t.ev||overlap(a.t,t))return false;} return true; };
+  const options=(b,e,except)=>e.termine.filter(t=>free(t)>0&&okT(b,t,except));
+  const put=(b,t)=>{const p=b.pts[t.ev.id]||0;A.get(b.id).push({ev:t.ev,t,pts:p,fb:p===0});load.set(t.id,used(t)+1)};
+  const move=(a,t,b)=>{load.set(a.t.id,used(a.t)-1);a.t=t;a.ev=t.ev;a.pts=b.pts[t.ev.id]||0;a.fb=a.pts===0;load.set(t.id,used(t)+1)};
+  const fillRatio=t=>t.cap==null?0.6:used(t)/t.cap;
+  return {A,load,used,free,okT,options,put,move,fillRatio};
+}
+const rankedEvents=(b,lot)=>EVENTS.filter(e=>(b.pts[e.id]||0)>0).sort((x,y)=>b.pts[y.id]-b.pts[x.id]||x.pop-y.pop);
+function fallback(S,b){
+  const c=EVENTS.flatMap(e=>(e.nur&&b.g&&e.nur!==b.g)?[]:S.options(b,e));
+  if(!c.length)return false;
+  c.sort((x,y)=>S.fillRatio(x)-S.fillRatio(y)||x.sd-y.sd); S.put(b,c[0]); return true;
+}
+
+function allocatePoints(ballots,K,seed){
+  const r=mulberry32(seed^0x5bd1e995), lot=new Map(ballots.map(b=>[b.id,r()]));
+  const S=makeState(ballots), rk=new Map(ballots.map(b=>[b.id,rankedEvents(b)]));
+  const pickT=ts=>ts.slice().sort((x,y)=>(S.free(y)-S.free(x))||(x.sd-y.sd))[0];
+  for(let round=1;round<=K;round++){
+    let pending=ballots.filter(b=>S.A.get(b.id).length<round); const noBid=[];
+    while(pending.length){
+      const bids=[];
+      for(const b of pending){const e=rk.get(b.id).find(e=>S.options(b,e).length); if(e)bids.push({b,e,p:b.pts[e.id]}); else noBid.push(b);}
+      bids.sort((x,y)=>(y.p-x.p)||(lot.get(x.b.id)-lot.get(y.b.id)));
+      const next=[];
+      for(const x of bids){const ts=S.options(x.b,x.e); if(ts.length)S.put(x.b,pickT(ts)); else next.push(x.b);}
+      pending=next;
+    }
+    noBid.sort((x,y)=>lot.get(x.id)-lot.get(y.id)).forEach(b=>fallback(S,b));
+  }
+  improve(ballots,S);
+  return S.A;
+}
+function improve(ballots,S){
+  for(let pass=0;pass<15;pass++){
+    let changed=false;
+    for(const b of ballots) for(const a of S.A.get(b.id)){
+      const cands=rankedEvents(b).filter(e=>b.pts[e.id]>a.pts);
+      for(const e of cands){const ts=S.options(b,e,a); if(ts.length){S.move(a,ts[0],b);changed=true;break;}}
+    }
+    for(let i=0;i<ballots.length;i++){const b1=ballots[i];
+      for(let j=i+1;j<ballots.length;j++){const b2=ballots[j];
+        for(const a1 of S.A.get(b1.id)) for(const a2 of S.A.get(b2.id)){
+          if(a1.ev===a2.ev)continue;
+          const g1=(b1.pts[a2.ev.id]||0)-a1.pts, g2=(b2.pts[a1.ev.id]||0)-a2.pts;
+          if(g1<0||g2<0||g1+g2===0)continue;
+          if(!S.okT(b1,a2.t,a1)||!S.okT(b2,a1.t,a2))continue;
+          const t1=a1.t,t2=a2.t; S.move(a1,t2,b1); S.move(a2,t1,b2); changed=true;
+        }}}
+    if(!changed)break;
+  }
+}
+function allocateFCFS(ballots,K,seed){
+  const r=mulberry32(seed^0x27d4eb2d);
+  const order=ballots.map(b=>({b,x:r()})).sort((a,c)=>a.x-c.x).map(o=>o.b);
+  const S=makeState(ballots);
+  for(const b of order){
+    for(const e of rankedEvents(b)){ if(S.A.get(b.id).length>=K)break; const ts=S.options(b,e); if(ts.length)S.put(b,ts.sort((x,y)=>x.sd-y.sd)[0]); }
+    while(S.A.get(b.id).length<K && fallback(S,b));
+  }
+  return S.A;
+}
+function bestPossible(b,K){
+  return EVENTS.filter(e=>e.termine.some(t=>!b.unav.has(t.id))).map(e=>b.pts[e.id]||0).sort((x,y)=>y-x).slice(0,K).reduce((a,c)=>a+c,0);
+}
+function metrics(ballots,A,K){
+  const sats=[]; let top1=0,fb=0,short=0;
+  for(const b of ballots){
+    const as=A.get(b.id), got=as.reduce((s,a)=>s+a.pts,0), best=bestPossible(b,K);
+    const s=best?got/best:1; b._sat=s; sats.push(s);
+    const top=Math.max(0,...Object.values(b.pts));
+    if(top>0&&as.some(a=>a.pts===top))top1++;
+    if(as.some(a=>a.fb))fb++;
+    if(as.length<K)short++;
+  }
+  const sorted=sats.slice().sort((a,b)=>a-b), n=ballots.length||1, d=Math.max(1,Math.round(n*.1));
+  return {top1:top1/n,avg:sats.reduce((a,b)=>a+b,0)/n,worst:sorted.slice(0,d).reduce((a,b)=>a+b,0)/d,fb,short,n:ballots.length};
+}
+
+/* ---------- Ablauf ---------- */
+function allBallots(){return mine.concat(sims)}
+function recompute(){
+  const bs=allBallots();
+  const A=allocatePoints(bs,cfg.K,cfg.seed);
+  const mP=metrics(bs,A,cfg.K);
+  const sats=new Map(bs.map(b=>[b.id,b._sat]));
+  const F=allocateFCFS(bs,cfg.K,cfg.seed);
+  const mF=metrics(bs,F,cfg.K);
+  bs.forEach(b=>b._sat=sats.get(b.id));
+  result={A,mP,mF,bs};
+}
+
+/* ---------- Ansicht 1: Wählen ---------- */
+function draftSum(){return Object.values(draft.pts).reduce((a,b)=>a+b,0)}
+function renderLead(){
+  $('#lead').textContent=`Du hast ${cfg.budget} Punkte. Verteile sie auf mindestens ${cfg.minEvents} Veranstaltungen, höchstens ${cfg.maxPer} auf eine. Je mehr Punkte, desto wichtiger ist dir die Veranstaltung. Du bekommst ${cfg.K} Veranstaltungen zugeteilt, erst nach dem Anmeldeschluss.`;
+}
+function renderList(){
+  $('#evlist').innerHTML=EVENTS.map(e=>{
+    const p=draft.pts[e.id]||0, multi=e.termine.length>1, cap=capOf(e);
+    const ts=e.termine.map(t=>{
+      const txt=`${when(t)} · ${esc(t.ort)}${t.cap?` · ${t.cap} Plätze`:''}`;
+      if(!multi) return `<li>${txt}</li>`;
+      const off=draft.unav.includes(t.id);
+      return `<li><label class="${off?'off':''}"><input type="checkbox" data-t="${t.id}" ${off?'':'checked'}><span>${txt}</span></label></li>`;
+    }).join('');
+    return `<div class="ev ${p?'on':''}" data-ev="${e.id}">
+      <div style="min-width:0"><h3>${esc(e.title)}${e.nur?`<span class="tag">nur ${e.nur==='m'?'Burschen':'Mädchen'}</span>`:''}${cap==null?'<span class="tag">offen</span>':''}</h3>
+      ${multi?'<div class="meta">Hake ab, an welchen Terminen du Zeit hast:</div>':''}<ul>${ts}</ul></div>
+      <div class="stepper"><button type="button" data-d="-1" aria-label="5 Punkte weniger für ${esc(e.title)}">−</button><output aria-label="Punkte">${p}</output><button type="button" data-d="1" aria-label="5 Punkte mehr für ${esc(e.title)}">+</button></div>
+    </div>`;}).join('');
+  updateSide();
+}
+function updateSide(){
+  const sum=draftSum(), rest=cfg.budget-sum, n=Object.values(draft.pts).filter(v=>v>0).length;
+  $('#rest').textContent=rest; $('#of').textContent='von '+cfg.budget;
+  $('#bar').style.width=$('#mini-bar').style.width=Math.min(100,sum/cfg.budget*100)+'%';
+  $('#mini-txt').textContent=`Noch ${rest} Punkte · ${n} gewählt`;
+  const noTime=EVENTS.filter(e=>draft.pts[e.id]&&e.termine.every(t=>draft.unav.includes(t.id)));
+  const checks=[[rest===0,`Alle ${cfg.budget} Punkte verteilt`],[n>=cfg.minEvents,`Mindestens ${cfg.minEvents} Veranstaltungen (${n})`],[!noTime.length,'Bei jeder gewählten Veranstaltung passt mindestens ein Termin']];
+  $('#checks').innerHTML=checks.map(([ok,t])=>`<li class="${ok?'ok':''}">${t}</li>`).join('');
+  const r=EVENTS.filter(e=>draft.pts[e.id]).sort((a,b)=>draft.pts[b.id]-draft.pts[a.id]);
+  $('#rank').innerHTML=r.map(e=>`<li>${esc(e.title)} <span>· ${draft.pts[e.id]}</span></li>`).join('');
+  $('#rank-empty').hidden=r.length>0;
+  document.querySelectorAll('.ev').forEach(el=>{
+    const id=el.dataset.ev,p=draft.pts[id]||0;
+    el.classList.toggle('on',p>0); el.querySelector('output').textContent=p;
+    el.querySelector('[data-d="-1"]').disabled=p<=0;
+    el.querySelector('[data-d="1"]').disabled=p>=cfg.maxPer||rest<=0;
+  });
+  $('#submit').disabled=!(checks.every(c=>c[0])&&$('#name').value.trim());
+}
+$('#evlist').addEventListener('click',ev=>{
+  const btn=ev.target.closest('button[data-d]'); if(!btn)return;
+  const id=btn.closest('.ev').dataset.ev, cur=draft.pts[id]||0;
+  const nv=Math.max(0,Math.min(cfg.maxPer,cur+STEP*+btn.dataset.d));
+  if(nv-cur>cfg.budget-draftSum())return;
+  if(nv)draft.pts[id]=nv; else delete draft.pts[id];
+  updateSide();
+});
+$('#evlist').addEventListener('change',ev=>{
+  const cb=ev.target.closest('input[data-t]'); if(!cb)return;
+  const id=cb.dataset.t; draft.unav=draft.unav.filter(x=>x!==id); if(!cb.checked)draft.unav.push(id);
+  cb.closest('label').classList.toggle('off',!cb.checked); updateSide();
+});
+$('#name').addEventListener('input',updateSide);
+$('#submit').addEventListener('click',()=>{
+  const name=$('#name').value.trim(); if(!name)return;
+  const id='me-'+name.toLowerCase().replace(/\s+/g,'-');
+  mine=mine.filter(b=>b.id!==id);
+  mine.unshift({id,name,pts:{...draft.pts},unav:new Set(draft.unav),sim:false});
+  store.set('mine',mine.map(b=>({...b,unav:[...b.unav]})));
+  recompute(); highlight=id; $('#see-me').hidden=false;
+  toast('Deine Wahl ist gespeichert. Im Prototyp wird sofort zugeteilt.');
+});
+$('#see-me').addEventListener('click',()=>{ $('#q').value=''; });
+
+/* ---------- Ansicht 2: Organisation ---------- */
+function renderOrg(){
+  $('#r-budget').value=cfg.budget;$('#r-min').value=cfg.minEvents;$('#r-max').value=cfg.maxPer;$('#r-k').value=cfg.K;$('#n-sim').value=cfg.nSim;
+  const bs=allBallots();
+  $('#reg-sum').innerHTML=`<b>${bs.length}</b> Anmeldungen: ${mine.length} echte (in diesem Browser), ${sims.length} Beispiel-Firmlinge. Bei ${cfg.K} Veranstaltungen pro Person werden <b>${bs.length*cfg.K}</b> Plätze gebraucht.`;
+  const rows=EVENTS.map(e=>{
+    const bid=bs.filter(b=>b.pts[e.id]>0), sum=bid.reduce((a,b)=>a+b.pts[e.id],0), cap=capOf(e);
+    return {e,n:bid.length,sum,avg:bid.length?sum/bid.length:0,cap,ratio:cap?bid.length/cap:0};
+  }).sort((a,b)=>b.sum-a.sum);
+  $('#demand').innerHTML=`<thead><tr><th>Veranstaltung</th><th class="num">Plätze</th><th class="num">Interessierte</th><th class="num">Punkte gesamt</th><th class="num">Ø Punkte</th><th>Nachfrage</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td>${esc(r.e.title)}</td><td class="num">${r.cap??'offen'}</td><td class="num">${r.n}</td><td class="num">${r.sum}</td><td class="num">${r.avg.toFixed(1)}</td>
+    <td>${r.cap?`<div class="ratio"><div class="meter"><i class="${r.ratio>1?'hot':''}" style="width:${Math.min(100,r.ratio/3*100)}%"></i></div><span class="small">${r.ratio.toFixed(1)}×</span></div>`:'<span class="muted small">unbegrenzt</span>'}</td></tr>`).join('')+'</tbody>';
+}
+function readRules(){
+  const v={budget:+$('#r-budget').value,minEvents:+$('#r-min').value,maxPer:+$('#r-max').value,K:+$('#r-k').value};
+  let err='';
+  if(v.budget%STEP||v.maxPer%STEP)err='Punkte bitte in 5er-Schritten angeben.';
+  else if(v.maxPer>v.budget)err='Die Höchstpunkte pro Veranstaltung dürfen nicht über dem Punktekonto liegen.';
+  else if(v.minEvents*STEP>v.budget)err=`Mit ${v.budget} Punkten sind höchstens ${v.budget/STEP} Veranstaltungen möglich.`;
+  else if(v.K>v.minEvents)err='Es sollten mindestens so viele Veranstaltungen bepunktet werden, wie zugeteilt werden.';
+  $('#r-err').textContent=err; $('#r-err').hidden=!err;
+  if(err)return;
+  Object.assign(cfg,v); store.set('cfg',cfg);
+  sims=genSims(); trimDraft(); recompute(); renderLead(); renderList(); renderOrg();
+  toast('Regeln übernommen, Beispieldaten neu erzeugt.');
+}
+function trimDraft(){
+  for(const k in draft.pts){draft.pts[k]=Math.min(draft.pts[k],cfg.maxPer)}
+  while(draftSum()>cfg.budget){const k=Object.keys(draft.pts).sort((a,b)=>draft.pts[a]-draft.pts[b])[0];draft.pts[k]-=STEP;if(!draft.pts[k])delete draft.pts[k];}
+}
+['#r-budget','#r-min','#r-max','#r-k'].forEach(s=>$(s).addEventListener('change',readRules));
+$('#regen').addEventListener('click',()=>{
+  cfg.nSim=Math.max(10,Math.min(400,+$('#n-sim').value||140)); cfg.seed=Math.floor(Math.random()*9000)+1000; store.set('cfg',cfg);
+  sims=genSims(); recompute(); renderOrg(); toast(`${cfg.nSim} neue Beispiel-Firmlinge erzeugt.`);
+});
+$('#run').addEventListener('click',()=>{recompute(); location.hash='zuteilung';});
+
+/* ---------- Ansicht 3: Zuteilung ---------- */
+function renderResult(){
+  const {A,mP,mF,bs}=result;
+  $('#z-lead').textContent=`${mP.n} Firmlinge, je ${cfg.K} Veranstaltungen. Zum Vergleich wurde mit denselben Wünschen auch „Wer zuerst kommt“ durchgespielt: alle klicken um 18:00, die Reihenfolge entscheidet der Zufall.`;
+  const card=(lbl,p,f,fmt,higherBetter)=>{
+    const d=p-f, good=higherBetter?d>=0:d<=0;
+    const ds=fmt===pct?(d>0?'+':'')+Math.round(d*100)+' Pp.':(d>0?'+':'')+d;
+    return `<div class="card"><div class="lbl">${lbl}</div><div class="big">${fmt(p)}</div>
+      <div class="vs">Wer zuerst kommt: <b>${fmt(f)}</b> ${d?`<span class="delta ${good?'':'neg'}">${ds}</span>`:''}</div></div>`;
+  };
+  const id=x=>String(x);
+  $('#cmp').innerHTML=card('bekamen ihre Nr.-1-Veranstaltung',mP.top1,mF.top1,pct,true)
+    +card('Ø Zufriedenheit (erreichte Punkte)',mP.avg,mF.avg,pct,true)
+    +card('Zufriedenheit der schlechtesten 10 %',mP.worst,mF.worst,pct,true)
+    +card('Firmlinge mit Ersatzveranstaltung',mP.fb,mF.fb,id,false);
+  $('#how').innerHTML=[
+    `Es wird in ${cfg.K} Runden verteilt. Jede Runde bekommt jeder Firmling genau eine Veranstaltung. So hat niemand alle drei Wunschplätze, während andere leer ausgehen.`,
+    'Innerhalb einer Runde zählt die Punktezahl: Wer für eine Veranstaltung mehr Punkte gesetzt hat, hat Vorrang. Bei Gleichstand entscheidet das Los, nie die Uhrzeit.',
+    'Ist die Wunschveranstaltung voll oder der Termin kollidiert, kommt die nächste in der eigenen Reihung dran. Bleibt nichts Bepunktetes übrig, gibt es eine Ersatzveranstaltung mit freien Plätzen.',
+    'Zum Schluss wird getauscht: Wenn zwei Firmlinge durch einen Tausch beide gleich gut oder besser dastehen, tauschen sie automatisch.'
+  ].map(t=>`<li>${t}</li>`).join('');
+  const load=new Map(); for(const as of A.values())for(const a of as)load.set(a.t.id,(load.get(a.t.id)||0)+1);
+  $('#fill').innerHTML=EVENTS.map(e=>`<div class="ev-f"><div class="small">${esc(e.title)}</div><div class="ts">${e.termine.map(t=>{
+    const n=load.get(t.id)||0;
+    return `<div class="slot">${t.flex?'Termin flexibel':fD.format(t.sd)+(e.termine.length>2?' '+fT.format(t.sd):'')} · <b style="color:var(--ink)">${n}${t.cap?' / '+t.cap:''}</b>${t.cap?`<div class="meter"><i style="width:${Math.min(100,n/t.cap*100)}%"></i></div>`:'<div class="meter"><i style="width:0"></i></div>'}</div>`;}).join('')}</div></div>`).join('');
+  renderPeople();
+}
+function renderPeople(){
+  const {A,bs}=result, q=$('#q').value.trim().toLowerCase();
+  let list=bs.filter(b=>!q||b.name.toLowerCase().includes(q));
+  if(!q)list.sort((a,b)=>(a.sim-b.sim)||(a._sat-b._sat));
+  const total=list.length, lim=showAll||q?list.length:40;
+  list=list.slice(0,lim);
+  $('#people').innerHTML=`<thead><tr><th>Name</th><th>Zugeteilt (Punkte)</th><th>Zufriedenheit</th></tr></thead><tbody>`+list.map(b=>{
+    const as=A.get(b.id).slice().sort((x,y)=>x.t.sd-y.t.sd);
+    return `<tr class="${b.id===highlight?'me':''}"><td>${esc(b.name)}${b.sim?'':'<span class="tag">echt</span>'}</td>
+    <td><div class="chips">${as.map(a=>`<span class="chip ${a.fb?'fb':''}" title="${esc(when(a.t))}">${esc(a.ev.title.replace(/[„“]/g,'').split(/ – |!|\?/)[0].slice(0,34))}<b>${a.fb?'Ersatz':a.pts}</b></span>`).join('')}${as.length<cfg.K?'<span class="chip fb">fehlt</span>':''}</div></td>
+    <td><div class="sat"><div class="meter"><i style="width:${Math.round(b._sat*100)}%"></i></div><span class="small">${pct(b._sat)}</span></div></td></tr>`;}).join('')+'</tbody>';
+  $('#more').hidden=lim>=total; $('#more').textContent=`Alle ${total} anzeigen`;
+}
+$('#q').addEventListener('input',renderPeople);
+$('#more').addEventListener('click',()=>{showAll=true;renderPeople()});
+$('#copy').addEventListener('click',()=>{
+  const {A,bs}=result;
+  const csv=['Name;Veranstaltung;Termin;Ort;Punkte;Ersatz'].concat(bs.flatMap(b=>A.get(b.id).map(a=>[b.name,a.ev.title,when(a.t),a.t.ort,a.pts,a.fb?'ja':'nein'].map(v=>String(v).replace(/;/g,',')).join(';')))).join('\n');
+  const ta=$('#csv'); ta.value=csv;
+  const fb=()=>{ta.hidden=false;ta.focus();ta.select();toast('Text markiert. Mit Strg+C kopieren.')};
+  try{navigator.clipboard.writeText(csv).then(()=>toast('Liste in die Zwischenablage kopiert.'),fb)}catch(e){fb()}
+});
+
+/* ---------- Routing ---------- */
+const VIEWS=['waehlen','organisation','zuteilung'];
+function route(){
+  const v=VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'waehlen';
+  VIEWS.forEach(x=>$('#v-'+x).hidden=x!==v);
+  document.querySelectorAll('nav.steps a').forEach(a=>a.dataset.v===v?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current'));
+  if(v==='organisation')renderOrg();
+  if(v==='zuteilung')renderResult();
+}
+window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0)});
+
+/* ---------- Start ---------- */
+sims=genSims(); recompute(); renderLead(); renderList(); route();
+</script>
+
+</body>
+</html>
