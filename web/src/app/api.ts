@@ -5,20 +5,24 @@ import { Observable, firstValueFrom } from 'rxjs';
 export type Phase = 'Draft' | 'Open' | 'Closed' | 'Published';
 export const PHASES: Phase[] = ['Draft', 'Open', 'Closed', 'Published'];
 
-export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; }
+export interface Group { id: string; name: string; perParticipant: number; minActivities: number; color: string; }
+export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
+export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; }
 export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; }
+export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; }
+export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; }
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; rules: Rules; }
 export interface ListedParticipant { id: string; name: string; hasVoted: boolean; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
-export interface Assignment { activityId: string; title: string; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; points: number; isFallback: boolean; }
+export interface Assignment { activityId: string; title: string; groupId: string | null; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; points: number; isFallback: boolean; }
 export interface Participant { ballotId: string; name: string; isSample: boolean; satisfaction: number; assignments: Assignment[]; }
+export interface MyActivityStatus { activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free'; position: number | null; waitlisted: boolean; start: string | null; end: string | null; flexible: boolean; location: string | null; }
+export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
@@ -57,6 +61,10 @@ export class Api {
   mySlots(name: string) { return this.call(this.http.post<SlotSummary[]>('/api/my-slots', { name })); }
   myResult(id: string, name: string) {
     return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }));
+  }
+  myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name })); }
+  setWaitlist(id: string, name: string, activityIds: string[]) {
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds }));
   }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }

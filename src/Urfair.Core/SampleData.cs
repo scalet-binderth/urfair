@@ -5,6 +5,18 @@ public static class SampleData
 {
     private const string YouthChurch = "Grüner Anker, Jugendkirche Linz";
 
+    /// <summary>Like the real confirmation preparation: 2 projects from the larger green group, 1 from the smaller blue group.</summary>
+    public static readonly IReadOnlyList<ActivityGroup> Groups =
+    [
+        new("green", "Grüne Projekte", PerParticipant: 2, MinActivities: 3, Color: "green"),
+        new("blue", "Blaue Projekte", PerParticipant: 1, MinActivities: 2, Color: "blue"),
+    ];
+
+    public static readonly Rules FirmungRules = new(PointBudget: 100, MinActivities: 5, MaxPerActivity: 40, PerParticipant: 3, Groups: Groups);
+
+    /// <summary>Invented split for the demo: social and faith-themed projects form the blue group.</summary>
+    private static readonly HashSet<string> BlueProjects = ["gehoerlos", "peace", "brot", "geisterfahrer", "magdaman", "espoto", "altenheim"];
+
     public static IReadOnlyList<Activity> Activities()
     {
         var list = new List<Activity>();
@@ -48,7 +60,7 @@ public static class SampleData
         A("magdaman", "MAGDAMAN – Hackln für den guten Zweck", 3, null, ("2027-05-15T00:00", null, "Pfarrheim St. Magdalena", null, true));
         A("espoto", "Espoto", 2, null, ("2027-06-30T00:00", null, "Pfarrkirche St. Magdalena", null, true));
         A("altenheim", "Besuch im Altenheim", 4, null, ("2027-06-30T00:00", null, "SZ Franz Hillinger", 15, true));
-        return list;
+        return list.Select(a => a with { GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green" }).ToList();
     }
 
     private static readonly string[] FemaleNames = "Anna Lena Sophie Marie Hannah Lea Laura Sarah Julia Emma Mia Valentina Katharina Magdalena Theresa Johanna Clara Elena Nina Paula Selina Viktoria".Split(' ');
@@ -72,6 +84,16 @@ public static class SampleData
             // Weighted sampling without replacement (Efraimidis–Spirakis)
             var chosen = pool.Select(a => (a, key: Math.Pow(rnd.NextDouble(), 1.0 / a.Popularity)))
                 .OrderByDescending(x => x.key).Take(k).Select(x => x.a).ToList();
+            // Each group needs its minimum number of activities; add the missing ones at random ranks.
+            foreach (var g in r.GroupList)
+            {
+                var missing = g.MinActivities - chosen.Count(a => a.GroupId == g.Id);
+                foreach (var a in pool.Where(a => a.GroupId == g.Id && !chosen.Contains(a))
+                             .Select(a => (a, key: Math.Pow(rnd.NextDouble(), 1.0 / a.Popularity)))
+                             .OrderByDescending(x => x.key).Take(Math.Max(0, missing)).Select(x => x.a).ToList())
+                    chosen.Insert(rnd.Next(chosen.Count + 1), a);
+            }
+            k = chosen.Count;
 
             var u = chosen.Select(_ => 1).ToArray();
             var rest = units - k;

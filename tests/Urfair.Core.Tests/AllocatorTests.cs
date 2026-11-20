@@ -97,6 +97,36 @@ public class AllocatorTests
         }
     }
 
+    [Theory]
+    [InlineData(2027)]
+    [InlineData(4711)]
+    public void Groups_give_everyone_two_green_and_one_blue(int seed)
+    {
+        var rules = SampleData.FirmungRules;
+        Assert.Empty(Validation.Check(rules));
+        var ballots = SampleData.Participants(160, rules, Activities, seed);
+        Assert.All(ballots, b => Assert.Empty(Validation.Check(b, rules, Activities)));
+
+        var group = Activities.ToDictionary(a => a.Id, a => a.GroupId);
+        foreach (var a in new[] { Allocator.PointBased(Activities, ballots, 3, seed, rules.Groups), Allocator.FirstComeFirstServed(Activities, ballots, 3, seed, rules.Groups) })
+        foreach (var (_, list) in a.Assignments)
+        {
+            Assert.Equal(2, list.Count(x => group[x.Session.ActivityId] == "green"));
+            Assert.Equal(1, list.Count(x => group[x.Session.ActivityId] == "blue"));
+        }
+    }
+
+    [Fact]
+    public void Group_rules_and_ballots_are_checked()
+    {
+        var wrongSum = SampleData.FirmungRules with { PerParticipant = 4, MinActivities = 5 };
+        Assert.Contains("groupQuotaSum", Validation.Check(wrongSum).Select(e => e.Code));
+        // Only green projects: the blue minimum is missing.
+        var b = new Ballot("x", "Test", new Dictionary<string, int> { ["kino"] = 40, ["nacht"] = 30, ["hochseil"] = 10, ["radl"] = 10, ["misterx"] = 10 }, new HashSet<string>());
+        Assert.Contains("tooFewInGroup", Validation.Check(b, SampleData.FirmungRules, Activities).Select(e => e.Code));
+        Assert.Equal(SampleData.FirmungRules, SampleData.FirmungRules with { Groups = SampleData.Groups.ToList() });
+    }
+
     [Fact]
     public void Invalid_activity_is_rejected_with_codes()
     {

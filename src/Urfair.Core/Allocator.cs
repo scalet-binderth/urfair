@@ -11,12 +11,15 @@ public sealed class Allocator
     private readonly IReadOnlyList<Ballot> _ballots;
     private readonly Dictionary<string, List<Assignment>> _assignments;
     private readonly Dictionary<string, int> _load = new();
+    private readonly Dictionary<string, ActivityGroup> _groupOf;
 
-    private Allocator(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots)
+    private Allocator(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, IReadOnlyList<ActivityGroup>? groups)
     {
         _activities = activities;
         _ballots = ballots;
         _assignments = ballots.ToDictionary(b => b.Id, _ => new List<Assignment>());
+        var byId = (groups ?? []).ToDictionary(g => g.Id);
+        _groupOf = activities.Where(a => a.GroupId is not null && byId.ContainsKey(a.GroupId)).ToDictionary(a => a.Id, a => byId[a.GroupId!]);
     }
 
     public IReadOnlyDictionary<string, List<Assignment>> Assignments => _assignments;
@@ -24,9 +27,9 @@ public sealed class Allocator
 
     // ---------- public procedures ----------
 
-    public static Allocator PointBased(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed)
+    public static Allocator PointBased(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed, IReadOnlyList<ActivityGroup>? groups = null)
     {
-        var a = new Allocator(activities, ballots);
+        var a = new Allocator(activities, ballots, groups);
         var rnd = new Random(seed);
         var lottery = ballots.ToDictionary(b => b.Id, _ => rnd.NextDouble());
         var ranking = ballots.ToDictionary(b => b.Id, a.Ranking);
@@ -59,9 +62,9 @@ public sealed class Allocator
         return a;
     }
 
-    public static Allocator FirstComeFirstServed(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed)
+    public static Allocator FirstComeFirstServed(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed, IReadOnlyList<ActivityGroup>? groups = null)
     {
-        var a = new Allocator(activities, ballots);
+        var a = new Allocator(activities, ballots, groups);
         var rnd = new Random(seed ^ 0x27d4eb2d);
         foreach (var b in ballots.OrderBy(_ => rnd.NextDouble()).ToList())
         {
@@ -100,15 +103,16 @@ public sealed class Allocator
             incomplete);
     }
 
-    /// <summary>Points achieved relative to the best possible (top N of the participant's own ballot).</summary>
+    /// <summary>Points achieved relative to the best possible (top N of the participant's own ballot, per group if there are groups).</summary>
     public double Satisfaction(Ballot b, int perParticipant)
     {
-        var best = _activities
-            .Where(x => x.Sessions.Any(s => !b.UnavailableSessions.Contains(s.Id)))
-            .Select(x => b.PointsFor(x.Id))
-            .OrderDescending().Take(perParticipant).Sum();
+        var reachable = _activities.Where(x => x.Sessions.Any(s => !b.UnavailableSessions.Contains(s.Id))).ToList();
+        int Top(IEnumerable<Activity> list, int n) => list.Select(x => b.PointsFor(x.Id)).OrderDescending().Take(n).Sum();
+        var best = _groupOf.Count == 0
+            ? Top(reachable, perParticipant)
+            : _groupOf.Values.Distinct().Sum(g => Top(reachable.Where(x => GroupOf(x.Id) == g), g.PerParticipant));
         var got = _assignments[b.Id].Sum(x => x.Points);
-        return best == 0 ? 1 : got / (double)best;
+        return best == 0 ? 1 : Math.Min(1, got / (double)best);
     }
 
     // ---------- internals ----------
@@ -128,8 +132,14 @@ public sealed class Allocator
             if (ReferenceEquals(x, except)) continue;
             if (x.Session.ActivityId == s.ActivityId || x.Session.Overlaps(s)) return false;
         }
+        // Group quota: e.g. at most 2 green and 1 blue project per participant.
+        if (GroupOf(s.ActivityId) is { } g &&
+            _assignments[b.Id].Count(x => !ReferenceEquals(x, except) && GroupOf(x.Session.ActivityId) == g) >= g.PerParticipant)
+            return false;
         return true;
     }
+
+    private ActivityGroup? GroupOf(string activityId) => _groupOf.GetValueOrDefault(activityId);
 
     private IEnumerable<Session> Available(Ballot b, Activity act, Assignment? except = null) =>
         act.Sessions.Where(s => Free(s) > 0 && Fits(b, s, except));

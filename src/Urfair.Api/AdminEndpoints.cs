@@ -7,11 +7,11 @@ namespace Urfair.Api;
 public record CreateSlotRequest(string Name, bool WithSampleData);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
-public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions);
+public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
 public record ParticipantListDto(Guid Id, string Name, bool HasVoted);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
-public record AssignmentDto(string ActivityId, string Title, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points, bool IsFallback);
+public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points, bool IsFallback);
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
     IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants);
@@ -55,7 +55,13 @@ public static class AdminEndpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             var name = (req.Name ?? "").Trim();
-            var rules = req.Rules with { Step = 5 };
+            // New groups get an id; colours fall back to green.
+            var groups = (req.Rules.Groups ?? []).Select(g => g with
+            {
+                Id = string.IsNullOrWhiteSpace(g.Id) ? Ids.New() : g.Id.Trim(), Name = (g.Name ?? "").Trim(),
+                Color = string.IsNullOrWhiteSpace(g.Color) ? "green" : g.Color,
+            }).ToList();
+            var rules = req.Rules with { Step = 5, Groups = groups };
             var errors = Validation.Check(rules);
             if (name.Length == 0) errors.Insert(0, new ValidationError("nameRequired"));
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
@@ -63,6 +69,10 @@ public static class AdminEndpoints
             var rulesChanged = slot.ToRules() != rules;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
             slot.Apply(rules);
+            // Activities of a removed group become ungrouped.
+            var ids = groups.Select(g => g.Id).ToHashSet();
+            foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())
+                if (!ids.Contains(a.GroupId!)) a.GroupId = null;
             await db.SaveChangesAsync();
             if (rulesChanged) await Database.ResetSamplesAsync(db, id); // sample ballots must follow the new rules
             return Results.NoContent();
@@ -179,14 +189,16 @@ public static class AdminEndpoints
         var ballots = entities.Select(b => b.ToModel()).ToList();
         var k = slot.PerParticipant;
 
-        var pointBased = Allocator.PointBased(activities, ballots, k, slot.Seed);
-        var fcfs = Allocator.FirstComeFirstServed(activities, ballots, k, slot.Seed);
+        var groups = slot.ToRules().Groups;
+        var pointBased = Allocator.PointBased(activities, ballots, k, slot.Seed, groups);
+        var fcfs = Allocator.FirstComeFirstServed(activities, ballots, k, slot.Seed, groups);
         var titles = activities.ToDictionary(a => a.Id, a => a.Title);
+        var groupOf = activities.ToDictionary(a => a.Id, a => a.GroupId);
         var isSample = entities.ToDictionary(b => b.Id.ToString(), b => b.IsSample);
 
         var participants = ballots.Select(b => new ParticipantDto(b.Id, b.Name, isSample[b.Id], pointBased.Satisfaction(b, k),
             pointBased.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
-                x.Session.ActivityId, titles[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
+                x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
                 x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback)).ToList())).ToList();
 
         var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, pointBased.Load);
@@ -204,6 +216,7 @@ public static class AdminEndpoints
 
         entity.Title = req.Title!.Trim();
         entity.RestrictedTo = restricted;
+        entity.GroupId = string.IsNullOrWhiteSpace(req.GroupId) ? null : req.GroupId;
         var keep = new List<SessionEntity>();
         foreach (var s in sessions)
         {

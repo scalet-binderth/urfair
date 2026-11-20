@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, ActivityInput, Api, fromLocalInput, toLocalInput } from './api';
+import { Activity, ActivityInput, Api, Group, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
 
 interface SessionForm { id: string | null; start: string; end: string; location: string; capacity: number | null; flexible: boolean; }
@@ -21,6 +21,13 @@ interface SessionForm { id: string | null; start: string; end: string; location:
             <option value="w">{{ i18n.t('common.only.w') }}</option>
             <option value="m">{{ i18n.t('common.only.m') }}</option>
           </select></div>
+        @if (groups().length) {
+          <div class="field"><label [for]="uid + '-group'">{{ i18n.t('editor.group') }}</label>
+            <select [id]="uid + '-group'" [(ngModel)]="groupId">
+              <option value="">{{ i18n.t('editor.noGroup') }}</option>
+              @for (g of groups(); track g.id) { <option [value]="g.id">{{ g.name }}</option> }
+            </select></div>
+        }
       </div>
 
       <h3>{{ i18n.t('editor.sessions') }}</h3>
@@ -61,6 +68,8 @@ export class ActivityEditor implements OnInit {
   readonly slotId = input.required<string>();
   /** Activity to edit; null creates a new one. */
   readonly activity = input<Activity | null>(null);
+  /** Groups of the FairSlot; empty hides the group field. */
+  readonly groups = input<Group[]>([]);
   readonly saved = output<void>();
   readonly cancelled = output<void>();
 
@@ -69,6 +78,7 @@ export class ActivityEditor implements OnInit {
   protected uid = 'ae' + Math.random().toString(36).slice(2, 8);
   protected title = '';
   protected restrictedTo = '';
+  protected groupId = '';
   protected sessions: SessionForm[] = [];
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
@@ -78,6 +88,7 @@ export class ActivityEditor implements OnInit {
     if (a) {
       this.title = a.title;
       this.restrictedTo = a.restrictedTo ?? '';
+      this.groupId = a.groupId ?? '';
       this.sessions = a.sessions.map(s => ({ id: s.id, start: toLocalInput(s.start), end: toLocalInput(s.end), location: s.location, capacity: s.capacity, flexible: s.flexible }));
     } else {
       this.addSession();
@@ -93,6 +104,7 @@ export class ActivityEditor implements OnInit {
     const body: ActivityInput = {
       title: this.title.trim(),
       restrictedTo: this.restrictedTo || null,
+      groupId: this.groupId || null,
       sessions: this.sessions.map(s => ({
         id: s.id, start: s.start, end: s.flexible ? null : fromLocalInput(s.end), location: s.location.trim(),
         capacity: s.capacity === null || (s.capacity as unknown) === '' ? null : Number(s.capacity), flexible: s.flexible,

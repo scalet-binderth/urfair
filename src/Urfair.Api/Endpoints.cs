@@ -5,12 +5,16 @@ using Urfair.Core;
 namespace Urfair.Api;
 
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
-public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions);
+public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
+public record WaitlistRequest(string Name, List<string>? ActivityIds);
+public record MyActivityStatusDto(string ActivityId, string Title, string? GroupId, int Points, string Status, int? Position, bool Waitlisted,
+    DateTime? Start, DateTime? End, bool Flexible, string? Location);
+public record MyStatusDto(bool Voted, IReadOnlyList<MyActivityStatusDto> Activities, IReadOnlyList<string> Full);
 
 /// <summary>Endpoints for participants.</summary>
 public static class Endpoints
@@ -57,6 +61,32 @@ public static class Endpoints
             return Results.Ok(new { voted = mine is not null, assignments = mine?.Assignments ?? [] });
         });
 
+        // Interim status while voting is open: what the person would get if the allocation ran now.
+        api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            var name = (req.Name ?? "").Trim();
+            if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
+            return Results.Ok(await StatusAsync(db, slot, name));
+        });
+
+        // Which not-yet-fixed activities the person wants to keep following on the waiting list.
+        api.MapPost("/slots/{id:guid}/waitlist", async (Guid id, WaitlistRequest req, AppDbContext db) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            var name = (req.Name ?? "").Trim();
+            if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
+            if (slot.Phase is not (Phase.Open or Phase.Closed)) return Errors("registrationClosed");
+            var ballot = await db.Ballots.Include(b => b.Points)
+                .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower())
+                .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
+            if (ballot is null) return Errors("notVoted");
+            var pointed = ballot.Points.Where(p => p.Points > 0).Select(p => p.ActivityId).ToHashSet();
+            ballot.Waitlist = (req.ActivityIds ?? []).Where(pointed.Contains).Distinct().ToList();
+            await db.SaveChangesAsync();
+            return Results.Ok(await StatusAsync(db, slot, name));
+        });
+
         api.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg) =>
             await ToDto(db, id, cfg) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
@@ -85,6 +115,8 @@ public static class Endpoints
                 FairSlotId = id, Name = name,
                 Points = points.Select(p => new BallotPoints { ActivityId = p.Key, Points = p.Value }).ToList(),
                 UnavailableSessions = unavailable.ToList(),
+                // Keep earlier waiting-list choices for activities that still have points.
+                Waitlist = existing.SelectMany(b => b.Waitlist).Where(points.ContainsKey).Distinct().ToList(),
             };
             db.Ballots.Add(entity);
             await db.SaveChangesAsync();
@@ -92,15 +124,52 @@ public static class Endpoints
         });
     }
 
-    public static async Task<SlotDto?> ToDto(AppDbContext db, Guid id, IConfiguration cfg) =>
-        await db.FairSlots.Where(s => s.Id == id)
-            .Select(s => new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline,
-                new Rules(s.PointBudget, s.MinActivities, s.MaxPerActivity, s.PerParticipant, 5),
-                s.Ballots.Count, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll))
-            .SingleOrDefaultAsync();
+    public static async Task<SlotDto?> ToDto(AppDbContext db, Guid id, IConfiguration cfg)
+    {
+        var s = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+        if (s is null) return null;
+        var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
+        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll);
+    }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
-        a.Sessions.Select(s => new SessionDto(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList());
+        a.Sessions.Select(s => new SessionDto(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(), a.GroupId);
+
+    /// <summary>
+    /// Runs the allocation with the ballots so far. Per activity the person gave points to:
+    /// "fixed" (would get it), "waitlist" (all seats taken, position = people without a seat who gave more points + 1)
+    /// or "free" (seats left, but the person already has enough higher-ranked activities, or the date clashes).
+    /// </summary>
+    private static async Task<MyStatusDto> StatusAsync(AppDbContext db, FairSlotEntity slot, string name)
+    {
+        var activities = await Database.LoadActivitiesAsync(db, slot.Id);
+        var entities = await Database.LoadBallotsAsync(db, slot.Id);
+        var mine = entities.Where(b => !b.IsSample && b.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).MaxBy(b => b.SubmittedAt);
+        var ballots = entities.Select(b => b.ToModel()).ToList();
+        var allocation = Allocator.PointBased(activities, ballots, slot.PerParticipant, slot.Seed, slot.ToRules().Groups);
+
+        bool Full(Activity a) => a.Sessions.All(s => s.Capacity is { } c && allocation.Load(s) >= c);
+        var full = activities.Where(Full).Select(a => a.Id).ToList();
+        if (mine is null) return new MyStatusDto(false, [], full);
+
+        var me = ballots.Single(b => b.Id == mine.Id.ToString());
+        var assigned = allocation.Assignments[me.Id].ToDictionary(x => x.Session.ActivityId);
+        var list = activities.Where(a => me.PointsFor(a.Id) > 0 || assigned.ContainsKey(a.Id))
+            .OrderByDescending(a => me.PointsFor(a.Id))
+            .Select(a =>
+            {
+                if (assigned.TryGetValue(a.Id, out var x))
+                    return new MyActivityStatusDto(a.Id, a.Title, a.GroupId, me.PointsFor(a.Id), "fixed", null, false,
+                        x.Session.Start, x.Session.End, x.Session.Flexible, x.Session.Location);
+                var waiting = full.Contains(a.Id);
+                int? position = waiting
+                    ? 1 + ballots.Count(b => b.Id != me.Id && b.PointsFor(a.Id) > me.PointsFor(a.Id) && allocation.Assignments[b.Id].All(y => y.Session.ActivityId != a.Id))
+                    : null;
+                return new MyActivityStatusDto(a.Id, a.Title, a.GroupId, me.PointsFor(a.Id), waiting ? "waitlist" : "free", position,
+                    mine.Waitlist.Contains(a.Id), null, null, false, null);
+            }).ToList();
+        return new MyStatusDto(true, list, full);
+    }
 
     public static IResult Errors(string code) => Results.BadRequest(new ErrorsDto([new ValidationError(code)]));
 }
