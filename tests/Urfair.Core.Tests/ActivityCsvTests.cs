@@ -44,9 +44,19 @@ public class ActivityCsvTests
         var activities = SampleData.Activities();
         var again = ActivityCsv.Parse(ActivityCsv.Write(activities, SampleData.Groups), SampleData.Groups);
         Assert.Empty(again.Errors);
-        Assert.Equal(activities.Select(a => (a.Title, a.GroupId, a.RestrictedTo, a.Description, a.Sessions.Count, a.Seats)),
-            again.Activities.Select(a => (a.Title, a.GroupId, a.RestrictedTo, a.Description, a.Sessions.Count, a.Seats)));
+        Assert.Equal(activities.Select(a => (a.Title, a.GroupId, a.RestrictedTo, a.Description, a.Parish, a.Leader, a.Sessions.Count, a.Seats)),
+            again.Activities.Select(a => (a.Title, a.GroupId, a.RestrictedTo, a.Description, a.Parish, a.Leader, a.Sessions.Count, a.Seats)));
         Assert.Equal(activities.SelectMany(a => a.Sessions.Select(s => (s.Start, s.End, s.Location, s.Flexible))),
             again.Activities.SelectMany(a => a.Sessions.Select(s => (s.Start, s.End, s.Location, s.Flexible))));
+    }
+
+    [Fact]
+    public void Reads_optional_parish_and_leader_columns()
+    {
+        const string csv = "Titel;Pfarre;Leitung;Beginn\nKuchenbuffet;;;13.06.2027 13:00\nKinderschminken;St. Markus;Eva;13.06.2027 13:00\n";
+        var a = ActivityCsv.Parse(csv, []).Activities;
+        Assert.Null(a[0].Parish);
+        Assert.Null(a[0].Leader);
+        Assert.Equal(("St. Markus", "Eva"), (a[1].Parish, a[1].Leader));
     }
 }

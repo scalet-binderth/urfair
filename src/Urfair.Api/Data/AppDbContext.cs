@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions options) : DbContext(options)
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Parish).HasMaxLength(120);
+            e.Property(x => x.Organiser).HasMaxLength(120);
             e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(20);
             e.HasMany(x => x.Activities).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Ballots).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
@@ -43,6 +45,8 @@ public class AppDbContext(DbContextOptions options) : DbContext(options)
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.GroupId).HasMaxLength(40);
             e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.Parish).HasMaxLength(120);
+            e.Property(x => x.Leader).HasMaxLength(120);
             e.HasMany(x => x.Sessions).WithOne().HasForeignKey(s => s.ActivityId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<SessionEntity>(e =>

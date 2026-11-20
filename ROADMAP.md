@@ -5,7 +5,7 @@ Principle: **`main` is always the running demo** (https://urfair.onrender.com). 
 requests; CI must be green; Render deploys `main` automatically. The same code later runs as a real instance
 with `Demo__Enabled=false`. Anything "outgoing" (e-mails, offers) shows up in an in-app demo mailbox in demo mode.
 
-Status as of 20 November 2026. The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
+Status as of 20 November 2026. In step 3, the parish becomes a selection from the list of parishes (today free text). The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
 and English; keep both in sync.
 
 ## Done
@@ -17,6 +17,8 @@ and English; keep both in sync.
 - Demo people B–D start with ballots
 - **Step 1 (this PR):** EF Core migrations (SQLite + PostgreSQL), demo switch `Demo__Enabled`, reset of the whole
   demo, description per activity, Excel/CSV import and export of activities (instead of a PDF importer)
+- Optional parish and person responsible per vote, parish and leader per activity (only where they differ);
+  shown to participants and included in the CSV columns `Pfarre` and `Leitung`
 
 ## Next steps (each ends with a demo that can be shown)
 

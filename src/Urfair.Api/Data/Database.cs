@@ -92,26 +92,27 @@ public static class Database
     {
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         await CreateSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, new DateTime(2026, 11, 18, 23, 59, 0),
-            SampleData.FirmungRules, SampleData.Activities(), 140, [b, c, d], withBallots: [b, c, d]);
+            SampleData.FirmungRules, SampleData.Activities(), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
         await CreateSlotAsync(db, "Ministrantenausflug Herbst 2026", Phase.Published, new DateTime(2026, 9, 15, 23, 59, 0),
-            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d]);
+            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d], parish: "Hl. Geist", organiser: "Miriam Koller");
         await CreateSlotAsync(db, "Ferienprogramm Sommer 2026", Phase.Closed, new DateTime(2026, 6, 30, 23, 59, 0),
-            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d]);
+            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d], parish: "St. Magdalena", organiser: "Stefan Huber");
         await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.CampRules, DemoData.Camp(), 0, []);
+            DemoData.CampRules, DemoData.Camp(), 0, [], parish: "Christkönig", organiser: "Jungschar Christkönig");
         await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true);
+            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true, parish: "St. Markus", organiser: "Maria Pichler");
     }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
-        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), SampleData.FirmungRules, SampleData.Activities(), sampleCount, []);
+        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), SampleData.FirmungRules, SampleData.Activities(), sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
-        IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false)
+        IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false,
+        string? parish = null, string? organiser = null)
     {
-        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll };
+        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser };
         slot.Apply(rules);
         var order = 0;
         foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));
@@ -145,7 +146,7 @@ public static class Database
         var entity = new ActivityEntity
         {
             FairSlotId = slotId, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity,
-            GroupId = a.GroupId, Description = a.Description, SortOrder = sortOrder,
+            GroupId = a.GroupId, Description = a.Description, Parish = a.Parish, Leader = a.Leader, SortOrder = sortOrder,
         };
         entity.Sessions = a.Sessions.Select(s => new SessionEntity
         {

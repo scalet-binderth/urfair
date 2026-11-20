@@ -4,6 +4,7 @@ namespace Urfair.Core;
 public static class Validation
 {
     public const int MaxDescription = 2000;
+    public const int MaxShortText = 120;
 
     private static ValidationError E(string code, params (string Key, object Value)[] args) =>
         new(code, args.Length == 0 ? null : args.ToDictionary(a => a.Key, a => a.Value));
@@ -49,6 +50,7 @@ public static class Validation
         if (string.IsNullOrWhiteSpace(a.Title)) errors.Add(E("titleRequired"));
         if (a.RestrictedTo is not (null or "m" or "w")) errors.Add(E("restrictionInvalid"));
         if (a.Description is { Length: > MaxDescription }) errors.Add(E("descriptionTooLong", ("max", MaxDescription)));
+        if (a.Parish is { Length: > MaxShortText } || a.Leader is { Length: > MaxShortText }) errors.Add(E("textTooLong", ("max", MaxShortText)));
         if (a.Sessions.Count == 0) errors.Add(E("sessionRequired"));
         foreach (var s in a.Sessions)
         {

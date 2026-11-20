@@ -34,6 +34,14 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Leader")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Popularity")
                         .HasColumnType("INTEGER");
 
@@ -115,6 +123,14 @@ namespace Urfair.Api.Data.Migrations.Sqlite
 
                     b.Property<bool>("OpenToAll")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Organiser")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("PerParticipant")
                         .HasColumnType("INTEGER");

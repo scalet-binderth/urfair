@@ -53,6 +53,11 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
                   <input id="s-deadline" type="datetime-local" [(ngModel)]="form.deadline" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.phaseHint') }}</p>
+              <div class="row">
+                <div class="field grow"><label for="s-parish">{{ i18n.t('admin.parish') }}</label><input id="s-parish" maxlength="120" [(ngModel)]="form.parish" /></div>
+                <div class="field grow"><label for="s-organiser">{{ i18n.t('admin.organiser') }}</label><input id="s-organiser" maxlength="120" [(ngModel)]="form.organiser" /></div>
+              </div>
+              <p class="muted small">{{ i18n.t('admin.parishHint') }}</p>
               <label class="check"><input type="checkbox" [(ngModel)]="form.openToAll" />{{ i18n.t('admin.openToAll') }}</label>
               <p class="muted small">{{ i18n.t('admin.openToAllHint') }}</p>
               <h2>{{ i18n.t('admin.rules') }}</h2>
@@ -119,8 +124,9 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
                       @if (a.restrictedTo) { <span class="tag">{{ i18n.t('common.only.' + a.restrictedTo) }}</span> }
                       <span class="tag">{{ a.seats ?? i18n.t('common.unlimited') }} {{ a.seats ? i18n.t('admin.col.seats') : '' }}</span>
                     </h3>
+                    @if (a.parish || a.leader) { <div class="muted small">{{ i18n.byLine(a.parish, a.leader, true) }}</div> }
                     @if (a.description) { <p class="muted small desc">{{ a.description }}</p> }
-                    <ul>@for (x of a.sessions; track x.id) { <li>{{ i18n.when(x) }} · {{ x.location }}@if (x.capacity) { · {{ i18n.t('common.seats', { n: x.capacity }) }} }</li> }</ul>
+                    <ul>@for (x of a.sessions; track x.id) { <li>{{ i18n.when(x) }}@if (x.location) { · {{ x.location }} }@if (x.capacity) { · {{ i18n.t('common.seats', { n: x.capacity }) }} }</li> }</ul>
                   </div>
                   <div class="row actions">
                     @if (confirmDelete() === a.id) {
@@ -281,8 +287,8 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; parish: string; organiser: string; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, parish: '', organiser: '', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
   protected formGroups: Group[] = [];
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
@@ -296,7 +302,8 @@ export class AdminSlotPage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, rules: { ...slot.rules } };
+      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll,
+        parish: slot.parish ?? '', organiser: slot.organiser ?? '', rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
       this.needsKey.set(false);
@@ -350,6 +357,7 @@ export class AdminSlotPage implements OnInit {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
         name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll,
+        parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null,
         rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));

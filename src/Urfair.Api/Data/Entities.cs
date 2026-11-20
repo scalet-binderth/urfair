@@ -20,6 +20,9 @@ public class FairSlotEntity
     public int SampleCount { get; set; }
     /// <summary>Anyone who signs in may see and vote, without being on the participant list (demo playground, later self-registration).</summary>
     public bool OpenToAll { get; set; }
+    /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>
+    public string? Parish { get; set; }
+    public string? Organiser { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
@@ -53,12 +56,15 @@ public class ActivityEntity
     public int Popularity { get; set; } = 5;
     public string? GroupId { get; set; }
     public string? Description { get; set; }
+    /// <summary>Optional, only when it differs from the FairSlot.</summary>
+    public string? Parish { get; set; }
+    public string? Leader { get; set; }
     public int SortOrder { get; set; }
     public List<SessionEntity> Sessions { get; set; } = [];
 
     public Activity ToModel() => new(Id, Title,
         Sessions.OrderBy(s => s.Start).Select(s => new Session(s.Id, Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(),
-        RestrictedTo, Popularity, GroupId, Description);
+        RestrictedTo, Popularity, GroupId, Description, Parish, Leader);
 }
 
 public class SessionEntity
