@@ -72,7 +72,8 @@ public static class ActivityCsv
                 if (restriction == "?") { errors.Add(E("csvRestrictionInvalid", line, ("value", Cell(row, "restriction")))); restriction = null; }
                 var description = Cell(row, "description");
                 draft = (line, title, description.Length == 0 ? null : description, group?.Id, restriction,
-                    OrNull(Cell(row, "parish")), OrNull(Cell(row, "leader")), []);
+                    Parishes.Match(Cell(row, "parish")), OrNull(Cell(row, "leader")), []);
+                if (Cell(row, "parish") is { Length: > 0 } p && Parishes.Match(p) is null) errors.Add(E("csvParishUnknown", line, ("value", p)));
                 drafts.Add(draft);
             }
 

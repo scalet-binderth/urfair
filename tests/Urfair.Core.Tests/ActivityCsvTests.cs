@@ -53,10 +53,23 @@ public class ActivityCsvTests
     [Fact]
     public void Reads_optional_parish_and_leader_columns()
     {
-        const string csv = "Titel;Pfarre;Leitung;Beginn\nKuchenbuffet;;;13.06.2027 13:00\nKinderschminken;St. Markus;Eva;13.06.2027 13:00\n";
-        var a = ActivityCsv.Parse(csv, []).Activities;
+        const string csv = "Titel;Pfarre;Leitung;Beginn\nKuchenbuffet;;;13.06.2027 13:00\nKinderschminken;St. Markus;Eva;13.06.2027 13:00\nTombola;Urfahr-Süd;;13.06.2027 13:00\n";
+        var result = ActivityCsv.Parse(csv, []);
+        var a = result.Activities;
+        Assert.Contains(result.Errors, e => e.Code == "csvParishUnknown" && (int)e.Args!["row"] == 4);
         Assert.Null(a[0].Parish);
         Assert.Null(a[0].Leader);
-        Assert.Equal(("St. Markus", "Eva"), (a[1].Parish, a[1].Leader));
+        Assert.Equal(("Pfarrgemeinde Urfahr-St. Markus", "Eva"), (a[1].Parish, a[1].Leader));
     }
+
+    [Theory]
+    [InlineData("St. Markus", "Pfarrgemeinde Urfahr-St. Markus")]
+    [InlineData("urfahr-hl. geist", "Pfarrgemeinde Urfahr-Hl. Geist")]
+    [InlineData("Pfarrgemeinde Urfahr-Lichtenberg", "Pfarrgemeinde Urfahr-Lichtenberg")]
+    [InlineData("Pöstlingberg", "Urfahr-Pöstlingberg")]
+    [InlineData("Junia", Parishes.Junia)]
+    [InlineData("St. Junia", Parishes.Junia)]
+    [InlineData("Linz-Süd", null)]
+    [InlineData("", null)]
+    public void Parish_short_forms_are_matched(string text, string? expected) => Assert.Equal(expected, Parishes.Match(text));
 }

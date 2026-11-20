@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, input, output, sign
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityInput, Api, Group, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
+import { AppInfo } from './info';
 
 interface SessionForm { id: string | null; start: string; end: string; location: string; capacity: number | null; flexible: boolean; }
 
@@ -33,7 +34,11 @@ interface SessionForm { id: string | null; start: string; end: string; location:
         <textarea [id]="uid + '-desc'" rows="3" maxlength="2000" [placeholder]="i18n.t('editor.descriptionHint')" [(ngModel)]="description"></textarea></div>
       <div class="row">
         <div class="field grow"><label [for]="uid + '-parish'">{{ i18n.t('editor.parish') }}</label>
-          <input [id]="uid + '-parish'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="parish" /></div>
+          <select [id]="uid + '-parish'" [(ngModel)]="parish">
+            <option value="">{{ i18n.t('editor.inheritHint') }}</option>
+            @for (p of info.parishes(); track p) { <option [value]="p">{{ p }}</option> }
+            @if (parish && !info.parishes().includes(parish)) { <option [value]="parish">{{ parish }}</option> }
+          </select></div>
         <div class="field grow"><label [for]="uid + '-leader'">{{ i18n.t('editor.leader') }}</label>
           <input [id]="uid + '-leader'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="leader" /></div>
       </div>
@@ -83,6 +88,7 @@ export class ActivityEditor implements OnInit {
   readonly cancelled = output<void>();
 
   protected i18n = inject(I18n);
+  protected info = inject(AppInfo);
   private api = inject(Api);
   protected uid = 'ae' + Math.random().toString(36).slice(2, 8);
   protected title = '';

@@ -94,13 +94,13 @@ public static class Database
         await CreateSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, new DateTime(2026, 11, 18, 23, 59, 0),
             SampleData.FirmungRules, SampleData.Activities(), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
         await CreateSlotAsync(db, "Ministrantenausflug Herbst 2026", Phase.Published, new DateTime(2026, 9, 15, 23, 59, 0),
-            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d], parish: "Hl. Geist", organiser: "Miriam Koller");
+            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller");
         await CreateSlotAsync(db, "Ferienprogramm Sommer 2026", Phase.Closed, new DateTime(2026, 6, 30, 23, 59, 0),
-            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d], parish: "St. Magdalena", organiser: "Stefan Huber");
+            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber");
         await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.CampRules, DemoData.Camp(), 0, [], parish: "Christkönig", organiser: "Jungschar Christkönig");
+            DemoData.CampRules, DemoData.Camp(), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig");
         await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true, parish: "St. Markus", organiser: "Maria Pichler");
+            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler");
     }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>

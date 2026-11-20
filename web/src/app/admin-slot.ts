@@ -54,7 +54,12 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
               </div>
               <p class="muted small">{{ i18n.t('admin.phaseHint') }}</p>
               <div class="row">
-                <div class="field grow"><label for="s-parish">{{ i18n.t('admin.parish') }}</label><input id="s-parish" maxlength="120" [(ngModel)]="form.parish" /></div>
+                <div class="field grow"><label for="s-parish">{{ i18n.t('admin.parish') }}</label>
+                  <select id="s-parish" [(ngModel)]="form.parish">
+                    <option value="">{{ i18n.t('admin.parishNone') }}</option>
+                    @for (p of info.parishes(); track p) { <option [value]="p">{{ p }}</option> }
+                    @if (form.parish && !info.parishes().includes(form.parish)) { <option [value]="form.parish">{{ form.parish }}</option> }
+                  </select></div>
                 <div class="field grow"><label for="s-organiser">{{ i18n.t('admin.organiser') }}</label><input id="s-organiser" maxlength="120" [(ngModel)]="form.organiser" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.parishHint') }}</p>
@@ -270,7 +275,7 @@ export class AdminSlotPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
 
-  private info = inject(AppInfo);
+  protected info = inject(AppInfo);
   protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'demand', 'results', 'demo'] as Tab[]).filter(t => t !== 'demo' || this.info.demo()); }
   protected participants = signal<ListedParticipant[]>([]);
   protected newParticipant = '';
