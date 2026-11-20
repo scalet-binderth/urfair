@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
 import { AdminKeyPrompt } from './admin-key';
-import { Activity, Api, ApiFailure, Demand, ListedParticipant, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
+import { Activity, Api, ApiFailure, Demand, GROUP_COLORS, Group, ListedParticipant, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
@@ -58,8 +58,24 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
                 <div class="field"><label for="r-budget">{{ i18n.t('admin.budget') }}</label><input id="r-budget" type="number" step="5" [(ngModel)]="form.rules.pointBudget" /></div>
                 <div class="field"><label for="r-min">{{ i18n.t('admin.min') }}</label><input id="r-min" type="number" step="1" [(ngModel)]="form.rules.minActivities" /></div>
                 <div class="field"><label for="r-max">{{ i18n.t('admin.max') }}</label><input id="r-max" type="number" step="5" [(ngModel)]="form.rules.maxPerActivity" /></div>
-                <div class="field"><label for="r-k">{{ i18n.t('admin.k') }}</label><input id="r-k" type="number" step="1" [(ngModel)]="form.rules.perParticipant" /></div>
+                <div class="field"><label for="r-k">{{ i18n.t('admin.k') }}</label>
+                  @if (formGroups.length) { <input id="r-k" type="number" [value]="groupSum()" disabled /> }
+                  @else { <input id="r-k" type="number" step="1" [(ngModel)]="form.rules.perParticipant" /> }</div>
               </div>
+              <h3>{{ i18n.t('admin.groups') }}</h3>
+              <p class="muted small">{{ i18n.t('admin.groupsHint') }}</p>
+              @for (g of formGroups; track $index; let i = $index) {
+                <div class="row group-row">
+                  <span class="grp" [attr.data-color]="g.color"></span>
+                  <div class="field grow"><label [for]="'g-name-' + i">{{ i18n.t('admin.groupName') }}</label><input [id]="'g-name-' + i" [(ngModel)]="g.name" /></div>
+                  <div class="field"><label [for]="'g-k-' + i">{{ i18n.t('admin.groupK') }}</label><input [id]="'g-k-' + i" type="number" min="1" [(ngModel)]="g.perParticipant" /></div>
+                  <div class="field"><label [for]="'g-min-' + i">{{ i18n.t('admin.groupMin') }}</label><input [id]="'g-min-' + i" type="number" min="1" [(ngModel)]="g.minActivities" /></div>
+                  <div class="field"><label [for]="'g-color-' + i">{{ i18n.t('admin.groupColor') }}</label>
+                    <select [id]="'g-color-' + i" [(ngModel)]="g.color">@for (c of colors; track c) { <option [value]="c">{{ i18n.t('color.' + c) }}</option> }</select></div>
+                  <button class="btn ghost small" type="button" [attr.aria-label]="i18n.t('admin.removeGroup')" (click)="formGroups.splice(i, 1)">✕</button>
+                </div>
+              }
+              <div><button class="btn ghost" type="button" (click)="addGroup()">{{ i18n.t('admin.addGroup') }}</button></div>
               <p class="muted small">{{ i18n.t('admin.rulesNote') }}</p>
               <div><button class="btn" type="button" [disabled]="busy()" (click)="saveSettings()">{{ i18n.t('common.save') }}</button></div>
             </div>
@@ -82,17 +98,18 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
         @case ('activities') {
           <div class="stack">
             @if (editing() === 'new') {
-              <app-activity-editor [slotId]="s.id" (saved)="afterSave()" (cancelled)="editing.set(null)" />
+              <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" (saved)="afterSave()" (cancelled)="editing.set(null)" />
             } @else {
               <div><button class="btn" type="button" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button></div>
             }
             @for (a of activities(); track a.id) {
               @if (editing() === a.id) {
-                <app-activity-editor [slotId]="s.id" [activity]="a" (saved)="afterSave()" (cancelled)="editing.set(null)" />
+                <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" [activity]="a" (saved)="afterSave()" (cancelled)="editing.set(null)" />
               } @else {
                 <div class="card act">
                   <div class="info">
-                    <h3>{{ a.title }}
+                    <h3>@if (groupOf(a); as g) { <span class="grp" [attr.data-color]="g.color" [title]="g.name"></span> }{{ a.title }}
+                      @if (groupOf(a); as g) { <span class="tag">{{ g.name }}</span> }
                       @if (a.restrictedTo) { <span class="tag">{{ i18n.t('common.only.' + a.restrictedTo) }}</span> }
                       <span class="tag">{{ a.seats ?? i18n.t('common.unlimited') }} {{ a.seats ? i18n.t('admin.col.seats') : '' }}</span>
                     </h3>
@@ -217,6 +234,9 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
     select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px }
     .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px }
     .rules input { max-width: 120px }
+    .group-row { align-items: end }
+    .group-row .grp { margin-bottom: 14px }
+    .group-row input[type=number] { max-width: 90px }
     .act { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px }
     .act .info { min-width: 0; flex: 1 1 300px }
     .act ul { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--muted); display: grid; gap: 2px }
@@ -253,7 +273,9 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5 } };
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+  protected formGroups: Group[] = [];
+  protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
   protected removeReal = false;
 
@@ -266,6 +288,7 @@ export class AdminSlotPage implements OnInit {
       this.slot.set(slot);
       this.activities.set(activities);
       this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, rules: { ...slot.rules } };
+      this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
       this.needsKey.set(false);
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
@@ -306,12 +329,19 @@ export class AdminSlotPage implements OnInit {
     try { await navigator.clipboard.writeText(this.participantUrl()); this.toast.show(this.i18n.t('admin.linkCopied')); } catch { /* link is visible and selectable */ }
   }
 
+  protected groupSum(): number { return this.formGroups.reduce((sum, g) => sum + Number(g.perParticipant || 0), 0); }
+  protected groupOf(a: Activity): Group | undefined { return this.slot()?.rules.groups?.find(g => g.id === a.groupId); }
+  protected addGroup(): void {
+    this.formGroups.push({ id: '', name: '', perParticipant: 1, minActivities: 2, color: GROUP_COLORS[this.formGroups.length % GROUP_COLORS.length] });
+  }
+
   protected ratioWidth(d: Demand): number { return Math.min(100, (d.interested / (d.seats ?? 1) / 3) * 100); }
 
   protected saveSettings(): Promise<void> {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
-        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, rules: this.form.rules,
+        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll,
+        rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));
       await this.load();

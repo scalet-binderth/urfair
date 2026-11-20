@@ -68,3 +68,7 @@ td.num, th.num { text-align: right }
 
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 32px); z-index: 20 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+/* Activity groups (e.g. green and blue projects) */
+.grp { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--g, var(--muted)); margin-right: 6px; vertical-align: 1px }
+[data-color="green"] { --g: #2C9A4D } [data-color="blue"] { --g: #2F6FD0 } [data-color="orange"] { --g: #D9822B }
+[data-color="purple"] { --g: #8A4FC7 } [data-color="red"] { --g: #C63B3B } [data-color="grey"] { --g: #7A7F8C }

@@ -27,6 +27,12 @@ public static class Validation
         var count = ballot.Points.Count(p => p.Value > 0);
         if (count < r.MinActivities) errors.Add(E("tooFewActivities", ("min", r.MinActivities), ("count", count)));
 
+        foreach (var g in r.GroupList)
+        {
+            var inGroup = ballot.Points.Count(p => p.Value > 0 && known.TryGetValue(p.Key, out var a) && a.GroupId == g.Id);
+            if (inGroup < g.MinActivities) errors.Add(E("tooFewInGroup", ("group", g.Name), ("min", g.MinActivities), ("count", inGroup)));
+        }
+
         foreach (var (id, p) in ballot.Points)
         {
             if (p > 0 && known.TryGetValue(id, out var a) && a.Sessions.All(s => ballot.UnavailableSessions.Contains(s.Id)))
@@ -58,6 +64,11 @@ public static class Validation
         if (r.MinActivities * r.Step > r.PointBudget) errors.Add(E("tooManyActivitiesForBudget", ("max", r.PointBudget / r.Step)));
         if (r.PerParticipant > r.MinActivities) errors.Add(E("perParticipantAboveMin"));
         if (r.PerParticipant < 1) errors.Add(E("perParticipantTooLow"));
+        if (r.GroupList.Count > 0)
+        {
+            if (r.GroupList.Any(g => string.IsNullOrWhiteSpace(g.Name))) errors.Add(E("groupNameRequired"));
+            if (r.GroupList.Any(g => g.PerParticipant < 1 || g.MinActivities < g.PerParticipant)) errors.Add(E("groupMinBelowQuota"));
+            if (r.GroupList.Sum(g => g.PerParticipant) != r.PerParticipant) errors.Add(E("groupQuotaSum", ("k", r.PerParticipant)));        }
         return errors;
     }
 }

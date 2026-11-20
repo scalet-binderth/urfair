@@ -24,11 +24,24 @@ public class FairSlotEntity
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
     public List<ParticipantEntity> Participants { get; set; } = [];
+    public List<GroupEntity> Groups { get; set; } = [];
 
-    public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant);
+    public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant, 5,
+        Groups.OrderBy(g => g.SortOrder).Select(g => g.ToModel()).ToList());
 
-    public void Apply(Rules r) =>
+    public void Apply(Rules r)
+    {
         (PointBudget, MinActivities, MaxPerActivity, PerParticipant) = (r.PointBudget, r.MinActivities, r.MaxPerActivity, r.PerParticipant);
+        // Update groups in place (matched by id) so EF Core does not track two rows with the same key.
+        var keep = r.GroupList.Select((g, i) =>
+        {
+            var e = Groups.FirstOrDefault(x => x.Id == g.Id) ?? new GroupEntity { Id = g.Id };
+            (e.Name, e.PerParticipant, e.MinActivities, e.Color, e.SortOrder) = (g.Name, g.PerParticipant, g.MinActivities, g.Color, i);
+            return e;
+        }).ToList();
+        Groups.RemoveAll(x => !keep.Contains(x));
+        foreach (var e in keep.Where(e => !Groups.Contains(e))) Groups.Add(e);
+    }
 }
 
 public class ActivityEntity
@@ -38,12 +51,13 @@ public class ActivityEntity
     public string Title { get; set; } = "";
     public string? RestrictedTo { get; set; }
     public int Popularity { get; set; } = 5;
+    public string? GroupId { get; set; }
     public int SortOrder { get; set; }
     public List<SessionEntity> Sessions { get; set; } = [];
 
     public Activity ToModel() => new(Id, Title,
         Sessions.OrderBy(s => s.Start).Select(s => new Session(s.Id, Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(),
-        RestrictedTo, Popularity);
+        RestrictedTo, Popularity, GroupId);
 }
 
 public class SessionEntity
@@ -67,6 +81,8 @@ public class BallotEntity
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     public List<BallotPoints> Points { get; set; } = [];
     public List<string> UnavailableSessions { get; set; } = [];
+    /// <summary>Activities the person wants to stay on the waiting list for, if they do not get a seat.</summary>
+    public List<string> Waitlist { get; set; } = [];
 
     public Ballot ToModel() => new(Id.ToString(), Name,
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
@@ -99,4 +115,17 @@ public static class Ids
 {
     /// <summary>Short random id for activities and sessions.</summary>
     public static string New() => Guid.NewGuid().ToString("N")[..12];
+}
+
+/// <summary>A group of activities with its own quota (owned by <see cref="FairSlotEntity"/>).</summary>
+public class GroupEntity
+{
+    public string Id { get; set; } = Ids.New();
+    public string Name { get; set; } = "";
+    public int PerParticipant { get; set; } = 1;
+    public int MinActivities { get; set; } = 1;
+    public string Color { get; set; } = "green";
+    public int SortOrder { get; set; }
+
+    public ActivityGroup ToModel() => new(Id, Name, PerParticipant, MinActivities, Color);
 }

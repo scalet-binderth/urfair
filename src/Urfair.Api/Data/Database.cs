@@ -12,7 +12,7 @@ public static class Database
     /// Bump when the model changes. While the app only holds demo data, a version mismatch resets the
     /// database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
     /// </summary>
-    private const int SchemaVersion = 5; // 5: OpenToAll, larger Pfarrfest demo
+    private const int SchemaVersion = 6; // 6: activity groups, demo people with ballots
 
     /// <summary>
     /// Chooses the database: PostgreSQL if DATABASE_URL (as provided by Neon, Render, Koyeb…) or
@@ -82,13 +82,14 @@ public static class Database
     /// <summary>
     /// Five demo FairSlots for presentations. Demo people: A sees nothing, B two open FairSlots,
     /// C two open and one published, D two open, one closed and one published.
-    /// "Pfarrfest" has no ballots at all, to try voting live.
+    /// B, C and D have already voted in their open FairSlots and can change their ballots.
+    /// "Pfarrfest" has no sample ballots, to try voting live.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         await CreateSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, new DateTime(2026, 11, 18, 23, 59, 0),
-            new Rules(), SampleData.Activities(), 140, [b, c, d]);
+            SampleData.FirmungRules, SampleData.Activities(), 140, [b, c, d], withBallots: [b, c, d]);
         await CreateSlotAsync(db, "Ministrantenausflug Herbst 2026", Phase.Published, new DateTime(2026, 9, 15, 23, 59, 0),
             DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d]);
         await CreateSlotAsync(db, "Ferienprogramm Sommer 2026", Phase.Closed, new DateTime(2026, 6, 30, 23, 59, 0),
@@ -96,12 +97,12 @@ public static class Database
         await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
             DemoData.CampRules, DemoData.Camp(), 0, []);
         await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], openToAll: true);
+            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true);
     }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
-        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), new Rules(), SampleData.Activities(), sampleCount, []);
+        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), SampleData.FirmungRules, SampleData.Activities(), sampleCount, []);
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
@@ -112,7 +113,7 @@ public static class Database
         var order = 0;
         foreach (var a in activities)
         {
-            var activity = new ActivityEntity { FairSlotId = slot.Id, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity, SortOrder = order++ };
+            var activity = new ActivityEntity { FairSlotId = slot.Id, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity, GroupId = a.GroupId, SortOrder = order++ };
             activity.Sessions = a.Sessions.Select(s => new SessionEntity
             {
                 ActivityId = activity.Id, Start = s.Start, End = s.End, Location = s.Location, Capacity = s.Capacity, Flexible = s.Flexible,
@@ -126,7 +127,8 @@ public static class Database
 
         if (withBallots is { Length: > 0 })
         {
-            var models = await LoadActivitiesAsync(db, slot.Id);
+            // Demo people have no gender on record, so leave out activities restricted to boys or girls.
+            var models = (await LoadActivitiesAsync(db, slot.Id)).Where(a => a.RestrictedTo is null).ToList();
             var generated = SampleData.Participants(withBallots.Length, slot.ToRules(), models, slot.Seed + 1);
             for (var i = 0; i < withBallots.Length; i++)
             {

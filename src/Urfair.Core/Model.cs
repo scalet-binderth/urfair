@@ -22,7 +22,8 @@ public sealed record Activity(
     string Title,
     IReadOnlyList<Session> Sessions,
     string? RestrictedTo = null,
-    int Popularity = 5)
+    int Popularity = 5,
+    string? GroupId = null)
 {
     public int? Seats => Sessions.Any(s => s.Capacity is null) ? null : Sessions.Sum(s => s.Capacity!.Value);
 }
@@ -38,12 +39,35 @@ public sealed record Ballot(
     public int PointsFor(string activityId) => Points.GetValueOrDefault(activityId);
 }
 
-public sealed record Rules(
+/// <summary>
+/// A group of activities, e.g. the "green" and "blue" projects of the confirmation preparation.
+/// Every participant gets exactly <see cref="PerParticipant"/> activities from the group and must give
+/// points to at least <see cref="MinActivities"/> of them.
+/// </summary>
+public sealed record ActivityGroup(string Id, string Name, int PerParticipant, int MinActivities, string Color = "green");
+
+/// <summary>Rules of a FairSlot. With groups, <see cref="PerParticipant"/> must be the sum of the group quotas.</summary>
+public record Rules(
     int PointBudget = 100,
     int MinActivities = 5,
     int MaxPerActivity = 40,
     int PerParticipant = 3,
-    int Step = 5);
+    int Step = 5,
+    IReadOnlyList<ActivityGroup>? Groups = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<ActivityGroup> GroupList => Groups ?? [];
+
+    public ActivityGroup? GroupOf(Activity a) => a.GroupId is null ? null : GroupList.FirstOrDefault(g => g.Id == a.GroupId);
+
+    // Compare groups by content so that "rules changed" detection works.
+    public virtual bool Equals(Rules? other) =>
+        other is not null && (PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step) ==
+        (other.PointBudget, other.MinActivities, other.MaxPerActivity, other.PerParticipant, other.Step) &&
+        GroupList.SequenceEqual(other.GroupList);
+
+    public override int GetHashCode() => HashCode.Combine(PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, GroupList.Count);
+}
 
 public sealed class Assignment(string ballotId, Session session, int points)
 {

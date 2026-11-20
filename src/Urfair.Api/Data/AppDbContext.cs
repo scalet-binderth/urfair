@@ -21,6 +21,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasMany(x => x.Activities).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Ballots).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Participants).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+            e.OwnsMany(x => x.Groups, g =>
+            {
+                g.ToTable("Groups");
+                g.WithOwner().HasForeignKey("FairSlotId");
+                g.HasKey("FairSlotId", nameof(GroupEntity.Id));
+                g.Property(x => x.Id).HasMaxLength(40);
+                g.Property(x => x.Name).HasMaxLength(100);
+                g.Property(x => x.Color).HasMaxLength(20);
+            });
         });
         b.Entity<ParticipantEntity>(e =>
         {
@@ -33,6 +42,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasMaxLength(40);
             e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.GroupId).HasMaxLength(40);
             e.HasMany(x => x.Sessions).WithOne().HasForeignKey(s => s.ActivityId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<SessionEntity>(e =>
