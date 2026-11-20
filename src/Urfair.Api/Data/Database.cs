@@ -9,10 +9,10 @@ namespace Urfair.Api.Data;
 public static class Database
 {
     /// <summary>
-    /// Bump when the model changes. While the app only holds demo data, a version mismatch resets the
-    /// database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
+    /// Demo mode (default on): demo people, sample data and reset buttons. A real instance sets
+    /// Demo__Enabled=false; the same code then runs without any demo content.
     /// </summary>
-    private const int SchemaVersion = 6; // 6: activity groups, demo people with ballots
+    public static bool IsDemo(IConfiguration config) => config.GetValue("Demo:Enabled", true);
 
     /// <summary>
     /// Chooses the database: PostgreSQL if DATABASE_URL (as provided by Neon, Render, Koyeb…) or
@@ -28,13 +28,11 @@ public static class Database
         var provider = config["Database:Provider"] ?? (string.IsNullOrEmpty(url) ? "Sqlite" : "Postgres");
         var connection = config.GetConnectionString("Default");
 
-        builder.Services.AddDbContext<AppDbContext>(o =>
-        {
-            if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
-                o.UseNpgsql(string.IsNullOrEmpty(url) ? connection : FromUrl(url));
-            else
-                o.UseSqlite(connection ?? "Data Source=urfair.db");
-        });
+        // The app works with AppDbContext; the provider-specific subclass brings the matching migrations.
+        if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+            builder.Services.AddDbContext<AppDbContext, PostgresAppDbContext>(o => o.UseNpgsql(string.IsNullOrEmpty(url) ? connection : FromUrl(url)));
+        else
+            builder.Services.AddDbContext<AppDbContext, SqliteAppDbContext>(o => o.UseSqlite(connection ?? "Data Source=urfair.db"));
     }
 
     /// <summary>Converts postgres://user:pass@host:port/db?sslmode=require into an Npgsql connection string.</summary>
@@ -56,27 +54,32 @@ public static class Database
         return csb.ConnectionString;
     }
 
-    /// <summary>Creates (or, on a schema change, recreates) the database and adds a demo FairSlot if there is none.</summary>
+    /// <summary>Applies pending migrations and, in demo mode, seeds the demo FairSlots if there are none.</summary>
     public static async Task InitialiseAsync(IServiceProvider services, ILogger logger)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var creator = db.GetService<IRelationalDatabaseCreator>();
 
-        if (await creator.ExistsAsync() && await creator.HasTablesAsync() && await CurrentVersionAsync(db) != SchemaVersion)
+        // One-time switch: databases created before migrations existed only hold demo data and are recreated.
+        if (await creator.ExistsAsync() && await creator.HasTablesAsync() && !(await db.Database.GetAppliedMigrationsAsync()).Any())
         {
-            logger.LogWarning("Database schema changed: recreating the (demo) database.");
+            logger.LogWarning("Database without migration history: recreating the (demo) database.");
             await WipeAsync(db);
         }
 
-        await db.Database.EnsureCreatedAsync();
-        if (!await db.Meta.AnyAsync())
-        {
-            db.Meta.Add(new MetaEntity { SchemaVersion = SchemaVersion });
-            await db.SaveChangesAsync();
-        }
+        await db.Database.MigrateAsync();
 
-        if (!await db.FairSlots.AnyAsync()) await SeedDemoAsync(db);
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        if (IsDemo(config) && !await db.FairSlots.AnyAsync()) await SeedDemoAsync(db);
+    }
+
+    /// <summary>Removes all FairSlots and seeds the demo again (demo mode only).</summary>
+    public static async Task ResetDemoAsync(AppDbContext db)
+    {
+        db.FairSlots.RemoveRange(await db.FairSlots.ToListAsync());
+        await db.SaveChangesAsync();
+        await SeedDemoAsync(db);
     }
 
     /// <summary>
@@ -111,15 +114,7 @@ public static class Database
         var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll };
         slot.Apply(rules);
         var order = 0;
-        foreach (var a in activities)
-        {
-            var activity = new ActivityEntity { FairSlotId = slot.Id, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity, GroupId = a.GroupId, SortOrder = order++ };
-            activity.Sessions = a.Sessions.Select(s => new SessionEntity
-            {
-                ActivityId = activity.Id, Start = s.Start, End = s.End, Location = s.Location, Capacity = s.Capacity, Flexible = s.Flexible,
-            }).ToList();
-            slot.Activities.Add(activity);
-        }
+        foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));
         slot.Participants = participants.Select(p => new ParticipantEntity { FairSlotId = slot.Id, Name = p }).ToList();
         db.FairSlots.Add(slot);
         await db.SaveChangesAsync();
@@ -144,6 +139,21 @@ public static class Database
         return slot;
     }
 
+    /// <summary>Creates the database rows for a model activity (new ids for the activity and its sessions).</summary>
+    public static ActivityEntity ToEntity(Activity a, Guid slotId, int sortOrder)
+    {
+        var entity = new ActivityEntity
+        {
+            FairSlotId = slotId, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity,
+            GroupId = a.GroupId, Description = a.Description, SortOrder = sortOrder,
+        };
+        entity.Sessions = a.Sessions.Select(s => new SessionEntity
+        {
+            ActivityId = entity.Id, Start = s.Start, End = s.End, Location = s.Location, Capacity = s.Capacity, Flexible = s.Flexible,
+        }).ToList();
+        return entity;
+    }
+
     /// <summary>Whether a person may see and vote in a FairSlot: listed, or the FairSlot is open to all (demo person A excluded).</summary>
     public static async Task<bool> CanTakePartAsync(AppDbContext db, Guid slotId, string name)
     {
@@ -157,12 +167,6 @@ public static class Database
     {
         var n = name.Trim().ToLower();
         return db.Participants.AnyAsync(p => p.FairSlotId == slotId && p.Name.ToLower() == n);
-    }
-
-    private static async Task<int?> CurrentVersionAsync(AppDbContext db)
-    {
-        try { return await db.Meta.Where(m => m.Id == 1).Select(m => (int?)m.SchemaVersion).SingleOrDefaultAsync(); }
-        catch { return null; } // table missing: database from before versioning
     }
 
     private static async Task WipeAsync(AppDbContext db)

@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { I18n } from './i18n';
 
 interface Row { cells: string[] }
-interface Phase { label: string; title: string; items: string[] }
+interface Phase { label: string; kind?: 'done' | 'parallel'; title: string; items: string[] }
 interface PlanText {
   title: string; lead: string; asOf: string;
   nowTitle: string; now: string[];
@@ -33,14 +33,18 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Projektgruppen wie bei der Firmung: 2 aus Grün, 1 aus Blau, frei definierbar',
       'Zwischenstand nach der Abgabe (fix, Warteliste mit Platz, ausgebucht) und Wartelisten-Häkchen',
       'Demo-Personen B bis D haben schon abgestimmt und können ändern',
+      'Veranstaltungen mit Beschreibung, Import und Export über Excel/CSV',
+      'Datenbank mit Migrationen: Daten bleiben bei Updates erhalten; Demo per Knopf zurücksetzen',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
     phases: [
-      { label: 'Schritt 1', title: 'Sichere Grundlage', items: ['Datenbank-Migrationen', 'Login mit Rollen (Junia- und Pfarr-Admins)', 'Teilnehmerliste mit E-Mail und CSV-Import', 'Persönliche Links mit Prüfung', 'Beschreibung pro Veranstaltung'] },
-      { label: 'Schritt 2', title: 'Zuteilung im Griff', items: ['Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'Abmelden und Nachrücken von der Warteliste'] },
-      { label: 'Parallel', title: 'Mit der Diözese', items: ['Hosting: Diözesanserver oder EU-Anbieter', 'Datenschutz mit dem Datenschutzbeauftragten', 'Impressum und Datenschutzerklärung'] },
-      { label: 'Danach', title: 'Probelauf und mehr', items: ['Probelauf mit 20 bis 30 Firmlingen', 'E-Mails, Pflichtbesetzung, „mehr als gefordert“, „mit Freund:in zusammen“, Vorjahr kopieren'] },
+      { label: 'Schritt 1 · erledigt', kind: 'done', title: 'Sichere Grundlage', items: ['Datenbank-Migrationen', 'Demo-Schalter (Demo und echte Instanz aus demselben Code)', 'Beschreibung pro Veranstaltung', 'Veranstaltungen aus Excel/CSV importieren'] },
+      { label: 'Schritt 2', title: 'Teilnehmende', items: ['Teilnehmerliste per CSV mit E-Mail', 'Persönliche Links mit Prüfung (Geburts- oder Taufdatum)', 'Demo-Postfach statt echter E-Mails'] },
+      { label: 'Schritt 3', title: 'Login und Rollen', items: ['Junia- und Pfarr-Admins', 'Sichtbarkeit pro Wahl', 'Demo-Konten per Knopf'] },
+      { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
+      { label: 'Schritt 5 und 6', title: 'Nach dem Probelauf', items: ['Abmelden und Nachrücken von der Warteliste', 'Pflichtbesetzung', '„Mehr als gefordert“', 'Zwischenstand ein- und ausschaltbar'] },
+      { label: 'Parallel', kind: 'parallel', title: 'Mit der Diözese', items: ['Hosting: Diözesanserver oder EU-Anbieter', 'Datenschutz mit dem Datenschutzbeauftragten', 'Impressum und Datenschutzerklärung'] },
     ],
     mustTitle: 'Muss vor echten Anmeldungen passieren',
     mustLead: 'Ohne diese Punkte dürfen keine echten Daten von Firmlingen in die App.',
@@ -48,7 +52,6 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     must: [
       { cells: ['Identifikation', 'E-Mail, CSV-Import, Hinzufügen von Hand, persönlicher Link, Prüfung nach dem Klick (z. B. Geburts- oder Taufdatum)', 'Heute kann sich jede:r unter jedem Namen anmelden'] },
       { cells: ['Login und Rollen', 'Echte Konten für mehrere Personen, Rollen pro Pfarre', 'Heute gibt es nur einen offenen Demo-Zugang'] },
-      { cells: ['Migrationen', 'Änderungen an der Datenbank ohne Datenverlust', 'Heute wird die Datenbank bei Strukturänderungen neu angelegt'] },
       { cells: ['Zuteilung festschreiben', 'Speichern, einfrieren, händisch verschieben, fixieren, neu rechnen', 'Heute wird bei jedem Aufruf neu gerechnet'] },
       { cells: ['Recht und Datenschutz', 'Impressum, Datenschutzerklärung, automatisches Löschen, Hosting in der EU', 'Daten von Minderjährigen'] },
     ],
@@ -71,7 +74,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { cells: ['Zwischenstand und Warteliste', 'In der Demo umgesetzt: nach der Abgabe sieht man, was man fix hätte, wo man auf der Warteliste steht (mit Platz) und was ausgebucht ist; pro Projekt „auf Warteliste bleiben“. Achtung: ein sichtbarer Zwischenstand verleitet zum Taktieren, daher pro Wahl ein- und ausschaltbar machen.', 'Demo erledigt, Schalter klein'] },
       { cells: ['Abmelden und Nachrücken nach Schluss', 'Organisation oder Teilnehmende melden ab. Der frei gewordene Platz wird der ersten Person auf der Warteliste (mit Häkchen) angeboten, mit Frist zum Annehmen, sonst der nächsten. Setzt festgeschriebene Zuteilung und E-Mails voraus.', 'mittel bis groß'] },
       { cells: ['Pflichtbesetzung (Posten müssen besetzt sein)', 'Beim Anlegen wählbar: „freie Wahl“ oder „alle Posten müssen besetzt sein“ (z. B. Pfarrfest). Dann füllt der Algorithmus zuerst die Mindestbesetzung jedes Termins auf, bevorzugt mit Personen, die dort Punkte gegeben haben. In der Abstimmung steht „hier fehlen noch X Personen“, damit sich Leute gezielt melden.', 'mittel'] },
-      { cells: ['Veranstaltungen aus PDF importieren', 'Technisch möglich mit einer freien Bibliothek (PdfPig, Apache-Lizenz, gratis). Ein PDF enthält aber nur Text an Positionen, keine Felder: das Erkennen von Titel, Datum, Ort und Plätzen klappt nur für ein bekanntes Layout zuverlässig, z. B. das jährliche Firmungs-PDF. Daher: PDF hochladen, Vorschau als Tabelle, korrigieren, dann übernehmen. Robuster und einfacher wäre zusätzlich eine Excel/CSV-Vorlage. KI-Erkennung ginge auch, kostet aber Geld und braucht eine Datenschutzklärung.', 'mittel'] },
+      { cells: ['Veranstaltungen importieren', 'Statt PDF über Excel/CSV, weil ein PDF keine Felder enthält. Umgesetzt in Schritt 1: Liste herunterladen, in Excel bearbeiten, hochladen, Vorschau prüfen, ergänzen oder ersetzen.', 'erledigt'] },
     ],
     shouldTitle: 'Sollte für den echten Einsatz dabei sein',
     should: ['Beschreibung pro Veranstaltung (was, mitbringen, Leitung)', 'Teilnehmerlisten für Leiter:innen zum Exportieren oder Drucken', 'Anmeldeschluss automatisch', 'Überblick „noch nicht abgestimmt“ für Erinnerungen'],
@@ -95,14 +98,18 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Activity groups as in the confirmation preparation: 2 from green, 1 from blue, freely definable',
       'Interim status after voting (fixed, waiting list with position, fully booked) and a waiting-list tick box',
       'Demo people B to D have already voted and can change their vote',
+      'Activities with descriptions, import and export via Excel/CSV',
+      'Database with migrations: data survives updates; reset the demo with one button',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
     phases: [
-      { label: 'Step 1', title: 'Safe foundation', items: ['Database migrations', 'Login with roles (Junia and parish admins)', 'Participant list with e-mail and CSV import', 'Personal links with a check', 'Description per activity'] },
-      { label: 'Step 2', title: 'Allocation under control', items: ['Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'Cancellations and moving up from the waiting list'] },
-      { label: 'In parallel', title: 'With the diocese', items: ['Hosting: diocese server or EU provider', 'Data protection with the data protection officer', 'Legal notice and privacy policy'] },
-      { label: 'Then', title: 'Pilot and more', items: ['Pilot with 20 to 30 confirmands', 'E-mails, required staffing, “more than required”, “together with a friend”, copy last year'] },
+      { label: 'Step 1 · done', kind: 'done', title: 'Safe foundation', items: ['Database migrations', 'Demo switch (demo and real instance from the same code)', 'Description per activity', 'Import activities from Excel/CSV'] },
+      { label: 'Step 2', title: 'Participants', items: ['Participant list via CSV with e-mail', 'Personal links with a check (date of birth or baptism)', 'Demo mailbox instead of real e-mails'] },
+      { label: 'Step 3', title: 'Login and roles', items: ['Junia and parish admins', 'Visibility per vote', 'Demo accounts via buttons'] },
+      { label: 'Step 4', title: 'Allocation under control', items: ['Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'then: pilot with 20 to 30 confirmands'] },
+      { label: 'Steps 5 and 6', title: 'After the pilot', items: ['Cancellations and moving up from the waiting list', 'Required staffing', '“More than required”', 'Interim status switchable'] },
+      { label: 'In parallel', kind: 'parallel', title: 'With the diocese', items: ['Hosting: diocese server or EU provider', 'Data protection with the data protection officer', 'Legal notice and privacy policy'] },
     ],
     mustTitle: 'Needed before real registrations',
     mustLead: 'Without these points no real data of confirmands may go into the app.',
@@ -110,7 +117,6 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     must: [
       { cells: ['Identification', 'E-mail, CSV import, manual entry, personal link, check after the click (e.g. date of birth or baptism)', 'Today anyone can sign in under any name'] },
       { cells: ['Login and roles', 'Real accounts for several people, roles per parish', 'Today there is only an open demo access'] },
-      { cells: ['Migrations', 'Database changes without data loss', 'Today the database is recreated on structural changes'] },
       { cells: ['Freeze the allocation', 'Store, freeze, move by hand, lock, recalculate', 'Today it is recalculated on every request'] },
       { cells: ['Legal and privacy', 'Legal notice, privacy policy, automatic deletion, hosting in the EU', 'Data of minors'] },
     ],
@@ -133,7 +139,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { cells: ['Interim status and waiting list', 'Done in the demo: after voting you see what you would get, where you are on the waiting list (with position) and what is fully booked; per activity “stay on the waiting list”. Note: a visible interim status invites tactics, so make it switchable per vote.', 'demo done, switch small'] },
       { cells: ['Cancellations and moving up after the deadline', 'Organisers or participants cancel. The free seat is offered to the first person on the waiting list (with the tick), with a deadline to accept, otherwise to the next. Needs a frozen allocation and e-mails.', 'medium to large'] },
       { cells: ['Required staffing (all posts must be filled)', 'Chosen when creating a vote: “free choice” or “all posts must be filled” (e.g. parish festival). Then the algorithm first fills each date’s minimum staffing, preferring people who gave it points. While voting, “X people still missing here” is shown so people sign up where needed.', 'medium'] },
-      { cells: ['Import activities from a PDF', 'Technically possible with a free library (PdfPig, Apache licence, no cost). A PDF only holds text at positions, no fields, so recognising title, date, place and seats is reliable only for a known layout, e.g. the yearly confirmation PDF. Hence: upload the PDF, preview as a table, correct, then take over. More robust and simpler would be an additional Excel/CSV template. AI recognition would work too, but costs money and needs a data protection review.', 'medium'] },
+      { cells: ['Import activities', 'Via Excel/CSV instead of PDF, because a PDF has no fields. Done in step 1: download the list, edit it in Excel, upload, check the preview, add or replace.', 'done'] },
     ],
     shouldTitle: 'Should be there for real use',
     should: ['Description per activity (what, what to bring, who leads)', 'Participant lists for leaders to export or print', 'Automatic registration deadline', 'Overview “not voted yet” for reminders'],
@@ -162,7 +168,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       <h2>{{ p.phasesTitle }}</h2>
       <ol class="phases">
         @for (ph of p.phases; track ph.label) {
-          <li class="card phase-card">
+          <li class="card phase-card" [attr.data-kind]="ph.kind">
             <span class="step">{{ ph.label }}</span>
             <h3>{{ ph.title }}</h3>
             <ul>@for (i of ph.items; track i) { <li>{{ i }}</li> }</ul>
@@ -222,8 +228,8 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     ul { margin: 0; padding-left: 20px; display: grid; gap: 4px }
     .phases { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; counter-reset: none }
     .phase-card { display: grid; gap: 8px; align-content: start; border-top: 4px solid var(--accent) }
-    .phase-card:nth-child(3) { border-top-color: var(--warn) }
-    .phase-card:nth-child(4) { border-top-color: var(--line) }
+    .phase-card[data-kind="done"] { border-top-color: var(--good) }
+    .phase-card[data-kind="parallel"] { border-top-color: var(--warn) }
     .step { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted) }
     .phase-card ul { font-size: 14px }
     .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px }

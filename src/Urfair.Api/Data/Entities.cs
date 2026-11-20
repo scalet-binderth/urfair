@@ -52,12 +52,13 @@ public class ActivityEntity
     public string? RestrictedTo { get; set; }
     public int Popularity { get; set; } = 5;
     public string? GroupId { get; set; }
+    public string? Description { get; set; }
     public int SortOrder { get; set; }
     public List<SessionEntity> Sessions { get; set; } = [];
 
     public Activity ToModel() => new(Id, Title,
         Sessions.OrderBy(s => s.Start).Select(s => new Session(s.Id, Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(),
-        RestrictedTo, Popularity, GroupId);
+        RestrictedTo, Popularity, GroupId, Description);
 }
 
 public class SessionEntity
@@ -102,13 +103,6 @@ public class BallotPoints
 {
     public string ActivityId { get; set; } = "";
     public int Points { get; set; }
-}
-
-/// <summary>Single row recording the schema version (see <see cref="Database"/>).</summary>
-public class MetaEntity
-{
-    public int Id { get; set; } = 1;
-    public int SchemaVersion { get; set; }
 }
 
 public static class Ids

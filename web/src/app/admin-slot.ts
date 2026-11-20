@@ -2,9 +2,11 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } fro
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
+import { ActivityImport } from './activity-import';
 import { AdminKeyPrompt } from './admin-key';
 import { Activity, Api, ApiFailure, Demand, GROUP_COLORS, Group, ListedParticipant, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
+import { AppInfo } from './info';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
 
@@ -13,7 +15,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
 /** Organisation view of one FairSlot. */
 @Component({
   selector: 'app-admin-slot',
-  imports: [FormsModule, RouterLink, ActivityEditor, AdminKeyPrompt, ResultsPage],
+  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, AdminKeyPrompt, ResultsPage],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <p><a routerLink="/admin">{{ i18n.t('admin.back') }}</a></p>
@@ -100,8 +102,12 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
             @if (editing() === 'new') {
               <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" (saved)="afterSave()" (cancelled)="editing.set(null)" />
             } @else {
-              <div><button class="btn" type="button" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button></div>
+              <div class="row">
+                <button class="btn" type="button" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
+                <button class="btn ghost" type="button" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
+              </div>
             }
+            @if (showImport()) { <app-activity-import [slotId]="s.id" [groups]="s.rules.groups ?? []" (imported)="afterImport()" /> }
             @for (a of activities(); track a.id) {
               @if (editing() === a.id) {
                 <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" [activity]="a" (saved)="afterSave()" (cancelled)="editing.set(null)" />
@@ -113,6 +119,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'demand' | 'results' | '
                       @if (a.restrictedTo) { <span class="tag">{{ i18n.t('common.only.' + a.restrictedTo) }}</span> }
                       <span class="tag">{{ a.seats ?? i18n.t('common.unlimited') }} {{ a.seats ? i18n.t('admin.col.seats') : '' }}</span>
                     </h3>
+                    @if (a.description) { <p class="muted small desc">{{ a.description }}</p> }
                     <ul>@for (x of a.sessions; track x.id) { <li>{{ i18n.when(x) }} · {{ x.location }}@if (x.capacity) { · {{ i18n.t('common.seats', { n: x.capacity }) }} }</li> }</ul>
                   </div>
                   <div class="row actions">
@@ -257,7 +264,8 @@ export class AdminSlotPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
 
-  protected readonly tabs: Tab[] = ['settings', 'activities', 'participants', 'demand', 'results', 'demo'];
+  private info = inject(AppInfo);
+  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'demand', 'results', 'demo'] as Tab[]).filter(t => t !== 'demo' || this.info.demo()); }
   protected participants = signal<ListedParticipant[]>([]);
   protected newParticipant = '';
   protected readonly phases = PHASES;
@@ -272,6 +280,7 @@ export class AdminSlotPage implements OnInit {
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
   protected confirmClear = signal(false);
+  protected showImport = signal(false);
   protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; rules: Rules } =
     { name: '', phase: 'Draft', deadline: '', openToAll: false, rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
   protected formGroups: Group[] = [];
@@ -354,6 +363,12 @@ export class AdminSlotPage implements OnInit {
       this.toast.show(this.i18n.t('common.deleted'));
       await this.router.navigate(['/admin']);
     });
+  }
+
+  protected async afterImport(): Promise<void> {
+    this.showImport.set(false);
+    this.toast.show(this.i18n.t('import.done'));
+    await this.load();
   }
 
   protected async afterSave(): Promise<void> {

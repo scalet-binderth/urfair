@@ -3,6 +3,8 @@ namespace Urfair.Core;
 /// <summary>Rule checks. Errors carry codes (not texts) so the UI can show them in any language.</summary>
 public static class Validation
 {
+    public const int MaxDescription = 2000;
+
     private static ValidationError E(string code, params (string Key, object Value)[] args) =>
         new(code, args.Length == 0 ? null : args.ToDictionary(a => a.Key, a => a.Value));
 
@@ -46,6 +48,7 @@ public static class Validation
         var errors = new List<ValidationError>();
         if (string.IsNullOrWhiteSpace(a.Title)) errors.Add(E("titleRequired"));
         if (a.RestrictedTo is not (null or "m" or "w")) errors.Add(E("restrictionInvalid"));
+        if (a.Description is { Length: > MaxDescription }) errors.Add(E("descriptionTooLong", ("max", MaxDescription)));
         if (a.Sessions.Count == 0) errors.Add(E("sessionRequired"));
         foreach (var s in a.Sessions)
         {

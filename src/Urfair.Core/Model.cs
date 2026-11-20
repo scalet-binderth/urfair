@@ -23,7 +23,8 @@ public sealed record Activity(
     IReadOnlyList<Session> Sessions,
     string? RestrictedTo = null,
     int Popularity = 5,
-    string? GroupId = null)
+    string? GroupId = null,
+    string? Description = null)
 {
     public int? Seats => Sessions.Any(s => s.Capacity is null) ? null : Sessions.Sum(s => s.Capacity!.Value);
 }

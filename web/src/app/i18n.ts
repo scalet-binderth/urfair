@@ -163,6 +163,20 @@ const texts: Record<Lang, Record<string, string>> = {
     'error.groupMinBelowQuota': 'Pro Gruppe muss mindestens 1 zugeteilt werden und mindestens so viele bepunktet wie zugeteilt.',
     'error.groupQuotaSum': 'Die Zuteilungen der Gruppen müssen zusammen {k} ergeben.',
     'error.notVoted': 'Bitte zuerst die Wahl abgeben.',
+    'editor.description': 'Beschreibung', 'editor.descriptionHint': 'Was passiert, was mitbringen, wer leitet (optional)',
+    'import.open': 'Aus Excel/CSV importieren', 'import.title': 'Veranstaltungen aus Excel/CSV importieren',
+    'import.lead': 'Lade die Liste als Vorlage herunter, bearbeite sie in Excel (eine Zeile pro Termin; gleicher Titel = gleiche Veranstaltung) und speichere sie als „CSV UTF-8“ oder „CSV“. Danach hier hochladen, Vorschau prüfen und übernehmen.',
+    'import.template': 'Liste/Vorlage herunterladen', 'import.choose': 'CSV-Datei wählen …',
+    'import.found': '{n} Veranstaltungen mit {s} Terminen erkannt.', 'import.replace': 'Bestehende Veranstaltungen ersetzen (sonst werden sie ergänzt)',
+    'import.replaceWarn': 'Achtung: Alle bisherigen Veranstaltungen werden gelöscht, abgegebene Stimmen verlieren ihre Punkte.',
+    'import.commit': '{n} Veranstaltungen übernehmen', 'import.done': 'Veranstaltungen importiert.',
+    'admin.resetAll': 'Demo komplett zurücksetzen', 'admin.resetAllHint': 'Löscht alle Wahlen, auch selbst angelegte, und legt die Demo-Wahlen neu an.',
+    'error.descriptionTooLong': 'Die Beschreibung darf höchstens {max} Zeichen lang sein.',
+    'error.row': 'Zeile {row}:', 'error.csvEmpty': 'Die Datei enthält keine Veranstaltungen.',
+    'error.csvColumnsMissing': 'Es fehlen Spalten: {columns}. Bitte die Vorlage verwenden.',
+    'error.csvTitleMissing': 'Titel fehlt.', 'error.csvDateInvalid': 'Datum „{value}“ nicht erkannt (z. B. 21.11.2026 14:00).',
+    'error.csvSeatsInvalid': 'Plätze „{value}“ ist keine Zahl.', 'error.csvGroupUnknown': 'Gruppe „{value}“ gibt es in dieser Wahl nicht.',
+    'error.csvRestrictionInvalid': 'Teilnahme „{value}“ nicht erkannt (leer, m oder w).',
   },
   en: {
     'app.name': 'Urfair',
@@ -322,6 +336,20 @@ const texts: Record<Lang, Record<string, string>> = {
     'error.groupMinBelowQuota': 'Each group must assign at least 1 and require at least as many with points as it assigns.',
     'error.groupQuotaSum': 'The group quotas must add up to {k}.',
     'error.notVoted': 'Please submit your vote first.',
+    'editor.description': 'Description', 'editor.descriptionHint': 'What happens, what to bring, who leads (optional)',
+    'import.open': 'Import from Excel/CSV', 'import.title': 'Import activities from Excel/CSV',
+    'import.lead': 'Download the list as a template, edit it in Excel (one row per date; same title = same activity) and save it as “CSV UTF-8” or “CSV”. Then upload it here, check the preview and take it over.',
+    'import.template': 'Download list/template', 'import.choose': 'Choose CSV file …',
+    'import.found': '{n} activities with {s} dates found.', 'import.replace': 'Replace existing activities (otherwise they are added)',
+    'import.replaceWarn': 'Careful: all current activities are deleted and submitted votes lose their points.',
+    'import.commit': 'Take over {n} activities', 'import.done': 'Activities imported.',
+    'admin.resetAll': 'Reset the whole demo', 'admin.resetAllHint': 'Deletes all votes, including ones you created, and recreates the demo votes.',
+    'error.descriptionTooLong': 'The description can be at most {max} characters long.',
+    'error.row': 'Row {row}:', 'error.csvEmpty': 'The file contains no activities.',
+    'error.csvColumnsMissing': 'Columns missing: {columns}. Please use the template.',
+    'error.csvTitleMissing': 'Title missing.', 'error.csvDateInvalid': 'Date “{value}” not recognised (e.g. 21.11.2026 14:00).',
+    'error.csvSeatsInvalid': 'Seats “{value}” is not a number.', 'error.csvGroupUnknown': 'There is no group “{value}” in this vote.',
+    'error.csvRestrictionInvalid': 'Participation “{value}” not recognised (empty, m or w).',
   },
 };
 
@@ -347,7 +375,9 @@ export class I18n {
 
   /** Translates validation errors returned by the API. */
   error(e: { code: string; args?: Args | null }): string {
-    return this.t('error.' + e.code, e.args ?? undefined);
+    const text = this.t('error.' + e.code, e.args ?? undefined);
+    // Import errors carry the CSV row.
+    return e.args?.['row'] ? this.t('error.row', { row: e.args['row'] }) + ' ' + text : text;
   }
 
   /** Translates a list of API errors, or a generic message for anything else. */

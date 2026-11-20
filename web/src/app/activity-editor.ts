@@ -29,6 +29,8 @@ interface SessionForm { id: string | null; start: string; end: string; location:
             </select></div>
         }
       </div>
+      <div class="field"><label [for]="uid + '-desc'">{{ i18n.t('editor.description') }}</label>
+        <textarea [id]="uid + '-desc'" rows="3" maxlength="2000" [placeholder]="i18n.t('editor.descriptionHint')" [(ngModel)]="description"></textarea></div>
 
       <h3>{{ i18n.t('editor.sessions') }}</h3>
       @for (s of sessions; track $index; let i = $index) {
@@ -58,6 +60,7 @@ interface SessionForm { id: string | null; start: string; end: string; location:
     .editor { border: 1px solid var(--accent); border-radius: var(--r); padding: 14px; background: var(--surface) }
     .grow { flex: 1 1 260px }
     select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px }
+    textarea { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; resize: vertical }
     .session { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: end; padding-bottom: 10px; border-bottom: 1px dashed var(--line) }
     .session .loc { flex: 1 1 180px }
     .session .cap { width: 130px }
@@ -79,6 +82,7 @@ export class ActivityEditor implements OnInit {
   protected title = '';
   protected restrictedTo = '';
   protected groupId = '';
+  protected description = '';
   protected sessions: SessionForm[] = [];
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
@@ -89,6 +93,7 @@ export class ActivityEditor implements OnInit {
       this.title = a.title;
       this.restrictedTo = a.restrictedTo ?? '';
       this.groupId = a.groupId ?? '';
+      this.description = a.description ?? '';
       this.sessions = a.sessions.map(s => ({ id: s.id, start: toLocalInput(s.start), end: toLocalInput(s.end), location: s.location, capacity: s.capacity, flexible: s.flexible }));
     } else {
       this.addSession();
@@ -105,6 +110,7 @@ export class ActivityEditor implements OnInit {
       title: this.title.trim(),
       restrictedTo: this.restrictedTo || null,
       groupId: this.groupId || null,
+      description: this.description.trim() || null,
       sessions: this.sessions.map(s => ({
         id: s.id, start: s.start, end: s.flexible ? null : fromLocalInput(s.end), location: s.location.trim(),
         capacity: s.capacity === null || (s.capacity as unknown) === '' ? null : Number(s.capacity), flexible: s.flexible,

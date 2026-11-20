@@ -60,6 +60,7 @@ import { Toast } from './toast';
                   @if (a.seats === null) { <span class="tag">{{ i18n.t('common.unlimited') }}</span> }
                   @if (status()?.full?.includes(a.id)) { <span class="tag full">{{ i18n.t('status.full') }}</span> }
                 </h3>
+                @if (a.description) { <p class="desc">{{ a.description }}</p> }
                 @if (a.sessions.length > 1) { <div class="muted small">{{ i18n.t('vote.pickSessions') }}</div> }
                 <ul>
                   @for (s of a.sessions; track s.id) {
@@ -140,6 +141,7 @@ import { Toast } from './toast';
     .act { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center }
     .act.on { border-color: var(--accent) }
     .info { min-width: 0 }
+    .desc { margin: 2px 0 6px; font-size: 14px; white-space: pre-line }
     ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--muted) }
     label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
     label input { margin-top: 3px; accent-color: var(--accent) }

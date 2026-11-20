@@ -2,14 +2,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Urfair.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions options) : DbContext(options)
 {
     public DbSet<FairSlotEntity> FairSlots => Set<FairSlotEntity>();
     public DbSet<ActivityEntity> Activities => Set<ActivityEntity>();
     public DbSet<SessionEntity> Sessions => Set<SessionEntity>();
     public DbSet<BallotEntity> Ballots => Set<BallotEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
-    public DbSet<MetaEntity> Meta => Set<MetaEntity>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -43,6 +42,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Id).HasMaxLength(40);
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.GroupId).HasMaxLength(40);
+            e.Property(x => x.Description).HasMaxLength(2000);
             e.HasMany(x => x.Sessions).WithOne().HasForeignKey(s => s.ActivityId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<SessionEntity>(e =>
@@ -62,6 +62,5 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 p.HasKey("BallotId", nameof(BallotPoints.ActivityId));
             });
         });
-        b.Entity<MetaEntity>().HasKey(x => x.Id);
     }
 }

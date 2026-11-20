@@ -1,6 +1,7 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { I18n } from './i18n';
+import { AppInfo } from './info';
 import { SessionService } from './session';
 import { Toast } from './toast';
 
@@ -37,7 +38,7 @@ import { Toast } from './toast';
         </nav>
       </div>
     </header>
-    <div class="wrap demo small">{{ i18n.t('app.demo') }}</div>
+    @if (info.demo()) { <div class="wrap demo small">{{ i18n.t('app.demo') }}</div> }
     <main class="wrap"><router-outlet /></main>
     <footer class="wrap small">{{ i18n.t('app.madeFor') }}</footer>
     @if (toast.message(); as m) {
@@ -138,6 +139,7 @@ export class App {
   protected i18n = inject(I18n);
   protected toast = inject(Toast);
   protected session = inject(SessionService);
+  protected info = inject(AppInfo);
   private router = inject(Router);
 
   protected signOut(): void {
