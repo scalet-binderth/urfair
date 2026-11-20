@@ -27,7 +27,8 @@ import { Toast } from './toast';
           @if (session.participantName(); as n) {
             <a routerLink="/slots" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('session.as', { name: n }) }}</a>
           } @else if (session.isAdmin()) {
-            <a routerLink="/admin" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('nav.admin') }}</a>
+            <a routerLink="/admin" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">{{ session.account()?.name ?? i18n.t('nav.admin') }}</a>
+            @if (session.account()?.isJuniaAdmin) { <a routerLink="/admin/accounts" routerLinkActive="on" ariaCurrentWhenActive="page">{{ i18n.t('nav.accounts') }}</a> }
           }
           @if (session.role()) {
             <button type="button" class="lang" (click)="signOut()">{{ i18n.t('session.signOut') }}</button>
@@ -141,6 +142,8 @@ export class App {
   protected session = inject(SessionService);
   protected info = inject(AppInfo);
   private router = inject(Router);
+
+  constructor() { this.session.refresh(); }
 
   protected signOut(): void {
     this.session.signOut();

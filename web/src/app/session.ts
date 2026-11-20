@@ -1,19 +1,20 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { Api } from './api';
+import { Account, Api } from './api';
 
-export type Role = { kind: 'participant'; name: string } | { kind: 'admin' };
+export type Role = { kind: 'participant'; name: string } | { kind: 'admin'; account: Account };
 
 /**
- * Demo sign-in: remembers in this browser tab whether someone entered as participant (with a name)
- * or as organiser. Not a security boundary; personal links and a real login replace it later.
+ * Who uses this browser tab: a participant (personal link, or name in demo mode) or an organiser account.
+ * The organiser's real sign-in is the server cookie; this only mirrors it for the UI.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionService {
   private api = inject(Api);
   readonly role = signal<Role | null>(SessionService.stored());
   readonly participantName = computed(() => { const r = this.role(); return r?.kind === 'participant' ? r.name : null; });
-  readonly isAdmin = computed(() => this.role()?.kind === 'admin');
+  readonly account = computed(() => { const r = this.role(); return r?.kind === 'admin' ? r.account : null; });
+  readonly isAdmin = computed(() => this.account() !== null);
 
   private static stored(): Role | null {
     try { return JSON.parse(sessionStorage.getItem('role') ?? 'null'); } catch { return null; }
@@ -25,10 +26,19 @@ export class SessionService {
   }
 
   signOut(): void {
+    if (this.isAdmin()) this.api.logout().catch(() => { /* cookie expires anyway */ });
     this.role.set(null);
-    this.api.setAdminKey('');
     this.api.setParticipantLink(null);
     try { sessionStorage.removeItem('role'); } catch { /* ignore */ }
+  }
+
+  /** Syncs the organiser role with the server cookie (e.g. after it expired or roles changed). */
+  async refresh(): Promise<void> {
+    try {
+      const { account } = await this.api.currentAccount();
+      if (account) { if (this.role()?.kind !== 'participant') this.signIn({ kind: 'admin', account }); }
+      else if (this.isAdmin()) { this.role.set(null); try { sessionStorage.removeItem('role'); } catch { /* ignore */ } }
+    } catch { /* offline: keep what we have */ }
   }
 }
 

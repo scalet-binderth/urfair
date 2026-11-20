@@ -5,7 +5,10 @@ using Urfair.Core;
 namespace Urfair.Api;
 
 public record CreateSlotRequest(string Name, bool WithSampleData);
-public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null, string? Organiser = null);
+public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
+    string? Parish, Visibility Visibility, bool CanEdit);
+public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
+    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -17,41 +20,48 @@ public record ParticipantDto(string BallotId, string Name, bool IsSample, double
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
     IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants);
 
-/// <summary>Endpoints for organisers. Optional protection via Admin:Key until a proper login exists.</summary>
+/// <summary>Endpoints for organisers (signed-in accounts; permissions in Access.cs).</summary>
 public static class AdminEndpoints
 {
     public static void MapAdminApi(this WebApplication app)
     {
-        var admin = app.MapGroup("/api/admin").AddEndpointFilter(async (ctx, next) =>
-        {
-            var key = ctx.HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Admin:Key"];
-            if (!string.IsNullOrEmpty(key) && ctx.HttpContext.Request.Headers["X-Admin-Key"] != key)
-                return Results.Unauthorized();
-            return await next(ctx);
-        });
+        // Every request needs a signed-in account; the filter also checks access to the FairSlot (Access.cs).
+        var admin = app.MapGroup("/api/admin").AddEndpointFilter(Access.Filter);
+        admin.MapAccountAdmin();
 
         // ---------- FairSlots ----------
 
-        admin.MapGet("/slots", async (AppDbContext db) =>
-            await db.FairSlots.OrderByDescending(s => s.CreatedAt)
-                .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
-                .ToListAsync());
+        // FairSlots the account may see.
+        admin.MapGet("/slots", async (AppDbContext db, HttpContext http) =>
+        {
+            var account = Access.Account(http);
+            var slots = await db.FairSlots.AsNoTracking().OrderByDescending(s => s.CreatedAt).ToListAsync();
+            var visible = slots.Where(s => Access.CanSee(account, s)).Select(s => s.Id).ToList();
+            var counts = await db.FairSlots.Where(s => visible.Contains(s.Id))
+                .Select(s => new { s.Id, Activities = s.Activities.Count, Ballots = s.Ballots.Count }).ToDictionaryAsync(x => x.Id);
+            return slots.Where(s => visible.Contains(s.Id)).Select(s => new AdminSlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline,
+                counts[s.Id].Activities, counts[s.Id].Ballots, s.Parish, s.Visibility, Access.For(account, s).CanEdit));
+        });
 
-        admin.MapPost("/slots", async (CreateSlotRequest req, AppDbContext db, IConfiguration cfg) =>
+        // A Pfarrgemeinde admin creates FairSlots for their own (first) Pfarrgemeinde, visible only there; Junia admins for all.
+        admin.MapPost("/slots", async (CreateSlotRequest req, AppDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             var name = (req.Name ?? "").Trim();
             if (name.Length == 0) return Endpoints.Errors("nameRequired");
-            if (req.WithSampleData && Database.IsDemo(cfg)) return Results.Ok(new { (await Database.CreateDemoSlotAsync(db, name, Phase.Draft, 140)).Id });
-            var slot = new FairSlotEntity { Name = name };
-            db.FairSlots.Add(slot);
+            var account = Access.Account(http);
+            var slot = req.WithSampleData && Database.IsDemo(cfg)
+                ? await Database.CreateDemoSlotAsync(db, name, Phase.Draft, 140)
+                : new FairSlotEntity { Name = name };
+            if (!account.IsJuniaAdmin) (slot.Parish, slot.Visibility) = (account.Parishes.FirstOrDefault(), Visibility.ParishOnly);
+            if (db.Entry(slot).State == EntityState.Detached) db.FairSlots.Add(slot);
             await db.SaveChangesAsync();
             return Results.Ok(new { slot.Id });
         });
 
-        admin.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg) =>
-            await Endpoints.ToDto(db, id, cfg) is { } dto ? Results.Ok(dto) : Results.NotFound());
+        admin.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg, HttpContext http) =>
+            await Endpoints.ToDto(db, id, cfg) is { } dto ? Results.Ok(dto with { CanEdit = Access.Slot(http).CanEdit }) : Results.NotFound());
 
-        admin.MapPut("/slots/{id:guid}", async (Guid id, UpdateSlotRequest req, AppDbContext db) =>
+        admin.MapPut("/slots/{id:guid}", async (Guid id, UpdateSlotRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
@@ -67,13 +77,18 @@ public static class AdminEndpoints
             if (name.Length == 0) errors.Insert(0, new ValidationError("nameRequired"));
             if (ParishOf(req.Parish) is { } parish && !Parishes.All.Contains(parish))
                 errors.Add(new ValidationError("parishUnknown", new Dictionary<string, object> { ["value"] = parish }));
+            // Pfarrgemeinde admins may move a FairSlot only to their own Pfarrgemeinde and never make it read-only for themselves.
+            var account = Access.Account(http);
+            if (!account.IsJuniaAdmin && (ParishOf(req.Parish) != slot.Parish || req.Visibility != slot.Visibility) &&
+                (req.Visibility == Visibility.JuniaReadOnly || ParishOf(req.Parish) is not { } p || !account.Parishes.Contains(p)))
+                errors.Add(new ValidationError("visibilityNotAllowed"));
             if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             var rulesChanged = slot.ToRules() != rules;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
-            (slot.Parish, slot.Organiser) = (ParishOf(req.Parish), Clean(req.Organiser));
+            (slot.Parish, slot.Organiser, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), req.Visibility);
             slot.Apply(rules);
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();

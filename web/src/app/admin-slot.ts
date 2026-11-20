@@ -1,13 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
 import { ActivityImport } from './activity-import';
 import { MailboxTab } from './mailbox-tab';
 import { ParticipantsTab } from './participants-tab';
-import { AdminKeyPrompt } from './admin-key';
-import { Activity, Api, ApiFailure, Demand, GROUP_COLORS, Group, PHASES, Phase, Rules, Slot, fromLocalInput, toLocalInput } from './api';
+import { Activity, Api, ApiFailure, Demand, GROUP_COLORS, Group, PHASES, Phase, Rules, Slot, VISIBILITIES, Visibility, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
+import { SessionService } from './session';
 import { AppInfo } from './info';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
@@ -17,11 +17,10 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
 /** Organisation view of one FairSlot. */
 @Component({
   selector: 'app-admin-slot',
-  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, AdminKeyPrompt, MailboxTab, ParticipantsTab, ResultsPage],
+  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, MailboxTab, ParticipantsTab, ResultsPage],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <p><a routerLink="/admin">{{ i18n.t('admin.back') }}</a></p>
-    @if (needsKey()) { <app-admin-key (entered)="load()" /> }
     @if (slot(); as s) {
       <div class="head">
         <h1>{{ s.name }} <span class="phase" [attr.data-phase]="s.phase">{{ i18n.t('phase.' + s.phase) }}</span></h1>
@@ -32,6 +31,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         </div>
       </div>
 
+      @if (!canEdit()) { <p class="card small readonly">{{ i18n.t('admin.readOnly') }}</p> }
       <nav class="tabs" role="tablist">
         @for (t of tabs; track t) {
           <button type="button" role="tab" [attr.aria-selected]="tab() === t" [class.on]="tab() === t" (click)="show(t)">
@@ -65,6 +65,11 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                 <div class="field grow"><label for="s-organiser">{{ i18n.t('admin.organiser') }}</label><input id="s-organiser" maxlength="120" [(ngModel)]="form.organiser" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.parishHint') }}</p>
+              <div class="field"><label for="s-visibility">{{ i18n.t('admin.visibility') }}</label>
+                <select id="s-visibility" [(ngModel)]="form.visibility">
+                  @for (v of visibilities(); track v) { <option [value]="v">{{ i18n.t('visibility.' + v) }}</option> }
+                </select></div>
+              <p class="muted small">{{ i18n.t('visibility.hint.' + form.visibility) }}</p>
               <label class="check"><input type="checkbox" [(ngModel)]="form.openToAll" />{{ i18n.t('admin.openToAll') }}</label>
               <p class="muted small">{{ i18n.t('admin.openToAllHint') }}</p>
               <h2>{{ i18n.t('admin.rules') }}</h2>
@@ -91,7 +96,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
               }
               <div><button class="btn ghost" type="button" (click)="addGroup()">{{ i18n.t('admin.addGroup') }}</button></div>
               <p class="muted small">{{ i18n.t('admin.rulesNote') }}</p>
-              <div><button class="btn" type="button" [disabled]="busy()" (click)="saveSettings()">{{ i18n.t('common.save') }}</button></div>
+              @if (canEdit()) { <div><button class="btn" type="button" [disabled]="busy()" (click)="saveSettings()">{{ i18n.t('common.save') }}</button></div> }
             </div>
             <div class="card stack">
               <h2>{{ i18n.t('admin.deleteSlot') }}</h2>
@@ -115,8 +120,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
               <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" (saved)="afterSave()" (cancelled)="editing.set(null)" />
             } @else {
               <div class="row">
-                <button class="btn" type="button" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
-                <button class="btn ghost" type="button" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
+                <button class="btn" type="button" [hidden]="!canEdit()" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
+                <button class="btn ghost" type="button" [hidden]="!canEdit()" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
               </div>
             }
             @if (showImport()) { <app-activity-import [slotId]="s.id" [groups]="s.rules.groups ?? []" (imported)="afterImport()" /> }
@@ -141,8 +146,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                       <button class="btn danger small" type="button" (click)="deleteActivity(a.id)">{{ i18n.t('common.delete') }}</button>
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
-                      <button class="btn ghost small" type="button" (click)="editing.set(a.id)">{{ i18n.t('common.edit') }}</button>
-                      <button class="btn ghost small" type="button" (click)="confirmDelete.set(a.id)">{{ i18n.t('common.delete') }}</button>
+                      <button class="btn ghost small" type="button" [hidden]="!canEdit()" (click)="editing.set(a.id)">{{ i18n.t('common.edit') }}</button>
+                      <button class="btn ghost small" type="button" [hidden]="!canEdit()" (click)="confirmDelete.set(a.id)">{{ i18n.t('common.delete') }}</button>
                     }
                   </div>
                 </div>
@@ -210,7 +215,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
       }
-    } @else if (!needsKey() && !errors().length) {
+    } @else if (!errors().length) {
       <p class="muted">{{ i18n.t('common.loading') }}</p>
     }
   `,
@@ -218,6 +223,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
     h1 .phase { font-size: 13px; vertical-align: middle; margin-left: 8px }
     .link { align-items: center; gap: 8px }
     .link a { overflow-wrap: anywhere }
+    .readonly { border-color: var(--warn); color: var(--warn) }
     .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px }
     .tabs button { padding: 9px 14px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; color: var(--muted); font-weight: 500 }
     .tabs button.on { color: var(--ink); border-bottom-color: var(--accent) }
@@ -246,10 +252,14 @@ export class AdminSlotPage implements OnInit {
   protected i18n = inject(I18n);
   private api = inject(Api);
   private router = inject(Router);
+  protected session = inject(SessionService);
   private toast = inject(Toast);
 
   protected info = inject(AppInfo);
-  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'demo'] as Tab[]).filter(t => t !== 'demo' || this.info.demo()); }
+  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
+  protected canEdit = computed(() => this.slot()?.canEdit !== false);
+  /** Pfarrgemeinde admins cannot make a vote read-only for themselves. */
+  protected visibilities = computed(() => VISIBILITIES.filter(v => v !== 'JuniaReadOnly' || this.session.account()?.isJuniaAdmin || this.slot()?.visibility === v));
   protected readonly phases = PHASES;
   protected tab = signal<Tab>('activities');
   protected slot = signal<Slot | null>(null);
@@ -258,13 +268,12 @@ export class AdminSlotPage implements OnInit {
   protected editing = signal<string | null>(null);
   protected confirmDelete = signal<string | null>(null);
   protected confirmDeleteSlot = signal(false);
-  protected needsKey = signal(false);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; parish: string; organiser: string; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, parish: '', organiser: '', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; parish: string; organiser: string; visibility: Visibility; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, parish: '', organiser: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
   protected formGroups: Group[] = [];
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
@@ -279,10 +288,9 @@ export class AdminSlotPage implements OnInit {
       this.slot.set(slot);
       this.activities.set(activities);
       this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll,
-        parish: slot.parish ?? '', organiser: slot.organiser ?? '', rules: { ...slot.rules } };
+        parish: slot.parish ?? '', organiser: slot.organiser ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
-      this.needsKey.set(false);
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
     } catch (e) {
       this.handle(e);
@@ -316,7 +324,7 @@ export class AdminSlotPage implements OnInit {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
         name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll,
-        parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null,
+        parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, visibility: this.form.visibility,
         rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));
@@ -378,7 +386,7 @@ export class AdminSlotPage implements OnInit {
   }
 
   private handle(e: unknown): void {
-    if (e instanceof ApiFailure && e.errors[0]?.code === 'unauthorized') this.needsKey.set(true);
+    if (e instanceof ApiFailure && e.errors[0]?.code === 'unauthorized') { this.session.refresh().then(() => this.router.navigate(['/'])); return; }
     else this.errors.set(this.i18n.errors(e));
   }
 }

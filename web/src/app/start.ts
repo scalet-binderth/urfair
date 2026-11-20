@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Api } from './api';
+import { Account, Api } from './api';
 import { AppInfo } from './info';
 import { I18n } from './i18n';
 import { SessionService } from './session';
@@ -39,20 +39,37 @@ import { SessionService } from './session';
         }
       </form>
 
-      <form class="card tile stack" (submit)="$event.preventDefault(); joinAsAdmin()">
+      <div class="card tile stack">
         <h2>{{ i18n.t('start.admin') }}</h2>
         <p class="muted">{{ i18n.t('start.adminText') }}</p>
-        @if (info.adminProtected()) {
-          <div class="field">
-            <label for="a-key">{{ i18n.t('admin.key') }}</label>
-            <input id="a-key" type="password" autocomplete="current-password" [(ngModel)]="key" name="key" />
+        @if (info.demo()) {
+          <div class="demo-people">
+            <p class="small muted">{{ i18n.t('start.demoAccounts') }}</p>
+            @for (d of demoAccounts; track d.key) {
+              <button type="button" class="person" [disabled]="busy()" (click)="demoLogin(d.key)">
+                <b>{{ d.badge }}</b> {{ i18n.t('start.demoAccount.' + d.key) }}<span class="muted small">{{ i18n.t('start.demoAccountText.' + d.key) }}</span>
+              </button>
+            }
           </div>
+        } @else if (setupNeeded()) {
+          <form class="stack" (submit)="$event.preventDefault(); setup()">
+            <p class="small">{{ i18n.t('start.setupText') }}</p>
+            <div class="field"><label for="s-key">{{ i18n.t('admin.key') }}</label><input id="s-key" name="key" type="password" [(ngModel)]="key" /></div>
+            <div class="field"><label for="s-name">{{ i18n.t('accounts.name') }}</label><input id="s-name" name="name" autocomplete="name" [(ngModel)]="accountName" /></div>
+            <div class="field"><label for="s-mail">{{ i18n.t('participants.email') }}</label><input id="s-mail" name="email" type="email" autocomplete="username" [(ngModel)]="email" /></div>
+            <div class="field"><label for="s-pw">{{ i18n.t('accounts.newPassword') }}</label><input id="s-pw" name="password" type="password" autocomplete="new-password" [(ngModel)]="password" /></div>
+            <button class="btn" type="submit" [disabled]="busy()">{{ i18n.t('start.setupGo') }}</button>
+          </form>
         } @else {
-          <p class="small muted">{{ i18n.t('start.adminDemo') }}</p>
+          <form class="stack" (submit)="$event.preventDefault(); login()">
+            <div class="field"><label for="a-mail">{{ i18n.t('participants.email') }}</label><input id="a-mail" name="email" type="email" autocomplete="username" [(ngModel)]="email" /></div>
+            <div class="field"><label for="a-pw">{{ i18n.t('accounts.password') }}</label><input id="a-pw" name="password" type="password" autocomplete="current-password" [(ngModel)]="password" /></div>
+            <button class="btn" type="submit" [disabled]="busy() || !email || !password">{{ i18n.t('start.adminGo') }}</button>
+            <p class="small muted">{{ i18n.t('start.forgot') }}</p>
+          </form>
         }
         @if (error()) { <ul class="errors"><li>{{ error() }}</li></ul> }
-        <button class="btn" type="submit" [disabled]="busy()">{{ i18n.t('start.adminGo') }}</button>
-      </form>
+      </div>
 
       <div class="card tile stack">
         <h2>{{ i18n.t('start.plan') }}</h2>
@@ -85,6 +102,13 @@ export class StartPage {
     { key: 'C', name: 'Clara Czerny' }, { key: 'D', name: 'David Doppler' },
   ];
   protected key = '';
+  protected email = '';
+  protected password = '';
+  protected accountName = '';
+  protected setupNeeded = signal(false);
+  protected readonly demoAccounts = [{ key: 'junia', badge: 'J' }, { key: 'markus', badge: 'M' }, { key: 'geist', badge: 'G' }];
+
+  constructor() { this.api.currentAccount().then(r => this.setupNeeded.set(r.setupNeeded), () => { /* ignore */ }); }
   protected error = signal<string | null>(null);
   protected busy = signal(false);
 
@@ -95,19 +119,25 @@ export class StartPage {
     this.router.navigate(['/slots']);
   }
 
-  protected async joinAsAdmin(): Promise<void> {
+  protected async demoLogin(key: string): Promise<void> { await this.signInWith(() => this.api.demoLogin(key)); }
+  protected async login(): Promise<void> { await this.signInWith(() => this.api.login(this.email.trim(), this.password)); }
+  protected async setup(): Promise<void> {
+    await this.signInWith(() => this.api.setup({ key: this.key, email: this.email.trim(), name: this.accountName.trim(), password: this.password }));
+  }
+
+  private async signInWith(action: () => Promise<Account>): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
-    this.api.setAdminKey(this.key);
     try {
-      await this.api.adminSlots(); // fails with 401 if the key is wrong
-      this.session.signIn({ kind: 'admin' });
+      const account = await action();
+      this.session.signOut();
+      this.session.signIn({ kind: 'admin', account });
       await this.router.navigate(['/admin']);
-    } catch {
-      this.api.setAdminKey('');
-      this.error.set(this.i18n.t('error.unauthorized'));
+    } catch (e) {
+      this.error.set(this.i18n.errors(e)[0]);
     } finally {
       this.busy.set(false);
+      this.password = '';
     }
   }
 }
