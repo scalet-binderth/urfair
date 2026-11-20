@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from './api';
+import { AppInfo } from './info';
 import { I18n } from './i18n';
 import { SessionService } from './session';
 
@@ -24,6 +25,7 @@ import { SessionService } from './session';
           <input id="p-name" autocomplete="name" [placeholder]="i18n.t('vote.namePlaceholder')" [(ngModel)]="name" name="name" />
         </div>
         <button class="btn" type="submit" [disabled]="!name.trim()">{{ i18n.t('start.participantGo') }}</button>
+        @if (info.demo()) {
         <div class="demo-people">
           <p class="small muted">{{ i18n.t('start.demoPeople') }}</p>
           @for (p of people; track p.key) {
@@ -32,12 +34,13 @@ import { SessionService } from './session';
             </button>
           }
         </div>
+        }
       </form>
 
       <form class="card tile stack" (submit)="$event.preventDefault(); joinAsAdmin()">
         <h2>{{ i18n.t('start.admin') }}</h2>
         <p class="muted">{{ i18n.t('start.adminText') }}</p>
-        @if (adminProtected()) {
+        @if (info.adminProtected()) {
           <div class="field">
             <label for="a-key">{{ i18n.t('admin.key') }}</label>
             <input id="a-key" type="password" autocomplete="current-password" [(ngModel)]="key" name="key" />
@@ -68,6 +71,7 @@ import { SessionService } from './session';
 })
 export class StartPage {
   protected i18n = inject(I18n);
+  protected info = inject(AppInfo);
   private api = inject(Api);
   private session = inject(SessionService);
   private router = inject(Router);
@@ -79,13 +83,8 @@ export class StartPage {
     { key: 'C', name: 'Clara Czerny' }, { key: 'D', name: 'David Doppler' },
   ];
   protected key = '';
-  protected adminProtected = signal(false);
   protected error = signal<string | null>(null);
   protected busy = signal(false);
-
-  constructor() {
-    this.api.info().then(i => this.adminProtected.set(i.adminProtected), () => { /* assume open demo */ });
-  }
 
   protected joinAsParticipant(): void {
     if (!this.name.trim()) return;

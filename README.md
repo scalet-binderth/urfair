@@ -43,10 +43,26 @@ cd web && npm ci && npx ng build        # builds the UI into src/Urfair.Api/wwwr
 cd ../src/Urfair.Api && dotnet run
 ```
 
-Open http://localhost:5080. A local SQLite file is created with a demo FairSlot.
+Open http://localhost:5080. A local SQLite file is created with the demo votes.
 
-While only demo data exists, a change of the database schema (`SchemaVersion` in `Database.cs`) recreates the
-database instead of migrating it. Switch to EF Core migrations before real registrations are stored.
+### Database changes (migrations)
+
+The schema is managed with EF Core migrations, applied automatically at start-up. Migrations are
+provider-specific, so every model change needs one migration for SQLite (local) and one for PostgreSQL (hosted):
+
+```
+dotnet tool restore
+dotnet ef migrations add <Name> -p src/Urfair.Api -c SqliteAppDbContext -o Data/Migrations/Sqlite
+dotnet ef migrations add <Name> -p src/Urfair.Api -c PostgresAppDbContext -o Data/Migrations/Postgres
+```
+
+In demo mode the organisation area has a button to reset the whole demo.
+
+### Importing activities
+
+Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
+(preview first, then add or replace). One row per date; rows with the same title form one activity.
+Columns: `Titel;Beschreibung;Gruppe;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too).
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
 
@@ -59,6 +75,9 @@ Tests: `dotnet test Urfair.slnx`
 | `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
 | `Admin__Key` | If set, the organisation area requires this key. Leave empty for open demos. |
+| `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
+
+See [ROADMAP.md](ROADMAP.md) for the plan and [CLAUDE.md](CLAUDE.md) for the working rules of this project.
 
 ## Deployment
 
@@ -67,7 +86,7 @@ the image on every push and pull request.
 
 ## Dependencies and licences
 
-Only permissively licensed, free components: .NET / ASP.NET Core / EF Core (MIT), Npgsql (PostgreSQL licence),
+Only permissively licensed, free components: .NET / ASP.NET Core / EF Core and the dotnet-ef tool (MIT), Npgsql (PostgreSQL licence),
 SQLite (public domain), Angular (MIT). No external fonts, CDNs or trackers.
 
 ## Licence

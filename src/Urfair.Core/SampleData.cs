@@ -17,6 +17,17 @@ public static class SampleData
     /// <summary>Invented split for the demo: social and faith-themed projects form the blue group.</summary>
     private static readonly HashSet<string> BlueProjects = ["gehoerlos", "peace", "brot", "geisterfahrer", "magdaman", "espoto", "altenheim"];
 
+    /// <summary>Invented short descriptions for some demo activities.</summary>
+    private static readonly Dictionary<string, string> Descriptions = new()
+    {
+        ["advent"] = "Wir binden gemeinsam Adventskränze aus Tannenzweigen. Bitte Gartenschere und Handschuhe mitbringen.",
+        ["nacht"] = "Eine Nacht in der Jugendkirche mit Spielen, Gesprächen und Frühstück. Schlafsack und Isomatte mitbringen.",
+        ["hochseil"] = "Klettern im Hochseilgarten gemeinsam mit deinem Paten oder deiner Patin. Feste Schuhe und Sportkleidung.",
+        ["kino"] = "Wir schauen gemeinsam einen Film und reden danach darüber, was er mit unserem Leben zu tun hat.",
+        ["altenheim"] = "Ein Nachmittag mit Bewohnerinnen und Bewohnern: plaudern, spielen, zuhören. Termin nach Vereinbarung.",
+        ["brot"] = "Ein Rundgang mit einem ehemals obdachlosen Stadtführer zu Orten, an denen Hilfe angeboten wird.",
+    };
+
     public static IReadOnlyList<Activity> Activities()
     {
         var list = new List<Activity>();
@@ -60,7 +71,7 @@ public static class SampleData
         A("magdaman", "MAGDAMAN – Hackln für den guten Zweck", 3, null, ("2027-05-15T00:00", null, "Pfarrheim St. Magdalena", null, true));
         A("espoto", "Espoto", 2, null, ("2027-06-30T00:00", null, "Pfarrkirche St. Magdalena", null, true));
         A("altenheim", "Besuch im Altenheim", 4, null, ("2027-06-30T00:00", null, "SZ Franz Hillinger", 15, true));
-        return list.Select(a => a with { GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green" }).ToList();
+        return list.Select(a => a with { GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green", Description = Descriptions.GetValueOrDefault(a.Id) }).ToList();
     }
 
     private static readonly string[] FemaleNames = "Anna Lena Sophie Marie Hannah Lea Laura Sarah Julia Emma Mia Valentina Katharina Magdalena Theresa Johanna Clara Elena Nina Paula Selina Viktoria".Split(' ');

@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { AdminKeyPrompt } from './admin-key';
 import { Api, ApiFailure, SlotSummary } from './api';
 import { I18n } from './i18n';
+import { AppInfo } from './info';
+import { Toast } from './toast';
 
 /** Organisation start page: all FairSlots and a form to create a new one. */
 @Component({
@@ -26,7 +28,7 @@ import { I18n } from './i18n';
           </div>
           <button class="btn" type="button" [disabled]="busy() || !name.trim()" (click)="create()">{{ i18n.t('admin.create') }}</button>
         </div>
-        <label class="check"><input type="checkbox" [(ngModel)]="withSample" />{{ i18n.t('admin.withSample') }}</label>
+        @if (info.demo()) { <label class="check"><input type="checkbox" [(ngModel)]="withSample" />{{ i18n.t('admin.withSample') }}</label> }
         @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
       </div>
 
@@ -53,6 +55,21 @@ import { I18n } from './i18n';
           } @else { <p class="muted">{{ i18n.t('admin.none') }}</p> }
         } @else if (!needsKey()) { <p class="muted">{{ i18n.t('common.loading') }}</p> }
       </div>
+      @if (info.demo()) {
+        <div class="card stack">
+          <h2>{{ i18n.t('admin.resetAll') }}</h2>
+          <p class="muted small">{{ i18n.t('admin.resetAllHint') }}</p>
+          @if (confirmResetAll()) {
+            <div class="row">
+              <span>{{ i18n.t('common.reallyDelete') }}</span>
+              <button class="btn" type="button" [disabled]="busy()" (click)="resetAll()">{{ i18n.t('admin.resetAll') }}</button>
+              <button class="btn ghost" type="button" (click)="confirmResetAll.set(false)">{{ i18n.t('common.cancel') }}</button>
+            </div>
+          } @else {
+            <div><button class="btn ghost" type="button" (click)="confirmResetAll.set(true)">{{ i18n.t('admin.resetAll') }}</button></div>
+          }
+        </div>
+      }
     </div>
   `,
   styles: `
@@ -63,6 +80,9 @@ export class AdminListPage {
   protected i18n = inject(I18n);
   private api = inject(Api);
   private router = inject(Router);
+  protected info = inject(AppInfo);
+  private toast = inject(Toast);
+  protected confirmResetAll = signal(false);
 
   protected slots = signal<SlotSummary[] | null>(null);
   protected needsKey = signal(false);
@@ -80,6 +100,22 @@ export class AdminListPage {
     } catch (e) {
       this.needsKey.set(e instanceof ApiFailure && e.errors[0]?.code === 'unauthorized');
       if (!this.needsKey()) this.errors.set(this.i18n.errors(e));
+    }
+  }
+
+  /** Demo only: deletes every vote and recreates the demo votes. */
+  protected async resetAll(): Promise<void> {
+    this.busy.set(true);
+    this.errors.set([]);
+    try {
+      await this.api.resetAll();
+      this.confirmResetAll.set(false);
+      this.toast.show(this.i18n.t('admin.resetDone'));
+      await this.load();
+    } catch (e) {
+      this.errors.set(this.i18n.errors(e));
+    } finally {
+      this.busy.set(false);
     }
   }
 

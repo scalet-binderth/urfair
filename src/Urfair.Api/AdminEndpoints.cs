@@ -7,10 +7,12 @@ namespace Urfair.Api;
 public record CreateSlotRequest(string Name, bool WithSampleData);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
-public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null);
+public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
 public record ParticipantListDto(Guid Id, string Name, bool HasVoted);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
+public record ImportRequest(string? Csv, bool Replace, bool Commit);
+public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyList<ValidationError> Errors, bool Saved);
 public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points, bool IsFallback);
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
@@ -36,11 +38,11 @@ public static class AdminEndpoints
                 .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
                 .ToListAsync());
 
-        admin.MapPost("/slots", async (CreateSlotRequest req, AppDbContext db) =>
+        admin.MapPost("/slots", async (CreateSlotRequest req, AppDbContext db, IConfiguration cfg) =>
         {
             var name = (req.Name ?? "").Trim();
             if (name.Length == 0) return Endpoints.Errors("nameRequired");
-            if (req.WithSampleData) return Results.Ok(new { (await Database.CreateDemoSlotAsync(db, name, Phase.Draft, 140)).Id });
+            if (req.WithSampleData && Database.IsDemo(cfg)) return Results.Ok(new { (await Database.CreateDemoSlotAsync(db, name, Phase.Draft, 140)).Id });
             var slot = new FairSlotEntity { Name = name };
             db.FairSlots.Add(slot);
             await db.SaveChangesAsync();
@@ -123,6 +125,42 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // ---------- Excel/CSV import and export ----------
+
+        // The current activities as CSV (also the template: edit in Excel, import again).
+        admin.MapGet("/slots/{id:guid}/activities.csv", async (Guid id, AppDbContext db) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            if (slot is null) return Results.NotFound();
+            var csv = ActivityCsv.Write(await Database.LoadActivitiesAsync(db, id), slot.ToRules().GroupList);
+            // BOM so that Excel recognises UTF-8 (umlauts).
+            return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(),
+                "text/csv; charset=utf-8", "veranstaltungen.csv");
+        });
+
+        // Preview (commit=false) or take over (commit=true) activities from CSV text.
+        admin.MapPost("/slots/{id:guid}/import", async (Guid id, ImportRequest req, AppDbContext db) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            if (slot is null) return Results.NotFound();
+            var result = ActivityCsv.Parse(req.Csv ?? "", slot.ToRules().GroupList);
+            if (!req.Commit || result.Errors.Count > 0 || result.Activities.Count == 0)
+                return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToDto).ToList(), result.Errors, false));
+
+            var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
+            if (req.Replace)
+            {
+                // Replacing removes the old activities and the points ballots gave to them.
+                db.Activities.RemoveRange(await db.Activities.Where(a => a.FairSlotId == id).ToListAsync());
+                foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == id).ToListAsync()) b.Points.Clear();
+                order = 0;
+            }
+            foreach (var a in result.Activities) db.Activities.Add(Database.ToEntity(a, id, order++));
+            await db.SaveChangesAsync();
+            if (req.Replace) await Database.ResetSamplesAsync(db, id); // sample ballots must refer to the new activities
+            return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToDto).ToList(), [], true));
+        });
+
         // ---------- Demand, demo data, allocation ----------
 
         admin.MapGet("/slots/{id:guid}/demand", async (Guid id, AppDbContext db) =>
@@ -137,10 +175,18 @@ public static class AdminEndpoints
             }).OrderByDescending(d => d.TotalPoints).ToList();
         });
 
-        admin.MapPost("/slots/{id:guid}/reset-demo", async (Guid id, ResetRequest req, AppDbContext db) =>
+        // Demo only: rebuild every demo FairSlot (since migrations, deploys keep the data).
+        admin.MapPost("/reset-all", async (AppDbContext db, IConfiguration cfg) =>
+        {
+            if (!Database.IsDemo(cfg)) return Results.NotFound();
+            await Database.ResetDemoAsync(db);
+            return Results.NoContent();
+        });
+
+        admin.MapPost("/slots/{id:guid}/reset-demo", async (Guid id, ResetRequest req, AppDbContext db, IConfiguration cfg) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (slot is null) return Results.NotFound();
+            if (slot is null || !Database.IsDemo(cfg)) return Results.NotFound();
             if (req.SampleCount is { } n) slot.SampleCount = Math.Clamp(n, 0, 1000);
             if (req.NewSeed) slot.Seed = Random.Shared.Next(1000, 9999);
             await db.SaveChangesAsync();
@@ -211,12 +257,13 @@ public static class AdminEndpoints
         var restricted = string.IsNullOrWhiteSpace(req.RestrictedTo) ? null : req.RestrictedTo;
         var sessions = (req.Sessions ?? []).Select(s =>
             new Session(s.Id ?? "", entity.Id, s.Start, s.Flexible ? null : s.End, (s.Location ?? "").Trim(), s.Capacity, s.Flexible)).ToList();
-        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted));
+        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim()));
         if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
         entity.Title = req.Title!.Trim();
         entity.RestrictedTo = restricted;
         entity.GroupId = string.IsNullOrWhiteSpace(req.GroupId) ? null : req.GroupId;
+        entity.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
         var keep = new List<SessionEntity>();
         foreach (var s in sessions)
         {

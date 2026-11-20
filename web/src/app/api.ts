@@ -11,9 +11,9 @@ export interface Rules { pointBudget: number; minActivities: number; maxPerActiv
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; }
 export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; }
+export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; }
+export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; }
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; rules: Rules; }
 export interface ListedParticipant { id: string; name: string; hasVoted: boolean; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
@@ -46,7 +46,7 @@ export class Api {
   }
 
   // ---------- general ----------
-  info() { return this.call(this.http.get<{ adminProtected: boolean }>('/api/info')); }
+  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean }>('/api/info')); }
 
   // ---------- participants ----------
   /** Previously submitted ballot of this name, or null. */
@@ -93,6 +93,11 @@ export class Api {
   participants(id: string) { return this.call(this.http.get<ListedParticipant[]>(`/api/admin/slots/${id}/participants`, this.admin())); }
   addParticipant(id: string, name: string) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, { name }, this.admin())); }
   removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
+  exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { ...this.admin(), responseType: 'blob' })); }
+  importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean }) {
+    return this.call(this.http.post<{ activities: Activity[]; errors: ApiError[]; saved: boolean }>(`/api/admin/slots/${id}/import`, body, this.admin()));
+  }
+  resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
 
   private admin() { return { headers: new HttpHeaders(this.adminKey() ? { 'X-Admin-Key': this.adminKey() } : {}) }; }
