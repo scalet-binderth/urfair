@@ -52,6 +52,7 @@ export class Api {
   accounts() { return this.call(this.http.get<ListedAccount[]>('/api/admin/accounts')); }
   createAccount(body: AccountInput) { return this.call(this.http.post<{ id: string; setupToken: string }>('/api/admin/accounts', body)); }
   updateAccount(id: string, body: AccountInput) { return this.call(this.http.put(`/api/admin/accounts/${id}`, body)); }
+  recover(key: string, email: string) { return this.call(this.http.post<{ setupToken: string }>('/api/auth/recover', { key, email })); }
   newSetupLink(id: string) { return this.call(this.http.post<{ setupToken: string }>(`/api/admin/accounts/${id}/setup-link`, {})); }
   deleteAccount(id: string) { return this.call(this.http.delete(`/api/admin/accounts/${id}`)); }
 

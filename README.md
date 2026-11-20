@@ -92,7 +92,7 @@ Tests: `dotnet test Urfair.slnx`
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
-| `Admin__Key` | Real instance only: key to create the very first Junia admin account (start page, while no account exists). Not used afterwards. |
+| `Admin__Key` | Real instance only: creates the very first Junia admin account (start page, while no account exists); afterwards only for the emergency access ("Notfall-Zugang": new one-time link for an existing Junia admin). Keep it secret. |
 | `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
 | `App__BaseUrl` | Public address used in invitation links (e.g. `https://urfair-prod.onrender.com`). Default: the request host. |
 
