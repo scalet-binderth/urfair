@@ -21,7 +21,7 @@ interface PlanText {
 const PLAN: Record<'de' | 'en', PlanText> = {
   de: {
     title: 'Umsetzungsplan',
-    lead: 'Die Demo ist vorzeigbar. Bis zum echten Einsatz im Pfarrverbund Urfahr St. Junia fehlen vor allem Dinge, die man in der Vorführung nicht sieht.',
+    lead: 'Die Demo ist vorzeigbar. Bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlen vor allem Dinge, die man in der Vorführung nicht sieht.',
     asOf: 'Stand: 20. November 2026',
     nowTitle: 'Was die Demo schon kann',
     now: [
@@ -35,12 +35,13 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Demo-Personen B bis D haben schon abgestimmt und können ändern',
       'Veranstaltungen mit Beschreibung, Pfarre und Leitung, Import und Export über Excel/CSV',
       'Datenbank mit Migrationen: Daten bleiben bei Updates erhalten; Demo per Knopf zurücksetzen',
+      'Teilnehmerliste mit E-Mail, Geburtsdatum und Pfarrgemeinde, von Hand oder per CSV; persönliche Links und Einladungen',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
     phases: [
       { label: 'Schritt 1 · erledigt', kind: 'done', title: 'Sichere Grundlage', items: ['Datenbank-Migrationen', 'Demo-Schalter (Demo und echte Instanz aus demselben Code)', 'Beschreibung pro Veranstaltung', 'Veranstaltungen aus Excel/CSV importieren'] },
-      { label: 'Schritt 2', title: 'Teilnehmende', items: ['Teilnehmerliste pro Wahl per CSV oder von Hand, mit E-Mail und Pfarrgemeinde', 'Persönliche Links mit Prüfung (Geburts- oder Taufdatum)', 'Demo-Postfach statt echter E-Mails'] },
+      { label: 'Schritt 2 · erledigt', kind: 'done', title: 'Teilnehmende', items: ['Teilnehmerliste pro Wahl per CSV oder von Hand, mit E-Mail und Pfarrgemeinde', 'Persönliche Links mit Prüfung des Geburtsdatums', 'Einladungen: Demo-Postfach, sonst zum Kopieren'] },
       { label: 'Schritt 3', title: 'Login und Rollen', items: ['Junia- und Pfarrgemeinde-Admins', 'Sichtbarkeit pro Wahl', 'Import und Pflege der Teilnehmenden je nach Rolle', 'Demo-Konten per Knopf'] },
       { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
       { label: 'Schritt 5 und 6', title: 'Nach dem Probelauf', items: ['Abmelden und Nachrücken von der Warteliste', 'Pflichtbesetzung', '„Mehr als gefordert“', 'Zwischenstand ein- und ausschaltbar'] },
@@ -87,7 +88,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
   },
   en: {
     title: 'Roadmap',
-    lead: 'The demo is ready to show. Before real use across the parish network Urfahr St. Junia, mostly invisible things are missing.',
+    lead: 'The demo is ready to show. Before real use in the Pfarre Urfahr-St. Junia, mostly invisible things are missing.',
     asOf: 'As of 20 November 2026',
     nowTitle: 'What the demo can do',
     now: [
@@ -101,12 +102,13 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Demo people B to D have already voted and can change their vote',
       'Activities with description, parish and leader, import and export via Excel/CSV',
       'Database with migrations: data survives updates; reset the demo with one button',
+      'Participant list with e-mail, date of birth and parish community, by hand or via CSV; personal links and invitations',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
     phases: [
       { label: 'Step 1 · done', kind: 'done', title: 'Safe foundation', items: ['Database migrations', 'Demo switch (demo and real instance from the same code)', 'Description per activity', 'Import activities from Excel/CSV'] },
-      { label: 'Step 2', title: 'Participants', items: ['Participant list per vote via CSV or by hand, with e-mail and Pfarrgemeinde', 'Personal links with a check (date of birth or baptism)', 'Demo mailbox instead of real e-mails'] },
+      { label: 'Step 2 · done', kind: 'done', title: 'Participants', items: ['Participant list per vote via CSV or by hand, with e-mail and Pfarrgemeinde', 'Personal links with a date-of-birth check', 'Invitations: demo mailbox, otherwise to copy'] },
       { label: 'Step 3', title: 'Login and roles', items: ['Junia and parish community admins', 'Visibility per vote', 'Importing and editing participants by role', 'Demo accounts via buttons'] },
       { label: 'Step 4', title: 'Allocation under control', items: ['Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'then: pilot with 20 to 30 confirmands'] },
       { label: 'Steps 5 and 6', title: 'After the pilot', items: ['Cancellations and moving up from the waiting list', 'Required staffing', '“More than required”', 'Interim status switchable'] },

@@ -70,6 +70,11 @@ public static class Database
 
         await db.Database.MigrateAsync();
 
+        // Participants from before personal links get their token now.
+        var withoutToken = await db.Participants.Where(p => p.Token == "").ToListAsync();
+        foreach (var p in withoutToken) p.Token = ParticipantEntity.NewToken();
+        if (withoutToken.Count > 0) await db.SaveChangesAsync();
+
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         if (IsDemo(config) && !await db.FairSlots.AnyAsync()) await SeedDemoAsync(db);
     }
@@ -116,7 +121,9 @@ public static class Database
         slot.Apply(rules);
         var order = 0;
         foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));
-        slot.Participants = participants.Select(p => new ParticipantEntity { FairSlotId = slot.Id, Name = p }).ToList();
+        slot.Participants = participants.Select(p => DemoData.People.FirstOrDefault(x => x.Name == p) is { } d
+            ? new ParticipantEntity { FairSlotId = slot.Id, Name = p, Email = d.Email, BirthDate = d.BirthDate, Parish = d.Parish }
+            : new ParticipantEntity { FairSlotId = slot.Id, Name = p }).ToList();
         db.FairSlots.Add(slot);
         await db.SaveChangesAsync();
         await ResetSamplesAsync(db, slot.Id);

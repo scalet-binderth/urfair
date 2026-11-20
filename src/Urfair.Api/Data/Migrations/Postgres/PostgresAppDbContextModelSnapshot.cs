@@ -163,21 +163,78 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.ToTable("FairSlots");
                 });
 
+            modelBuilder.Entity("Urfair.Api.Data.MailEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("FairSlotId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("To")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FairSlotId");
+
+                    b.ToTable("Mails");
+                });
+
             modelBuilder.Entity("Urfair.Api.Data.ParticipantEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("InvitedAt")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Token");
 
                     b.HasIndex("FairSlotId", "Name");
 
@@ -296,6 +353,15 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         });
 
                     b.Navigation("Groups");
+                });
+
+            modelBuilder.Entity("Urfair.Api.Data.MailEntity", b =>
+                {
+                    b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FairSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Urfair.Api.Data.ParticipantEntity", b =>

@@ -3,13 +3,13 @@ namespace Urfair.Core;
 /// <summary>Additional invented FairSlots and demo people for presentations.</summary>
 public static class DemoData
 {
-    public sealed record Person(string Key, string Name);
+    public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish);
 
     /// <summary>A: no FairSlot, B: two open, C: two open + one published, D: two open + one closed + one published.</summary>
-    public static readonly Person A = new("A", "Anna Ammer");
-    public static readonly Person B = new("B", "Ben Berger");
-    public static readonly Person C = new("C", "Clara Czerny");
-    public static readonly Person D = new("D", "David Doppler");
+    public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
+    public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus");
+    public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist");
+    public static readonly Person D = new("D", "David Doppler", "david.doppler@example.org", new(2012, 1, 9), "Pfarrgemeinde Urfahr-Christkönig");
     public static readonly IReadOnlyList<Person> People = [A, B, C, D];
 
     /// <summary>Demo person A stays without any vote, even for votes open to all (shows the "nothing assigned" case).</summary>

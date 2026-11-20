@@ -15,7 +15,9 @@ export interface Activity { id: string; title: string; restrictedTo: string | nu
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; }
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; rules: Rules; }
-export interface ListedParticipant { id: string; name: string; hasVoted: boolean; }
+export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; parish: string | null; }
+export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
+export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
@@ -49,27 +51,44 @@ export class Api {
   info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; parishes: string[] }>('/api/info')); }
 
   // ---------- participants ----------
+  /** Personal link of the signed-in participant (token and confirmed date of birth), sent with participant requests. */
+  setParticipantLink(link: { token: string; check: string } | null): void {
+    this.participantLink = link;
+    try { if (link) sessionStorage.setItem('participantLink', JSON.stringify(link)); else sessionStorage.removeItem('participantLink'); } catch { /* ignore */ }
+  }
+  private participantLink: { token: string; check: string } | null = Api.storedLink();
+  private static storedLink(): { token: string; check: string } | null {
+    try { return JSON.parse(sessionStorage.getItem('participantLink') ?? 'null'); } catch { return null; }
+  }
+  private me() {
+    const l = this.participantLink;
+    return { headers: new HttpHeaders(l ? { 'X-Participant': l.token, 'X-Participant-Check': l.check } : {}) };
+  }
+  linkInfo(token: string) { return this.call(this.http.get<{ slotId: string; slotName: string; needsCheck: boolean }>(`/api/p/${token}`)); }
+  linkCheck(token: string, birthDate: string | null) {
+    return this.call(this.http.post<{ name: string; slotId: string }>(`/api/p/${token}/check`, { birthDate }));
+  }
   /** Previously submitted ballot of this name, or null. */
   async lookupBallot(id: string, name: string): Promise<{ points: Record<string, number>; unavailableSessions: string[] } | null> {
     try {
-      return await firstValueFrom(this.http.post<{ points: Record<string, number>; unavailableSessions: string[] }>(`/api/slots/${id}/ballots/lookup`, { name }));
+      return await firstValueFrom(this.http.post<{ points: Record<string, number>; unavailableSessions: string[] }>(`/api/slots/${id}/ballots/lookup`, { name }, this.me()));
     } catch (e) {
       if (e instanceof HttpErrorResponse && e.status === 404) return null;
       throw new ApiFailure([{ code: 'generic' }]);
     }
   }
-  mySlots(name: string) { return this.call(this.http.post<SlotSummary[]>('/api/my-slots', { name })); }
+  mySlots(name: string) { return this.call(this.http.post<SlotSummary[]>('/api/my-slots', { name }, this.me())); }
   myResult(id: string, name: string) {
-    return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }));
+    return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }, this.me()));
   }
-  myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name })); }
+  myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name }, this.me())); }
   setWaitlist(id: string, name: string, activityIds: string[]) {
-    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds }));
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds }, this.me()));
   }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }
   submitBallot(id: string, body: { name: string; points: Record<string, number>; unavailableSessions: string[] }) {
-    return this.call(this.http.post<{ id: string; replaced: boolean }>(`/api/slots/${id}/ballots`, body));
+    return this.call(this.http.post<{ id: string; replaced: boolean }>(`/api/slots/${id}/ballots`, body, this.me()));
   }
 
   // ---------- organisation ----------
@@ -91,7 +110,14 @@ export class Api {
     return this.call(this.http.post(`/api/admin/slots/${id}/reset-demo`, body, this.admin()));
   }
   participants(id: string) { return this.call(this.http.get<ListedParticipant[]>(`/api/admin/slots/${id}/participants`, this.admin())); }
-  addParticipant(id: string, name: string) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, { name }, this.admin())); }
+  addParticipant(id: string, body: ParticipantInput) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, body, this.admin())); }
+  updateParticipant(participantId: string, body: ParticipantInput) { return this.call(this.http.put(`/api/admin/participants/${participantId}`, body, this.admin())); }
+  exportParticipants(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/participants.csv`, { ...this.admin(), responseType: 'blob' })); }
+  importParticipants(id: string, body: { csv: string; commit: boolean }) {
+    return this.call(this.http.post<{ people: ParticipantInput[]; errors: ApiError[]; new: number; updated: number; saved: boolean }>(`/api/admin/slots/${id}/participants/import`, body, this.admin()));
+  }
+  createInvitations(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/invitations`, {}, this.admin())); }
+  mails(id: string) { return this.call(this.http.get<Mail[]>(`/api/admin/slots/${id}/mails`, this.admin())); }
   removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
   exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { ...this.admin(), responseType: 'blob' })); }
   importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean }) {

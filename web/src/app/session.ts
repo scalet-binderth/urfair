@@ -27,6 +27,7 @@ export class SessionService {
   signOut(): void {
     this.role.set(null);
     this.api.setAdminKey('');
+    this.api.setParticipantLink(null);
     try { sessionStorage.removeItem('role'); } catch { /* ignore */ }
   }
 }

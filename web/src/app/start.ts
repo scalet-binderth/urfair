@@ -19,12 +19,14 @@ import { SessionService } from './session';
     <div class="tiles">
       <form class="card tile stack" (submit)="$event.preventDefault(); joinAsParticipant()">
         <h2>{{ i18n.t('start.participant') }}</h2>
-        <p class="muted">{{ i18n.t('start.participantText') }}</p>
+        <p class="muted">{{ i18n.t(info.demo() ? 'start.participantText' : 'start.linkOnly') }}</p>
+        @if (info.demo()) {
         <div class="field">
           <label for="p-name">{{ i18n.t('vote.name') }}</label>
           <input id="p-name" autocomplete="name" [placeholder]="i18n.t('vote.namePlaceholder')" [(ngModel)]="name" name="name" />
         </div>
         <button class="btn" type="submit" [disabled]="!name.trim()">{{ i18n.t('start.participantGo') }}</button>
+        }
         @if (info.demo()) {
         <div class="demo-people">
           <p class="small muted">{{ i18n.t('start.demoPeople') }}</p>
@@ -88,6 +90,7 @@ export class StartPage {
 
   protected joinAsParticipant(): void {
     if (!this.name.trim()) return;
+    this.api.setParticipantLink(null); // demo: sign in by name
     this.session.signIn({ kind: 'participant', name: this.name.trim() });
     this.router.navigate(['/slots']);
   }

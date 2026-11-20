@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddAppDatabase();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHealthChecks();
+builder.Services.AddMemoryCache(); // counts failed link checks
 
 var app = builder.Build();
 
@@ -17,6 +18,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapHealthChecks("/health");
 app.MapApi();
+app.MapParticipantLinks();
 app.MapAdminApi();
 app.MapFallbackToFile("index.html");
 
