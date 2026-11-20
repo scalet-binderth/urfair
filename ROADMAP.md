@@ -25,13 +25,18 @@ and English; keep both in sync.
   filter by Pfarrgemeinde); personal link `/p/{token}` with a date-of-birth check (10 wrong tries lock it for 15 minutes),
   afterwards the browser sends token and date with every participant request; outside demo mode only links work;
   invitations with the link (demo mailbox, otherwise texts to copy until e-mail sending exists)
+- **Step 3:** organiser accounts (e-mail and password, PBKDF2 hashes, cookie with keys in the database, 10 wrong
+  logins lock for 15 minutes); Junia admins create accounts for Junia or one or more Pfarrgemeinden with a one-time
+  link to set the password; the first Junia admin of a real instance is created with `Admin__Key`; visibility per vote
+  (Pfarrgemeinde only / Junia shared / Junia read-only) checked on the server for every organiser request;
+  participants, import, invitations limited to the own Pfarrgemeinden in Junia-wide votes; demo accounts via buttons
 
 ## Next steps (each ends with a demo that can be shown)
 
 | Step | Work packages | Visible in the demo |
 |---|---|---|
 | 2 ✓ | done, see above | |
-| 3 | Login with roles (Junia admin, Pfarrgemeinde admin), visibility per vote (Pfarrgemeinde only / Junia shared / Junia read-only), participant import and editing limited by role, all checked on the server | demo accounts via buttons |
+| 3 ✓ | done, see above | |
 | 4 | Freeze the allocation, move by hand, lock, recalculate; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 5 | Cancellations after the deadline (organiser and participant); moving up from the waiting list with a deadline to accept | offer in the demo mailbox |
@@ -75,6 +80,6 @@ officer, legal notice and privacy policy, automatic deletion after an event.
 ## Open questions
 
 - Who is the contact for hosting and data protection in the parish and diocese?
-- May one person be admin of several parishes?
+- ~~May one person be admin of several parishes?~~ Yes (an account can have several Pfarrgemeinden).
 - May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes? (proposal: yes, only rows of their own Pfarrgemeinde)
 - Pilot with 20–30 confirmands or the whole year group right away?

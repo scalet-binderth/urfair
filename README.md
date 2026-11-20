@@ -66,6 +66,15 @@ if a date of birth is stored it is asked after the click. Invitations with the l
 "Einladungen" tab: in demo mode as a demo mailbox, otherwise as texts to copy (the app does not send e-mails yet).
 Outside demo mode participants can only sign in with their link.
 
+### Organiser accounts and roles
+
+Organisers sign in with e-mail and password (cookie; keys stored in the database so sign-ins survive restarts).
+Junia admins manage accounts under "Konten": a new account is assigned to Junia (may do everything) or to one or more
+Pfarrgemeinden and gets a one-time link (7 days) to set its password; the link is passed on personally.
+Every vote has a visibility: *Pfarrgemeinde intern*, *Junia gemeinsam* or *Junia, nur lesen*. The server checks every
+request of the organisation area (`src/Urfair.Api/Access.cs`); Pfarrgemeinde admins only see and edit participants of
+their own Pfarrgemeinden in Junia-wide votes. In demo mode, three demo accounts sign in with a button.
+
 ### Importing activities
 
 Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
@@ -83,7 +92,7 @@ Tests: `dotnet test Urfair.slnx`
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
-| `Admin__Key` | If set, the organisation area requires this key. Leave empty for open demos. |
+| `Admin__Key` | Real instance only: key to create the very first Junia admin account (start page, while no account exists). Not used afterwards. |
 | `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
 | `App__BaseUrl` | Public address used in invitation links (e.g. `https://urfair-prod.onrender.com`). Default: the request host. |
 

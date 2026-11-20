@@ -8,13 +8,18 @@ export const PHASES: Phase[] = ['Draft', 'Open', 'Closed', 'Published'];
 export interface Group { id: string; name: string; perParticipant: number; minActivities: number; color: string; }
 export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; }
-export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; }
+export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; canEdit?: boolean | null; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; }
-export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; rules: Rules; }
+export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; rules: Rules; }
+export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
+export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
+export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
+export interface AccountInput { email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; }
+export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; }
 export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; parish: string | null; }
 export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
 export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; }
@@ -35,17 +40,20 @@ export class ApiFailure extends Error {
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
-  /** Admin key kept for this browser tab only. */
-  readonly adminKey = signal(Api.storedKey());
 
-  private static storedKey(): string {
-    try { return sessionStorage.getItem('adminKey') ?? ''; } catch { return ''; }
-  }
-
-  setAdminKey(key: string): void {
-    this.adminKey.set(key);
-    try { sessionStorage.setItem('adminKey', key); } catch { /* ignore */ }
-  }
+  // ---------- organiser accounts (sign-in cookie) ----------
+  currentAccount() { return this.call(this.http.get<{ account: Account | null; setupNeeded: boolean }>('/api/auth/me')); }
+  login(email: string, password: string) { return this.call(this.http.post<Account>('/api/auth/login', { email, password })); }
+  logout() { return this.call(this.http.post('/api/auth/logout', {})); }
+  demoLogin(key: string) { return this.call(this.http.post<Account>('/api/auth/demo', { key })); }
+  setup(body: { key: string; email: string; name: string; password: string }) { return this.call(this.http.post<Account>('/api/auth/setup', body)); }
+  passwordLink(token: string) { return this.call(this.http.get<{ name: string; email: string }>(`/api/auth/password/${token}`)); }
+  setPassword(token: string, password: string) { return this.call(this.http.post<Account>(`/api/auth/password/${token}`, { password })); }
+  accounts() { return this.call(this.http.get<ListedAccount[]>('/api/admin/accounts')); }
+  createAccount(body: AccountInput) { return this.call(this.http.post<{ id: string; setupToken: string }>('/api/admin/accounts', body)); }
+  updateAccount(id: string, body: AccountInput) { return this.call(this.http.put(`/api/admin/accounts/${id}`, body)); }
+  newSetupLink(id: string) { return this.call(this.http.post<{ setupToken: string }>(`/api/admin/accounts/${id}/setup-link`, {})); }
+  deleteAccount(id: string) { return this.call(this.http.delete(`/api/admin/accounts/${id}`)); }
 
   // ---------- general ----------
   info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; parishes: string[] }>('/api/info')); }
@@ -126,7 +134,8 @@ export class Api {
   resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
 
-  private admin() { return { headers: new HttpHeaders(this.adminKey() ? { 'X-Admin-Key': this.adminKey() } : {}) }; }
+  /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
+  private admin() { return {}; }
 
   private async call<T>(request: Observable<T>): Promise<T> {
     try {
@@ -134,6 +143,7 @@ export class Api {
     } catch (e) {
       if (e instanceof HttpErrorResponse) {
         if (e.status === 401) throw new ApiFailure([{ code: 'unauthorized' }]);
+        if (e.status === 403) throw new ApiFailure([{ code: 'forbidden' }]);
         if (e.status === 400 && e.error?.errors) throw new ApiFailure(e.error.errors);
       }
       throw new ApiFailure([{ code: 'generic' }]);

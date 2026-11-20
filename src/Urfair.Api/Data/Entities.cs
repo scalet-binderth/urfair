@@ -5,6 +5,17 @@ namespace Urfair.Api.Data;
 /// <summary>Lifecycle of a FairSlot.</summary>
 public enum Phase { Draft, Open, Closed, Published }
 
+/// <summary>Who sees and edits a FairSlot in the organisation area (Junia admins always may).</summary>
+public enum Visibility
+{
+    /// <summary>All admins of all Pfarrgemeinden see and edit it.</summary>
+    JuniaShared,
+    /// <summary>Only admins of the FairSlot's Pfarrgemeinde.</summary>
+    ParishOnly,
+    /// <summary>All see it; only Junia admins edit it (Pfarrgemeinde admins maintain their own participants).</summary>
+    JuniaReadOnly,
+}
+
 /// <summary>One allocation round, e.g. "Confirmation preparation 2026/27", with its own rules, activities and ballots.</summary>
 public class FairSlotEntity
 {
@@ -23,6 +34,7 @@ public class FairSlotEntity
     /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>
     public string? Parish { get; set; }
     public string? Organiser { get; set; }
+    public Visibility Visibility { get; set; } = Visibility.JuniaShared;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
@@ -156,4 +168,24 @@ public class GroupEntity
     public int SortOrder { get; set; }
 
     public ActivityGroup ToModel() => new(Id, Name, PerParticipant, MinActivities, Color);
+}
+
+/// <summary>An organiser account. Junia admins may do everything; others work for the listed Pfarrgemeinden.</summary>
+public class AccountEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    /// <summary>Lower case; used to sign in.</summary>
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public bool IsJuniaAdmin { get; set; }
+    /// <summary>Official names (see Parishes) this account works for.</summary>
+    public List<string> Parishes { get; set; } = [];
+    /// <summary>PBKDF2 hash (see Passwords); null until the password has been set via the setup link.</summary>
+    public string? PasswordHash { get; set; }
+    /// <summary>One-time link to set the password, created by a Junia admin.</summary>
+    public string? SetupToken { get; set; }
+    public DateTime? SetupTokenExpires { get; set; }
+    /// <summary>Demo accounts sign in with a button, never with a password.</summary>
+    public bool IsDemo { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

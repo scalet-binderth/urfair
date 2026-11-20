@@ -25,28 +25,32 @@ public static class ParticipantEndpoints
 
     public static void MapParticipantAdmin(this RouteGroupBuilder admin)
     {
-        admin.MapGet("/slots/{id:guid}/participants", async (Guid id, AppDbContext db) =>
+        admin.MapGet("/slots/{id:guid}/participants", async (Guid id, AppDbContext db, HttpContext http) =>
         {
             var voted = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample).Select(b => b.Name.ToLower()).ToListAsync();
+            var access = Access.Slot(http);
             return (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Parish).ThenBy(p => p.Name).ToListAsync())
+                .Where(p => access.InScope(p.Parish))
                 .Select(p => new ParticipantListDto(p.Id, p.Name, p.Email, p.BirthDate, p.Parish, p.Token, p.InvitedAt, voted.Contains(p.Name.ToLower())));
         });
 
-        admin.MapPost("/slots/{id:guid}/participants", async (Guid id, ParticipantRequest req, AppDbContext db) =>
+        admin.MapPost("/slots/{id:guid}/participants", async (Guid id, ParticipantRequest req, AppDbContext db, HttpContext http) =>
         {
             if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
             if (Check(req, out var person) is { } error) return error;
+            if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (await Database.IsParticipantAsync(db, id, person.Name)) return Endpoints.Errors("alreadyListed");
             db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, Parish = person.Parish });
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
 
-        admin.MapPut("/participants/{participantId:guid}", async (Guid participantId, ParticipantRequest req, AppDbContext db) =>
+        admin.MapPut("/participants/{participantId:guid}", async (Guid participantId, ParticipantRequest req, AppDbContext db, HttpContext http) =>
         {
             var p = await db.Participants.FindAsync(participantId);
-            if (p is null) return Results.NotFound();
+            if (p is null || !Access.Slot(http).InScope(p.Parish)) return Results.NotFound();
             if (Check(req, out var person) is { } error) return error;
+            if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (!p.Name.Equals(person.Name, StringComparison.OrdinalIgnoreCase) && await Database.IsParticipantAsync(db, p.FairSlotId, person.Name))
                 return Endpoints.Errors("alreadyListed");
             (p.Name, p.Email, p.BirthDate, p.Parish) = (person.Name, person.Email, person.BirthDate, person.Parish);
@@ -54,34 +58,42 @@ public static class ParticipantEndpoints
             return Results.NoContent();
         });
 
-        admin.MapDelete("/participants/{participantId:guid}", async (Guid participantId, AppDbContext db) =>
+        admin.MapDelete("/participants/{participantId:guid}", async (Guid participantId, AppDbContext db, HttpContext http) =>
         {
             var p = await db.Participants.FindAsync(participantId);
-            if (p is null) return Results.NotFound();
+            if (p is null || !Access.Slot(http).InScope(p.Parish)) return Results.NotFound();
             db.Participants.Remove(p);
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
 
         // The list as CSV (also the template for the import).
-        admin.MapGet("/slots/{id:guid}/participants.csv", async (Guid id, AppDbContext db) =>
+        admin.MapGet("/slots/{id:guid}/participants.csv", async (Guid id, AppDbContext db, HttpContext http) =>
         {
-            var people = (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Name).ToListAsync())
+            var people = (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Name).ToListAsync()).Where(p => Access.Slot(http).InScope(p.Parish))
                 .Select(p => new ParticipantCsv.Person(p.Name, p.Email, p.BirthDate, p.Parish));
             return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(ParticipantCsv.Write(people))).ToArray(),
                 "text/csv; charset=utf-8", "teilnehmende.csv");
         });
 
         // Preview (commit=false) or take over (commit=true). Known names are updated with the new details, others are added.
-        admin.MapPost("/slots/{id:guid}/participants/import", async (Guid id, ParticipantImportRequest req, AppDbContext db) =>
+        admin.MapPost("/slots/{id:guid}/participants/import", async (Guid id, ParticipantImportRequest req, AppDbContext db, HttpContext http) =>
         {
             if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
             var result = ParticipantCsv.Parse(req.Csv ?? "");
             var existing = await db.Participants.Where(p => p.FairSlotId == id).ToListAsync();
             ParticipantEntity? Known(string name) => existing.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            // Pfarrgemeinde admins may only import people of their own Pfarrgemeinden (and only touch those already listed).
+            var access = Access.Slot(http);
+            var errors = result.Errors.ToList();
+            var csvRows = (req.Csv ?? "").TrimStart('﻿').Split('\n');
+            foreach (var person in result.People.Where(p => !access.InScope(p.Parish) || (Known(p.Name) is { } k && !access.InScope(k.Parish))))
+                errors.Add(new("csvParishNotOwn", new Dictionary<string, object> { ["value"] = person.Name, ["row"] = RowOf(csvRows, person.Name) }));
+
             var updated = result.People.Count(p => Known(p.Name) is not null);
-            var preview = new ParticipantImportDto(result.People, result.Errors, result.People.Count - updated, updated, false);
-            if (!req.Commit || result.Errors.Count > 0 || result.People.Count == 0) return Results.Ok(preview);
+            var preview = new ParticipantImportDto(result.People, errors, result.People.Count - updated, updated, false);
+            if (!req.Commit || errors.Count > 0 || result.People.Count == 0) return Results.Ok(preview);
 
             foreach (var person in result.People)
             {
@@ -99,12 +111,14 @@ public static class ParticipantEndpoints
         });
 
         // Prepares invitation e-mails with the personal link for everyone with an e-mail address who has none yet.
-        admin.MapPost("/slots/{id:guid}/invitations", async (Guid id, AppDbContext db, HttpRequest http, IConfiguration cfg) =>
+        admin.MapPost("/slots/{id:guid}/invitations", async (Guid id, AppDbContext db, HttpContext ctx, IConfiguration cfg) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
-            var baseUrl = BaseUrl(http, cfg);
-            var due = await db.Participants.Where(p => p.FairSlotId == id && p.Email != null && p.InvitedAt == null).ToListAsync();
+            var baseUrl = BaseUrl(ctx.Request, cfg);
+            var access = Access.Slot(ctx);
+            var due = (await db.Participants.Where(p => p.FairSlotId == id && p.Email != null && p.InvitedAt == null).ToListAsync())
+                .Where(p => access.InScope(p.Parish)).ToList();
             foreach (var p in due)
             {
                 db.Mails.Add(Invitation(slot, p, baseUrl));
@@ -114,9 +128,15 @@ public static class ParticipantEndpoints
             return Results.Ok(new { created = due.Count });
         });
 
-        admin.MapGet("/slots/{id:guid}/mails", async (Guid id, AppDbContext db) =>
-            (await db.Mails.Where(m => m.FairSlotId == id).ToListAsync())
-                .OrderByDescending(m => m.CreatedAt).Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, m.CreatedAt)));
+        admin.MapGet("/slots/{id:guid}/mails", async (Guid id, AppDbContext db, HttpContext http) =>
+        {
+            var access = Access.Slot(http);
+            var inScope = (await db.Participants.Where(p => p.FairSlotId == id).Select(p => new { p.Id, p.Parish }).ToListAsync())
+                .Where(p => access.InScope(p.Parish)).Select(p => (Guid?)p.Id).ToHashSet();
+            return (await db.Mails.Where(m => m.FairSlotId == id).ToListAsync())
+                .Where(m => access.Scope is null || inScope.Contains(m.ParticipantId))
+                .OrderByDescending(m => m.CreatedAt).Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, m.CreatedAt));
+        });
     }
 
     public static void MapParticipantLinks(this WebApplication app)
@@ -171,6 +191,14 @@ public static class ParticipantEndpoints
             return null;
         }
         return p;
+    }
+
+    /// <summary>Row number (1 = header) of the first CSV line mentioning the name; for error messages only.</summary>
+    private static int RowOf(string[] rows, string name)
+    {
+        var first = name.Split(' ')[0];
+        var i = Array.FindIndex(rows, 1, r => r.Contains(name, StringComparison.OrdinalIgnoreCase) || r.Contains(first, StringComparison.OrdinalIgnoreCase));
+        return i < 0 ? 0 : i + 1;
     }
 
     private static IResult? Check(ParticipantRequest req, out ParticipantCsv.Person person)

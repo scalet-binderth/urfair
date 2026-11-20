@@ -7,7 +7,8 @@ namespace Urfair.Api;
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
-public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser);
+public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
+    Visibility Visibility, bool? CanEdit = null);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
@@ -131,7 +132,7 @@ public static class Endpoints
         var s = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (s is null) return null;
         var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
-        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser);
+        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility);
     }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
