@@ -46,7 +46,7 @@ export class Api {
   }
 
   // ---------- general ----------
-  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean }>('/api/info')); }
+  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; parishes: string[] }>('/api/info')); }
 
   // ---------- participants ----------
   /** Previously submitted ballot of this name, or null. */

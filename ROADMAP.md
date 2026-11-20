@@ -1,11 +1,12 @@
 # Roadmap
 
-Goal: Urfair as a free, shared tool for the parish network Urfahr St. Junia (7 parishes).
+Goal: Urfair as a free, shared tool for the Pfarre Urfahr-St. Junia and its 8 Pfarrgemeinden (parish communities;
+official names in `src/Urfair.Core/Parishes.cs`).
 Principle: **`main` is always the running demo** (https://urfair.onrender.com). Every step lands as small pull
 requests; CI must be green; Render deploys `main` automatically. The same code later runs as a real instance
 with `Demo__Enabled=false`. Anything "outgoing" (e-mails, offers) shows up in an in-app demo mailbox in demo mode.
 
-Status as of 20 November 2026. In step 3, the parish becomes a selection from the list of parishes (today free text). The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
+Status as of 20 November 2026. Parish fields are a selection from the official list. The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
 and English; keep both in sync.
 
 ## Done
@@ -18,14 +19,15 @@ and English; keep both in sync.
 - **Step 1 (this PR):** EF Core migrations (SQLite + PostgreSQL), demo switch `Demo__Enabled`, reset of the whole
   demo, description per activity, Excel/CSV import and export of activities (instead of a PDF importer)
 - Optional parish and person responsible per vote, parish and leader per activity (only where they differ);
-  shown to participants and included in the CSV columns `Pfarre` and `Leitung`
+  shown to participants and included in the CSV columns `Pfarre` and `Leitung`; parish chosen from the official list
+  (short forms such as "St. Markus" are recognised in the import)
 
 ## Next steps (each ends with a demo that can be shown)
 
 | Step | Work packages | Visible in the demo |
 |---|---|---|
 | 2 | Participant list via CSV with e-mail; personal links with a check (date of birth or baptism); demo mailbox | invitations in the demo mailbox, sign-in via link |
-| 3 | Login with roles (Junia admin, parish admin), parishes, visibility per vote (parish only / Junia shared / Junia read-only), checked on the server | demo accounts via buttons |
+| 3 | Login with roles (Junia admin, Pfarrgemeinde admin), visibility per vote (Pfarrgemeinde only / Junia shared / Junia read-only), checked on the server | demo accounts via buttons |
 | 4 | Freeze the allocation, move by hand, lock, recalculate; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 5 | Cancellations after the deadline (organiser and participant); moving up from the waiting list with a deadline to accept | offer in the demo mailbox |
@@ -56,5 +58,5 @@ officer, legal notice and privacy policy, automatic deletion after an event.
 
 - Who is the contact for hosting and data protection in the parish and diocese?
 - May one person be admin of several parishes?
-- May parish admins maintain their own participants in Junia votes?
+- May Pfarrgemeinde admins maintain their own participants in Junia votes?
 - Pilot with 20–30 confirmands or the whole year group right away?

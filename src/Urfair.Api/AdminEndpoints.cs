@@ -66,13 +66,15 @@ public static class AdminEndpoints
             var rules = req.Rules with { Step = 5, Groups = groups };
             var errors = Validation.Check(rules);
             if (name.Length == 0) errors.Insert(0, new ValidationError("nameRequired"));
-            if (Clean(req.Parish) is { Length: > Validation.MaxShortText } || Clean(req.Organiser) is { Length: > Validation.MaxShortText })
+            if (ParishOf(req.Parish) is { } parish && !Parishes.All.Contains(parish))
+                errors.Add(new ValidationError("parishUnknown", new Dictionary<string, object> { ["value"] = parish }));
+            if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             var rulesChanged = slot.ToRules() != rules;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
-            (slot.Parish, slot.Organiser) = (Clean(req.Parish), Clean(req.Organiser));
+            (slot.Parish, slot.Organiser) = (ParishOf(req.Parish), Clean(req.Organiser));
             slot.Apply(rules);
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();
@@ -256,20 +258,23 @@ public static class AdminEndpoints
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
+    /// <summary>Official parish name for a full or short form; unknown text is kept so validation can report it.</summary>
+    private static string? ParishOf(string? text) => Parishes.Match(text) ?? Clean(text);
+
     /// <summary>Copies a request onto an activity entity (sessions are matched by id). Returns an error result if invalid.</summary>
     private static IResult? Apply(ActivityEntity entity, ActivityRequest req)
     {
         var restricted = string.IsNullOrWhiteSpace(req.RestrictedTo) ? null : req.RestrictedTo;
         var sessions = (req.Sessions ?? []).Select(s =>
             new Session(s.Id ?? "", entity.Id, s.Start, s.Flexible ? null : s.End, (s.Location ?? "").Trim(), s.Capacity, s.Flexible)).ToList();
-        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: Clean(req.Parish), Leader: Clean(req.Leader)));
+        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Clean(req.Leader)));
         if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
         entity.Title = req.Title!.Trim();
         entity.RestrictedTo = restricted;
         entity.GroupId = string.IsNullOrWhiteSpace(req.GroupId) ? null : req.GroupId;
         entity.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
-        entity.Parish = Clean(req.Parish);
+        entity.Parish = ParishOf(req.Parish);
         entity.Leader = Clean(req.Leader);
         var keep = new List<SessionEntity>();
         foreach (var s in sessions)

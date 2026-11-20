@@ -31,15 +31,15 @@ public static class SampleData
     /// <summary>Invented parish and leader for some demo projects (the others inherit the vote's values).</summary>
     private static readonly Dictionary<string, (string? Parish, string? Leader)> Leads = new()
     {
-        ["advent"] = ("Hl. Geist", "Eva Leitner"),
-        ["krippe"] = ("St. Magdalena", "Josef Brandl"),
+        ["advent"] = ("Pfarrgemeinde Urfahr-Hl. Geist", "Eva Leitner"),
+        ["krippe"] = ("Pfarrgemeinde Urfahr-Lichtenberg", "Josef Brandl"),
         ["kitchen"] = (null, "Sarah Wimmer"),
         ["hochseil"] = (null, "Jungschar-Team"),
-        ["kino"] = ("Christkönig", "Lukas Mayr"),
-        ["altenheim"] = ("St. Markus", "Theresa Ebner"),
+        ["kino"] = ("Pfarrgemeinde Urfahr-Christkönig", "Lukas Mayr"),
+        ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner"),
     };
 
-    public const string FirmungParish = "Urfahr St. Junia (alle Pfarrteilgemeinden)";
+    public const string FirmungParish = Parishes.Junia;
     public const string FirmungOrganiser = "Firmteam Urfahr";
 
     public static IReadOnlyList<Activity> Activities()

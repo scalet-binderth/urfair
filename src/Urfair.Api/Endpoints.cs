@@ -24,7 +24,7 @@ public static class Endpoints
         var api = app.MapGroup("/api");
 
         // Tells the start page whether the organisation area needs an access key.
-        api.MapGet("/info", (IConfiguration cfg) => new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg) });
+        api.MapGet("/info", (IConfiguration cfg) => new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), parishes = Parishes.All });
 
         // Demo: reload a previously submitted ballot by name so it can be changed. Replaced by personal links later.
         api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db) =>

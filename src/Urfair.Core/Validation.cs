@@ -51,6 +51,7 @@ public static class Validation
         if (a.RestrictedTo is not (null or "m" or "w")) errors.Add(E("restrictionInvalid"));
         if (a.Description is { Length: > MaxDescription }) errors.Add(E("descriptionTooLong", ("max", MaxDescription)));
         if (a.Parish is { Length: > MaxShortText } || a.Leader is { Length: > MaxShortText }) errors.Add(E("textTooLong", ("max", MaxShortText)));
+        if (a.Parish is not null && !Parishes.All.Contains(a.Parish)) errors.Add(E("parishUnknown", ("value", a.Parish)));
         if (a.Sessions.Count == 0) errors.Add(E("sessionRequired"));
         foreach (var s in a.Sessions)
         {
