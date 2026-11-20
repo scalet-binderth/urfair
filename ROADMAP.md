@@ -26,8 +26,8 @@ and English; keep both in sync.
 
 | Step | Work packages | Visible in the demo |
 |---|---|---|
-| 2 | Participant list via CSV with e-mail; personal links with a check (date of birth or baptism); demo mailbox | invitations in the demo mailbox, sign-in via link |
-| 3 | Login with roles (Junia admin, Pfarrgemeinde admin), visibility per vote (Pfarrgemeinde only / Junia shared / Junia read-only), checked on the server | demo accounts via buttons |
+| 2 | Participant import per vote via CSV (first name, last name, e-mail, date of birth, Pfarrgemeinde), also by hand; personal links with a check (date of birth or baptism); demo mailbox | invitations in the demo mailbox, sign-in via link |
+| 3 | Login with roles (Junia admin, Pfarrgemeinde admin), visibility per vote (Pfarrgemeinde only / Junia shared / Junia read-only), participant import and editing limited by role, all checked on the server | demo accounts via buttons |
 | 4 | Freeze the allocation, move by hand, lock, recalculate; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 5 | Cancellations after the deadline (organiser and participant); moving up from the waiting list with a deadline to accept | offer in the demo mailbox |
@@ -41,6 +41,7 @@ officer, legal notice and privacy policy, automatic deletion after an event.
 - E-mails from the app (parish mail account)
 - "Together with a friend"
 - Copy last year's vote as a template
+- Take over participants from another vote
 - "Open to everyone" with an exclusion list (e.g. last year's participants)
 
 ## Requirement notes
@@ -53,10 +54,23 @@ officer, legal notice and privacy policy, automatic deletion after an event.
 - **Required staffing:** first fill every date's minimum, preferring people who gave it points; show missing
   people while voting.
 - **Import:** Excel/CSV instead of PDF (a PDF has no fields; reliable only for one fixed layout).
+- **Participant import:** the list belongs to one vote, never to a Pfarrgemeinde; each person carries a
+  Pfarrgemeinde column (short forms recognised, as for activities), so Junia-wide votes such as the Firmung can be
+  filtered and evaluated per Pfarrgemeinde. No central register of people across Junia: less data, deleted with the
+  vote (minors). Rows with errors are reported by row number. Permissions from step 3:
+
+  | Vote visibility | Junia admin | Pfarrgemeinde admin |
+  |---|---|---|
+  | Pfarrgemeinde only | everything | import and edit if it is their own Pfarrgemeinde |
+  | Junia shared | everything | import and edit, only rows of their own Pfarrgemeinde |
+  | Junia, read only | everything | proposal: only rows of their own Pfarrgemeinde; activities and rules not |
+
+  Rows for another Pfarrgemeinde are rejected with their row number. Step 2 builds the import with the Pfarrgemeinde
+  column but without permission checks; step 3 adds them without changing the import.
 
 ## Open questions
 
 - Who is the contact for hosting and data protection in the parish and diocese?
 - May one person be admin of several parishes?
-- May Pfarrgemeinde admins maintain their own participants in Junia votes?
+- May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes? (proposal: yes, only rows of their own Pfarrgemeinde)
 - Pilot with 20–30 confirmands or the whole year group right away?
