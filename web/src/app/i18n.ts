@@ -177,6 +177,11 @@ const texts: Record<Lang, Record<string, string>> = {
     'error.csvTitleMissing': 'Titel fehlt.', 'error.csvDateInvalid': 'Datum „{value}“ nicht erkannt (z. B. 21.11.2026 14:00).',
     'error.csvSeatsInvalid': 'Plätze „{value}“ ist keine Zahl.', 'error.csvGroupUnknown': 'Gruppe „{value}“ gibt es in dieser Wahl nicht.',
     'error.csvRestrictionInvalid': 'Teilnahme „{value}“ nicht erkannt (leer, m oder w).',
+    'editor.parish': 'Pfarre', 'editor.leader': 'Leitung', 'editor.inheritHint': 'leer = wie bei der Wahl',
+    'admin.parish': 'Veranstaltende Pfarre', 'admin.organiser': 'Verantwortlich',
+    'admin.parishHint': 'Optional. Wird den Teilnehmenden oben angezeigt. Weicht eine Veranstaltung ab, trägst du Pfarre oder Leitung dort ein.',
+    'by.parish': 'Pfarre: {p}', 'by.organiser': 'Verantwortlich: {n}', 'by.leader': 'Leitung: {n}',
+    'error.textTooLong': 'Pfarre, Leitung und Verantwortlich dürfen höchstens {max} Zeichen lang sein.',
   },
   en: {
     'app.name': 'Urfair',
@@ -350,6 +355,11 @@ const texts: Record<Lang, Record<string, string>> = {
     'error.csvTitleMissing': 'Title missing.', 'error.csvDateInvalid': 'Date “{value}” not recognised (e.g. 21.11.2026 14:00).',
     'error.csvSeatsInvalid': 'Seats “{value}” is not a number.', 'error.csvGroupUnknown': 'There is no group “{value}” in this vote.',
     'error.csvRestrictionInvalid': 'Participation “{value}” not recognised (empty, m or w).',
+    'editor.parish': 'Parish', 'editor.leader': 'Led by', 'editor.inheritHint': 'empty = same as the vote',
+    'admin.parish': 'Organising parish', 'admin.organiser': 'Person responsible',
+    'admin.parishHint': 'Optional. Shown to participants at the top. If an activity differs, enter its parish or leader there.',
+    'by.parish': 'Parish: {p}', 'by.organiser': 'Responsible: {n}', 'by.leader': 'Led by: {n}',
+    'error.textTooLong': 'Parish, leader and person responsible can be at most {max} characters long.',
   },
 };
 
@@ -384,6 +394,12 @@ export class I18n {
   errors(e: unknown): string[] {
     const list = (e as { errors?: { code: string; args?: Args | null }[] })?.errors;
     return list?.length ? list.map(x => this.error(x)) : [this.t('error.generic')];
+  }
+
+  /** "Pfarre: X · Leitung: Y" from the optional fields; empty if none is set. */
+  byLine(parish: string | null, person: string | null, leader = false): string {
+    return [parish ? this.t('by.parish', { p: parish }) : '', person ? this.t(leader ? 'by.leader' : 'by.organiser', { n: person }) : '']
+      .filter(x => x).join(' · ');
   }
 
   locale(): string { return this.lang() === 'de' ? 'de-AT' : 'en-GB'; }

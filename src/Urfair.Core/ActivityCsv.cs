@@ -7,7 +7,7 @@ namespace Urfair.Core;
 /// Reads activities from a CSV table as Excel saves it ("CSV UTF-8" or plain "CSV", separator ; or ,).
 /// One row per date; rows with the same title form one activity with several dates.
 /// Column names in German or English, in any order:
-/// Titel, Beschreibung, Gruppe, Teilnahme (m/w), Beginn, Ende, Ort, Plätze (empty = unlimited), Nach Vereinbarung (ja).
+/// Titel, Beschreibung, Gruppe, Pfarre, Leitung, Teilnahme (m/w), Beginn, Ende, Ort, Plätze (empty = unlimited), Nach Vereinbarung (ja).
 /// </summary>
 public static class ActivityCsv
 {
@@ -18,6 +18,8 @@ public static class ActivityCsv
         ["titel"] = "title", ["title"] = "title",
         ["beschreibung"] = "description", ["description"] = "description",
         ["gruppe"] = "group", ["group"] = "group",
+        ["pfarre"] = "parish", ["parish"] = "parish",
+        ["leitung"] = "leader", ["leader"] = "leader", ["ledby"] = "leader",
         ["teilnahme"] = "restriction", ["restriction"] = "restriction", ["whocantakepart"] = "restriction",
         ["beginn"] = "start", ["start"] = "start",
         ["ende"] = "end", ["end"] = "end",
@@ -50,7 +52,7 @@ public static class ActivityCsv
         }
 
         // Activities in order of first appearance; the first row of a title carries its description, group and restriction.
-        var drafts = new List<(int Row, string Title, string? Description, string? GroupId, string? RestrictedTo, List<Session> Sessions)>();
+        var drafts = new List<(int Row, string Title, string? Description, string? GroupId, string? RestrictedTo, string? Parish, string? Leader, List<Session> Sessions)>();
         for (var r = 1; r < rows.Count; r++)
         {
             var row = rows[r];
@@ -69,7 +71,8 @@ public static class ActivityCsv
                 var restriction = Restriction(Cell(row, "restriction"));
                 if (restriction == "?") { errors.Add(E("csvRestrictionInvalid", line, ("value", Cell(row, "restriction")))); restriction = null; }
                 var description = Cell(row, "description");
-                draft = (line, title, description.Length == 0 ? null : description, group?.Id, restriction, []);
+                draft = (line, title, description.Length == 0 ? null : description, group?.Id, restriction,
+                    OrNull(Cell(row, "parish")), OrNull(Cell(row, "leader")), []);
                 drafts.Add(draft);
             }
 
@@ -97,7 +100,7 @@ public static class ActivityCsv
         foreach (var (d, i) in drafts.Select((d, i) => (d, i)))
         {
             var id = $"import{i}";
-            var activity = new Activity(id, d.Title, d.Sessions.Select(s => s with { ActivityId = id }).ToList(), d.RestrictedTo, 5, d.GroupId, d.Description);
+            var activity = new Activity(id, d.Title, d.Sessions.Select(s => s with { ActivityId = id }).ToList(), d.RestrictedTo, 5, d.GroupId, d.Description, d.Parish, d.Leader);
             // Activity rules (end after start, seats ≥ 1 …), reported with the activity's first row.
             errors.AddRange(Validation.Check(activity).Select(e => e with { Args = WithRow(e.Args, d.Row) }));
             activities.Add(activity);
@@ -108,7 +111,7 @@ public static class ActivityCsv
     /// <summary>Writes activities in the same format (one row per date, separator ;) so a list can be edited in Excel and imported again.</summary>
     public static string Write(IReadOnlyList<Activity> activities, IReadOnlyList<ActivityGroup> groups)
     {
-        var sb = new StringBuilder("Titel;Beschreibung;Gruppe;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung\r\n");
+        var sb = new StringBuilder("Titel;Beschreibung;Gruppe;Pfarre;Leitung;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung\r\n");
         foreach (var a in activities)
         foreach (var (s, i) in a.Sessions.Select((s, i) => (s, i)))
         {
@@ -116,7 +119,8 @@ public static class ActivityCsv
             string[] cells =
             [
                 // Description, group and participation only on the first row of an activity.
-                a.Title, i > 0 ? "" : a.Description ?? "", i > 0 ? "" : groups.FirstOrDefault(g => g.Id == a.GroupId)?.Name ?? "", i > 0 ? "" : a.RestrictedTo ?? "",
+                a.Title, i > 0 ? "" : a.Description ?? "", i > 0 ? "" : groups.FirstOrDefault(g => g.Id == a.GroupId)?.Name ?? "",
+                i > 0 ? "" : a.Parish ?? "", i > 0 ? "" : a.Leader ?? "", i > 0 ? "" : a.RestrictedTo ?? "",
                 s.Flexible ? s.Start.ToString("dd.MM.yyyy") : s.Start.ToString("dd.MM.yyyy HH:mm"), end, s.Location,
                 s.Capacity?.ToString(CultureInfo.InvariantCulture) ?? "", s.Flexible ? "ja" : "",
             ];
@@ -140,6 +144,8 @@ public static class ActivityCsv
 
     private static string Normalise(string header) =>
         new(header.Trim().ToLowerInvariant().Where(char.IsLetter).ToArray());
+
+    private static string? OrNull(string value) => value.Length == 0 ? null : value;
 
     private static bool IsYes(string value) =>
         value.ToLowerInvariant() is "ja" or "j" or "x" or "yes" or "y" or "1" or "true" or "wahr";

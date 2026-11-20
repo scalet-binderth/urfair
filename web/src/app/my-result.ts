@@ -25,7 +25,7 @@ import { SessionService } from './session';
             @for (a of r.assignments; track a.sessionId) {
               <div class="card item">
                 <h3>{{ a.title }} @if (a.isFallback) { <span class="tag">{{ i18n.t('results.fallbackChip') }}</span> }</h3>
-                <p class="muted">{{ i18n.when(a) }} · {{ a.location }}</p>
+                <p class="muted">{{ i18n.when(a) }}@if (a.location) { · {{ a.location }} }</p>
               </div>
             }
           </div>

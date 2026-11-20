@@ -40,6 +40,14 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("Leader")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<int>("Popularity")
                         .HasColumnType("integer");
 
@@ -121,6 +129,14 @@ namespace Urfair.Api.Data.Migrations.Postgres
 
                     b.Property<bool>("OpenToAll")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Organiser")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<int>("PerParticipant")
                         .HasColumnType("integer");

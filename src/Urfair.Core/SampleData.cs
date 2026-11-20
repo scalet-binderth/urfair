@@ -28,6 +28,20 @@ public static class SampleData
         ["brot"] = "Ein Rundgang mit einem ehemals obdachlosen Stadtführer zu Orten, an denen Hilfe angeboten wird.",
     };
 
+    /// <summary>Invented parish and leader for some demo projects (the others inherit the vote's values).</summary>
+    private static readonly Dictionary<string, (string? Parish, string? Leader)> Leads = new()
+    {
+        ["advent"] = ("Hl. Geist", "Eva Leitner"),
+        ["krippe"] = ("St. Magdalena", "Josef Brandl"),
+        ["kitchen"] = (null, "Sarah Wimmer"),
+        ["hochseil"] = (null, "Jungschar-Team"),
+        ["kino"] = ("Christkönig", "Lukas Mayr"),
+        ["altenheim"] = ("St. Markus", "Theresa Ebner"),
+    };
+
+    public const string FirmungParish = "Urfahr St. Junia (alle Pfarrteilgemeinden)";
+    public const string FirmungOrganiser = "Firmteam Urfahr";
+
     public static IReadOnlyList<Activity> Activities()
     {
         var list = new List<Activity>();
@@ -71,7 +85,11 @@ public static class SampleData
         A("magdaman", "MAGDAMAN – Hackln für den guten Zweck", 3, null, ("2027-05-15T00:00", null, "Pfarrheim St. Magdalena", null, true));
         A("espoto", "Espoto", 2, null, ("2027-06-30T00:00", null, "Pfarrkirche St. Magdalena", null, true));
         A("altenheim", "Besuch im Altenheim", 4, null, ("2027-06-30T00:00", null, "SZ Franz Hillinger", 15, true));
-        return list.Select(a => a with { GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green", Description = Descriptions.GetValueOrDefault(a.Id) }).ToList();
+        return list.Select(a => a with
+        {
+            GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green", Description = Descriptions.GetValueOrDefault(a.Id),
+            Parish = Leads.GetValueOrDefault(a.Id).Parish, Leader = Leads.GetValueOrDefault(a.Id).Leader,
+        }).ToList();
     }
 
     private static readonly string[] FemaleNames = "Anna Lena Sophie Marie Hannah Lea Laura Sarah Julia Emma Mia Valentina Katharina Magdalena Theresa Johanna Clara Elena Nina Paula Selina Viktoria".Split(' ');

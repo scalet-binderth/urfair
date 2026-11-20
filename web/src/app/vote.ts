@@ -14,6 +14,7 @@ import { Toast } from './toast';
     @if (slot(); as c) {
       <div class="head">
         <p class="muted small">{{ c.name }}</p>
+        @if (c.parish || c.organiser) { <p class="muted small">{{ i18n.byLine(c.parish, c.organiser) }}</p> }
         <h1>{{ i18n.t('vote.title') }}</h1>
         <p>{{ i18n.t('vote.lead', { budget: c.rules.pointBudget, min: c.rules.minActivities, max: c.rules.maxPerActivity, k: c.rules.perParticipant }) }}</p>
         @if (groups().length) { <p>{{ i18n.t('vote.leadGroups') }}</p> }
@@ -34,7 +35,7 @@ import { Toast } from './toast';
                   <span class="muted small">· {{ i18n.t('status.points', { n: x.points }) }}</span></span>
                 <span class="chip" [attr.data-status]="x.status">{{ i18n.t('status.' + x.status, { n: x.position ?? 0 }) }}</span>
                 @if (x.status === 'fixed') {
-                  <span class="muted small w">{{ i18n.when({ start: x.start!, end: x.end, flexible: x.flexible }) }} · {{ x.location }}</span>
+                  <span class="muted small w">{{ i18n.when({ start: x.start!, end: x.end, flexible: x.flexible }) }}@if (x.location) { · {{ x.location }} }</span>
                 } @else {
                   <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
                 }
@@ -60,6 +61,7 @@ import { Toast } from './toast';
                   @if (a.seats === null) { <span class="tag">{{ i18n.t('common.unlimited') }}</span> }
                   @if (status()?.full?.includes(a.id)) { <span class="tag full">{{ i18n.t('status.full') }}</span> }
                 </h3>
+                @if (a.parish || a.leader) { <div class="muted small">{{ i18n.byLine(a.parish, a.leader, true) }}</div> }
                 @if (a.description) { <p class="desc">{{ a.description }}</p> }
                 @if (a.sessions.length > 1) { <div class="muted small">{{ i18n.t('vote.pickSessions') }}</div> }
                 <ul>
@@ -251,7 +253,7 @@ export class VotePage implements OnInit {
 
   protected sessionText(s: Activity['sessions'][number]): string {
     const seats = s.capacity ? ' · ' + this.i18n.t('common.seats', { n: s.capacity }) : '';
-    return `${this.i18n.when(s)} · ${s.location}${seats}`;
+    return `${this.i18n.when(s)}${s.location ? " · " + s.location : ""}${seats}`;
   }
 
   protected change(id: string, direction: 1 | -1): void {

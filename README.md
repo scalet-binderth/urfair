@@ -62,7 +62,8 @@ In demo mode the organisation area has a button to reset the whole demo.
 
 Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
 (preview first, then add or replace). One row per date; rows with the same title form one activity.
-Columns: `Titel;Beschreibung;Gruppe;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too).
+Columns: `Titel;Beschreibung;Gruppe;Pfarre;Leitung;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too;
+only `Titel` and `Beginn` are required; `Pfarre` and `Leitung` are left empty when they match the vote).
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
 

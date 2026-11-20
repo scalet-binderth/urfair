@@ -31,6 +31,12 @@ interface SessionForm { id: string | null; start: string; end: string; location:
       </div>
       <div class="field"><label [for]="uid + '-desc'">{{ i18n.t('editor.description') }}</label>
         <textarea [id]="uid + '-desc'" rows="3" maxlength="2000" [placeholder]="i18n.t('editor.descriptionHint')" [(ngModel)]="description"></textarea></div>
+      <div class="row">
+        <div class="field grow"><label [for]="uid + '-parish'">{{ i18n.t('editor.parish') }}</label>
+          <input [id]="uid + '-parish'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="parish" /></div>
+        <div class="field grow"><label [for]="uid + '-leader'">{{ i18n.t('editor.leader') }}</label>
+          <input [id]="uid + '-leader'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="leader" /></div>
+      </div>
 
       <h3>{{ i18n.t('editor.sessions') }}</h3>
       @for (s of sessions; track $index; let i = $index) {
@@ -83,6 +89,8 @@ export class ActivityEditor implements OnInit {
   protected restrictedTo = '';
   protected groupId = '';
   protected description = '';
+  protected parish = '';
+  protected leader = '';
   protected sessions: SessionForm[] = [];
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
@@ -94,6 +102,8 @@ export class ActivityEditor implements OnInit {
       this.restrictedTo = a.restrictedTo ?? '';
       this.groupId = a.groupId ?? '';
       this.description = a.description ?? '';
+      this.parish = a.parish ?? '';
+      this.leader = a.leader ?? '';
       this.sessions = a.sessions.map(s => ({ id: s.id, start: toLocalInput(s.start), end: toLocalInput(s.end), location: s.location, capacity: s.capacity, flexible: s.flexible }));
     } else {
       this.addSession();
@@ -111,6 +121,8 @@ export class ActivityEditor implements OnInit {
       restrictedTo: this.restrictedTo || null,
       groupId: this.groupId || null,
       description: this.description.trim() || null,
+      parish: this.parish.trim() || null,
+      leader: this.leader.trim() || null,
       sessions: this.sessions.map(s => ({
         id: s.id, start: s.start, end: s.flexible ? null : fromLocalInput(s.end), location: s.location.trim(),
         capacity: s.capacity === null || (s.capacity as unknown) === '' ? null : Number(s.capacity), flexible: s.flexible,
