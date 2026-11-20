@@ -30,6 +30,7 @@ and English; keep both in sync.
   link to set the password; the first Junia admin of a real instance is created with `Admin__Key`; visibility per vote
   (Pfarrgemeinde only / Junia shared / Junia read-only) checked on the server for every organiser request;
   participants, import, invitations limited to the own Pfarrgemeinden in Junia-wide votes; demo accounts via buttons
+- Emergency access: with `Admin__Key` a new one-time link for an existing Junia admin (e.g. the only one forgot the password)
 
 ## Next steps (each ends with a demo that can be shown)
 

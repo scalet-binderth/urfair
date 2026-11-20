@@ -15,6 +15,7 @@ public record SetupRequest(string? Key, string? Email, string? Name, string? Pas
 public record PasswordRequest(string? Password);
 public record AccountRequest(string? Email, string? Name, bool IsJuniaAdmin, List<string>? Parishes);
 public record DemoLoginRequest(string? Key);
+public record RecoverRequest(string? Key, string? Email);
 
 /// <summary>
 /// Organiser accounts: sign-in with e-mail and password (cookie), one-time links to set a password,
@@ -109,6 +110,26 @@ public static class AuthEndpoints
             await db.SaveChangesAsync();
             await SignInAsync(http, a);
             return Results.Ok(ToDto(a));
+        });
+
+        // Emergency access: whoever knows Admin:Key (i.e. has access to the server settings) gets a new one-time link
+        // for an existing Junia admin, e.g. when the only Junia admin forgot the password.
+        auth.MapPost("/recover", async (RecoverRequest req, AppDbContext db, IConfiguration cfg, IMemoryCache cache) =>
+        {
+            var key = cfg["Admin:Key"];
+            if (Database.IsDemo(cfg) || string.IsNullOrEmpty(key)) return Results.NotFound();
+            var fails = cache.Get<int>("recover");
+            if (fails >= MaxFailedLogins) return Endpoints.Errors("loginLocked");
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
+            var a = await db.Accounts.FirstOrDefaultAsync(x => x.Email == email && x.IsJuniaAdmin && !x.IsDemo);
+            if (req.Key != key || a is null)
+            {
+                cache.Set("recover", fails + 1, TimeSpan.FromMinutes(15));
+                return Endpoints.Errors("recoverFailed");
+            }
+            NewSetupLink(a);
+            await db.SaveChangesAsync();
+            return Results.Ok(new { a.SetupToken });
         });
 
         // One-time link to set (or reset) the password.

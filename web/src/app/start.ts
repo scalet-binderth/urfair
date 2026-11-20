@@ -67,6 +67,16 @@ import { SessionService } from './session';
             <button class="btn" type="submit" [disabled]="busy() || !email || !password">{{ i18n.t('start.adminGo') }}</button>
             <p class="small muted">{{ i18n.t('start.forgot') }}</p>
           </form>
+          @if (showRecover()) {
+            <form class="stack recover" (submit)="$event.preventDefault(); recover()">
+              <p class="small">{{ i18n.t('start.recoverText') }}</p>
+              <div class="field"><label for="r-key">{{ i18n.t('admin.key') }}</label><input id="r-key" name="rkey" type="password" autocomplete="off" [(ngModel)]="key" /></div>
+              <div class="field"><label for="r-mail">{{ i18n.t('start.recoverEmail') }}</label><input id="r-mail" name="rmail" type="email" [(ngModel)]="recoverEmail" /></div>
+              <button class="btn ghost" type="submit" [disabled]="busy() || !key || !recoverEmail">{{ i18n.t('start.recoverGo') }}</button>
+            </form>
+          } @else {
+            <button class="linkish small" type="button" (click)="showRecover.set(true)">{{ i18n.t('start.recoverOpen') }}</button>
+          }
         }
         @if (error()) { <ul class="errors"><li>{{ error() }}</li></ul> }
       </div>
@@ -85,6 +95,8 @@ import { SessionService } from './session';
     .demo-people { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px }
     .person { display: grid; grid-template-columns: 22px 1fr; gap: 0 8px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); cursor: pointer }
     .person:hover { border-color: var(--accent) }
+    .linkish { justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline }
+    .recover { border-top: 1px solid var(--line); padding-top: 12px }
     .person b { grid-row: span 2; color: var(--accent) }
   `,
 })
@@ -106,6 +118,8 @@ export class StartPage {
   protected password = '';
   protected accountName = '';
   protected setupNeeded = signal(false);
+  protected showRecover = signal(false);
+  protected recoverEmail = '';
   protected readonly demoAccounts = [{ key: 'junia', badge: 'J' }, { key: 'markus', badge: 'M' }, { key: 'geist', badge: 'G' }];
 
   constructor() { this.api.currentAccount().then(r => this.setupNeeded.set(r.setupNeeded), () => { /* ignore */ }); }
@@ -117,6 +131,21 @@ export class StartPage {
     this.api.setParticipantLink(null); // demo: sign in by name
     this.session.signIn({ kind: 'participant', name: this.name.trim() });
     this.router.navigate(['/slots']);
+  }
+
+  /** Emergency access with Admin__Key: opens a fresh one-time link for an existing Junia admin. */
+  protected async recover(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const { setupToken } = await this.api.recover(this.key, this.recoverEmail.trim());
+      await this.router.navigate(['/account', setupToken]);
+    } catch (e) {
+      this.error.set(this.i18n.errors(e)[0]);
+    } finally {
+      this.busy.set(false);
+      this.key = '';
+    }
   }
 
   protected async demoLogin(key: string): Promise<void> { await this.signInWith(() => this.api.demoLogin(key)); }
