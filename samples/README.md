@@ -9,6 +9,7 @@ CSV files (UTF-8, separator `;`) for trying the Excel/CSV import in the organisa
 | `firmvorbereitung-zusatz.csv` | 2 extra projects (one green, one blue) | Firmvorbereitung demo, "add" |
 | `pfarrfest.csv` | 10 helper posts with shifts | Pfarrfest or any vote without groups |
 | `ministrantenausflug.csv`, `ferienprogramm.csv`, `jungschar-sommerlager.csv` | the other demo votes | any vote without groups |
+| `teilnehmende-beispiel.csv` | 5 invented participants (tab "Teilnehmende" → "Aus Excel/CSV importieren") | any vote |
 | `beispiel-mit-fehlern.csv` | deliberate mistakes (date, title, group, seats, participation) | any vote, to show the error messages |
 
 The lists are exports of the demo data (`GET /api/admin/slots/{id}/activities.csv`); regenerate them the same way

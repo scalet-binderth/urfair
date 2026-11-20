@@ -46,7 +46,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'start.adminDemo': 'In der Testversion ist kein Zugangsschlüssel nötig.',
     'start.adminGo': 'Zur Organisation',
     'start.plan': 'Umsetzungsplan',
-    'start.planText': 'Was die Demo schon kann, was bis zum echten Einsatz im Pfarrverbund fehlt, und in welcher Reihenfolge.',
+    'start.planText': 'Was die Demo schon kann, was bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlt, und in welcher Reihenfolge.',
     'start.planGo': 'Plan ansehen',
     'session.as': 'Angemeldet als {name}', 'session.signOut': 'Abmelden',
     'vote.as': 'Du stimmst ab als {name}.', 'vote.loaded': 'Deine bisherige Wahl wurde geladen. Du kannst sie ändern und erneut abgeben.',
@@ -85,7 +85,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.back': '← Alle Wahlen',
     'admin.tab.settings': 'Einstellungen', 'admin.tab.activities': 'Veranstaltungen', 'admin.tab.demand': 'Nachfrage',
     'admin.tab.results': 'Zuteilung', 'admin.tab.demo': 'Beispieldaten', 'admin.tab.participants': 'Teilnehmende',
-    'admin.participantsNote': 'Nur Personen auf dieser Liste sehen die Wahl und können abstimmen. In der Testversion zählt der Name; später kommen E-Mail, CSV-Import und persönliche Links dazu.',
+
     'admin.participantName': 'Name', 'admin.addParticipant': 'Hinzufügen', 'admin.col.voted': 'Abgestimmt',
     'admin.voted': 'abgestimmt', 'admin.notVoted': 'noch nicht', 'admin.noParticipants': 'Noch niemand auf der Liste.',
     'admin.participantLink': 'Link für Teilnehmende', 'admin.copyLink': 'Link kopieren', 'admin.linkCopied': 'Link kopiert.',
@@ -183,6 +183,25 @@ const texts: Record<Lang, Record<string, string>> = {
     'by.parish': '{p}', 'by.organiser': 'Verantwortlich: {n}', 'by.leader': 'Leitung: {n}',
     'error.textTooLong': 'Leitung und Verantwortlich dürfen höchstens {max} Zeichen lang sein.',
     'error.parishUnknown': '„{value}“ ist keine Pfarrgemeinde von Urfahr-St. Junia.', 'error.csvParishUnknown': 'Pfarre „{value}“ nicht erkannt (z. B. „St. Markus“ oder „Junia“).',
+    'admin.tab.mail': 'Einladungen',
+    'participants.lead': 'Nur Personen auf dieser Liste sehen die Wahl. Jede Person bekommt einen persönlichen Link; ist ein Geburtsdatum eingetragen, wird es nach dem Klick abgefragt. In der Testversion geht zusätzlich die Anmeldung mit dem Namen.',
+    'participants.email': 'E-Mail', 'participants.birthDate': 'Geburtsdatum', 'participants.parish': 'Pfarrgemeinde',
+    'participants.count': '{n} Teilnehmende, {v} abgestimmt', 'participants.filter': 'Nach Pfarrgemeinde filtern', 'participants.allParishes': 'Alle Pfarrgemeinden',
+    'participants.link': 'Persönlicher Link', 'participants.open': 'öffnen', 'participants.invited': 'eingeladen',
+    'participants.importLead': 'Liste als Vorlage herunterladen, in Excel ergänzen (Spalten Name oder Vorname und Nachname, E-Mail, Geburtsdatum, Pfarrgemeinde) und als CSV hochladen. Bekannte Namen werden ergänzt, neue hinzugefügt; niemand wird gelöscht.',
+    'participants.found': '{n} neu, {u} bereits auf der Liste (werden ergänzt).', 'participants.commit': 'Übernehmen',
+    'participants.imported': '{n} hinzugefügt, {u} ergänzt.',
+    'mail.lead': 'Die App verschickt noch keine E-Mails. Erstelle die Einladungen und kopiere den Text jeweils in dein eigenes Mailprogramm.',
+    'mail.leadDemo': 'Demo-Postfach: Hier landen die E-Mails, die die App verschicken würde. Die Links lassen sich direkt öffnen.',
+    'mail.create': 'Einladungen erstellen', 'mail.created': '{n} Einladungen erstellt.', 'mail.to': 'An:', 'mail.copy': 'Text kopieren', 'mail.copied': 'Text kopiert.',
+    'mail.openLink': 'Link öffnen', 'mail.empty': 'Noch keine Einladungen. Erstellt werden sie für alle Teilnehmenden mit E-Mail-Adresse, die noch keine bekommen haben.',
+    'link.title': 'Willkommen!', 'link.lead': 'Zur Sicherheit: Bitte gib dein Geburtsdatum ein.', 'link.leadNoCheck': 'Mit diesem Link kommst du direkt zu deiner Wahl.',
+    'link.go': 'Weiter zur Wahl', 'link.note': 'Dieser Link gehört nur dir. Bitte gib ihn nicht weiter.',
+    'link.invalid': 'Link ungültig', 'link.invalidText': 'Dieser Link ist nicht (mehr) gültig. Bitte wende dich an das Organisationsteam.',
+    'start.linkOnly': 'Du bekommst vom Organisationsteam einen persönlichen Link per E-Mail. Über diesen Link kommst du zu deiner Wahl.',
+    'error.checkFailed': 'Das Geburtsdatum stimmt nicht. Nach mehreren Fehlversuchen ist der Link für 15 Minuten gesperrt.',
+    'error.emailInvalid': 'Die E-Mail-Adresse ist ungültig.', 'error.csvNameMissing': 'Name fehlt.',
+    'error.csvDuplicate': '„{value}“ kommt in der Liste doppelt vor.', 'error.csvEmailInvalid': 'E-Mail „{value}“ ist ungültig.',
   },
   en: {
     'app.name': 'Urfair',
@@ -225,7 +244,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'start.adminDemo': 'No access key is needed in the test version.',
     'start.adminGo': 'Go to organisation',
     'start.plan': 'Roadmap',
-    'start.planText': 'What the demo can do, what is missing for real use across the parish network, and in which order.',
+    'start.planText': 'What the demo can do, what is missing for real use in the Pfarre Urfahr-St. Junia, and in which order.',
     'start.planGo': 'View roadmap',
     'session.as': 'Signed in as {name}', 'session.signOut': 'Sign out',
     'vote.as': 'You are voting as {name}.', 'vote.loaded': 'Your previous vote has been loaded. You can change it and submit again.',
@@ -264,7 +283,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.back': '← All votes',
     'admin.tab.settings': 'Settings', 'admin.tab.activities': 'Activities', 'admin.tab.demand': 'Demand',
     'admin.tab.results': 'Allocation', 'admin.tab.demo': 'Sample data', 'admin.tab.participants': 'Participants',
-    'admin.participantsNote': 'Only people on this list see the vote and can take part. In the test version the name counts; e-mail, CSV import and personal links follow.',
     'admin.participantName': 'Name', 'admin.addParticipant': 'Add', 'admin.col.voted': 'Voted',
     'admin.voted': 'voted', 'admin.notVoted': 'not yet', 'admin.noParticipants': 'Nobody on the list yet.',
     'admin.participantLink': 'Link for participants', 'admin.copyLink': 'Copy link', 'admin.linkCopied': 'Link copied.',
@@ -362,6 +380,25 @@ const texts: Record<Lang, Record<string, string>> = {
     'by.parish': '{p}', 'by.organiser': 'Responsible: {n}', 'by.leader': 'Led by: {n}',
     'error.textTooLong': 'Leader and person responsible can be at most {max} characters long.',
     'error.parishUnknown': '“{value}” is not a parish community of Urfahr-St. Junia.', 'error.csvParishUnknown': 'Parish “{value}” not recognised (e.g. “St. Markus” or “Junia”).',
+    'admin.tab.mail': 'Invitations',
+    'participants.lead': 'Only people on this list see the vote. Everyone gets a personal link; if a date of birth is stored, it is asked after the click. In the test version signing in with the name also works.',
+    'participants.email': 'E-mail', 'participants.birthDate': 'Date of birth', 'participants.parish': 'Parish community',
+    'participants.count': '{n} participants, {v} voted', 'participants.filter': 'Filter by parish community', 'participants.allParishes': 'All parish communities',
+    'participants.link': 'Personal link', 'participants.open': 'open', 'participants.invited': 'invited',
+    'participants.importLead': 'Download the list as a template, complete it in Excel (columns Name or first and last name, e-mail, date of birth, parish community) and upload it as CSV. Known names are completed, new ones added; nobody is deleted.',
+    'participants.found': '{n} new, {u} already listed (will be completed).', 'participants.commit': 'Take over',
+    'participants.imported': '{n} added, {u} completed.',
+    'mail.lead': 'The app does not send e-mails yet. Create the invitations and copy each text into your own mail program.',
+    'mail.leadDemo': 'Demo mailbox: the e-mails the app would send end up here. The links can be opened directly.',
+    'mail.create': 'Create invitations', 'mail.created': '{n} invitations created.', 'mail.to': 'To:', 'mail.copy': 'Copy text', 'mail.copied': 'Text copied.',
+    'mail.openLink': 'Open link', 'mail.empty': 'No invitations yet. They are created for all participants with an e-mail address who have not had one.',
+    'link.title': 'Welcome!', 'link.lead': 'For safety: please enter your date of birth.', 'link.leadNoCheck': 'This link takes you straight to your vote.',
+    'link.go': 'Continue to the vote', 'link.note': 'This link is yours only. Please do not pass it on.',
+    'link.invalid': 'Invalid link', 'link.invalidText': 'This link is not (or no longer) valid. Please contact the organisers.',
+    'start.linkOnly': 'The organisers send you a personal link by e-mail. That link takes you to your vote.',
+    'error.checkFailed': 'The date of birth does not match. After several failed attempts the link is locked for 15 minutes.',
+    'error.emailInvalid': 'The e-mail address is invalid.', 'error.csvNameMissing': 'Name missing.',
+    'error.csvDuplicate': '“{value}” appears twice in the list.', 'error.csvEmailInvalid': 'E-mail “{value}” is invalid.',
   },
 };
 
@@ -422,6 +459,11 @@ export class I18n {
 
   date(iso: string | null): string {
     return iso ? new Intl.DateTimeFormat(this.locale(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)) : '–';
+  }
+
+  /** A date without time, e.g. a date of birth "2012-07-02". */
+  day(iso: string | null): string {
+    return iso ? new Intl.DateTimeFormat(this.locale(), { dateStyle: 'medium' }).format(new Date(iso + 'T00:00')) : '–';
   }
 
   percent(x: number): string { return Math.round(x * 100) + ' %'; }

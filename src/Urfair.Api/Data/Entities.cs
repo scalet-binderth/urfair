@@ -95,13 +95,41 @@ public class BallotEntity
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
         UnavailableSessions.ToHashSet(), Gender);
 }
-
-/// <summary>A person allowed to vote in a FairSlot. Identified by name in the demo; e-mail and personal links follow.</summary>
+/// <summary>
+/// A person allowed to vote in a FairSlot. Signs in with a personal link (token) and, if a date of birth is stored,
+/// confirms it after the click. In demo mode the name alone is enough.
+/// </summary>
 public class ParticipantEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid FairSlotId { get; set; }
     public string Name { get; set; } = "";
+    public string? Email { get; set; }
+    public DateOnly? BirthDate { get; set; }
+    /// <summary>Official name of the Pfarrgemeinde (see Parishes), optional.</summary>
+    public string? Parish { get; set; }
+    /// <summary>Secret part of the personal link /p/{token}.</summary>
+    public string Token { get; set; } = NewToken();
+    public DateTime? InvitedAt { get; set; }
+
+    /// <summary>128 random bits, URL-safe.</summary>
+    public static string NewToken() =>
+        Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+}
+
+/// <summary>
+/// A message prepared by the app (e.g. an invitation with the personal link). Not sent automatically: in demo mode it is
+/// shown in the demo mailbox, in real use organisers copy it into their own mail program until e-mail sending exists.
+/// </summary>
+public class MailEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public Guid? ParticipantId { get; set; }
+    public string To { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public string Body { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>Points a ballot gives to one activity (owned by <see cref="BallotEntity"/>).</summary>

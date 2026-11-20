@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions options) : DbContext(options)
     public DbSet<SessionEntity> Sessions => Set<SessionEntity>();
     public DbSet<BallotEntity> Ballots => Set<BallotEntity>();
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
+    public DbSet<MailEntity> Mails => Set<MailEntity>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -37,6 +38,18 @@ public class AppDbContext(DbContextOptions options) : DbContext(options)
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(120);
             e.HasIndex(x => new { x.FairSlotId, x.Name });
+            e.Property(x => x.Email).HasMaxLength(200);
+            e.Property(x => x.Parish).HasMaxLength(120);
+            e.Property(x => x.Token).HasMaxLength(40);
+            e.HasIndex(x => x.Token); // not unique: rows from before tokens start empty and are filled at start-up
+        });
+        b.Entity<MailEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.To).HasMaxLength(200);
+            e.Property(x => x.Subject).HasMaxLength(200);
+            e.HasIndex(x => x.FairSlotId);
+            e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<ActivityEntity>(e =>
         {

@@ -4,6 +4,7 @@ import { PlanPage } from './plan';
 import { HomePage } from './home';
 import { VotePage } from './vote';
 import { MyResultPage } from './my-result';
+import { LinkPage } from './link';
 import { AdminListPage } from './admin-list';
 import { AdminSlotPage } from './admin-slot';
 import { adminGuard, participantGuard } from './session';
@@ -11,6 +12,7 @@ import { adminGuard, participantGuard } from './session';
 export const routes: Routes = [
   { path: '', component: StartPage },
   { path: 'plan', component: PlanPage },
+  { path: 'p/:token', component: LinkPage },
   { path: 'slots', component: HomePage, canActivate: [participantGuard] },
   { path: 's/:slotId', component: VotePage, canActivate: [participantGuard] },
   { path: 's/:slotId/result', component: MyResultPage, canActivate: [participantGuard] },

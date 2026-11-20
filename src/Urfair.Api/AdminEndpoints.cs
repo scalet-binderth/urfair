@@ -9,7 +9,6 @@ public record UpdateSlotRequest(string Name, Phase Phase, DateTime? Registration
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
-public record ParticipantListDto(Guid Id, string Name, bool HasVoted);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
 public record ImportRequest(string? Csv, bool Replace, bool Commit);
 public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyList<ValidationError> Errors, bool Saved);
@@ -202,34 +201,8 @@ public static class AdminEndpoints
         admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
             await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
 
-        // ---------- Participant list ----------
-
-        admin.MapGet("/slots/{id:guid}/participants", async (Guid id, AppDbContext db) =>
-        {
-            var voted = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample).Select(b => b.Name.ToLower()).ToListAsync();
-            return (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Name).ToListAsync())
-                .Select(p => new ParticipantListDto(p.Id, p.Name, voted.Contains(p.Name.ToLower())));
-        });
-
-        admin.MapPost("/slots/{id:guid}/participants", async (Guid id, LookupRequest req, AppDbContext db) =>
-        {
-            var name = (req.Name ?? "").Trim();
-            if (name.Length == 0) return Endpoints.Errors("nameRequired");
-            if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
-            if (await Database.IsParticipantAsync(db, id, name)) return Endpoints.Errors("alreadyListed");
-            db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = name });
-            await db.SaveChangesAsync();
-            return Results.NoContent();
-        });
-
-        admin.MapDelete("/participants/{participantId:guid}", async (Guid participantId, AppDbContext db) =>
-        {
-            var p = await db.Participants.FindAsync(participantId);
-            if (p is null) return Results.NotFound();
-            db.Participants.Remove(p);
-            await db.SaveChangesAsync();
-            return Results.NoContent();
-        });
+        // ---------- Participant list, import, invitations (ParticipantEndpoints.cs) ----------
+        admin.MapParticipantAdmin();
     }
 
     /// <summary>Runs both allocation procedures for a FairSlot and shapes the result for the UI.</summary>

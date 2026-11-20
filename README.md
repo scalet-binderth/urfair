@@ -58,6 +58,14 @@ dotnet ef migrations add <Name> -p src/Urfair.Api -c PostgresAppDbContext -o Dat
 
 In demo mode the organisation area has a button to reset the whole demo.
 
+### Participants and personal links
+
+The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
+`Geburtsdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
+if a date of birth is stored it is asked after the click. Invitations with the link are prepared in the vote's
+"Einladungen" tab: in demo mode as a demo mailbox, otherwise as texts to copy (the app does not send e-mails yet).
+Outside demo mode participants can only sign in with their link.
+
 ### Importing activities
 
 Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
@@ -77,6 +85,7 @@ Tests: `dotnet test Urfair.slnx`
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
 | `Admin__Key` | If set, the organisation area requires this key. Leave empty for open demos. |
 | `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
+| `App__BaseUrl` | Public address used in invitation links (e.g. `https://urfair-prod.onrender.com`). Default: the request host. |
 
 See [ROADMAP.md](ROADMAP.md) for the plan and [CLAUDE.md](CLAUDE.md) for the working rules of this project.
 

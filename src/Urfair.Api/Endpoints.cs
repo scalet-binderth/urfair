@@ -26,10 +26,11 @@ public static class Endpoints
         // Tells the start page whether the organisation area needs an access key.
         api.MapGet("/info", (IConfiguration cfg) => new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), parishes = Parishes.All });
 
-        // Demo: reload a previously submitted ballot by name so it can be changed. Replaced by personal links later.
-        api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db) =>
+        // Reloads the own previously submitted ballot so it can be changed.
+        api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
-            var name = (req.Name ?? "").Trim().ToLower();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
+            var name = who.ToLower();
             var ballot = await db.Ballots.Include(b => b.Points).AsNoTracking()
                 .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name)
                 .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
@@ -38,22 +39,23 @@ public static class Endpoints
                 : Results.Ok(new { points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions });
         });
 
-        // FairSlots this person is listed in (drafts stay hidden). Demo: the person is identified by name.
-        api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db) =>
+        // FairSlots this person is listed in (drafts stay hidden). Identified by personal link, in demo mode also by name.
+        api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db, HttpContext http) =>
         {
-            var name = (req.Name ?? "").Trim().ToLower();
-            return await db.FairSlots
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
+            var name = who.ToLower();
+            return Results.Ok(await db.FairSlots
                 .Where(s => s.Phase != Phase.Draft && (s.Participants.Any(p => p.Name.ToLower() == name) || (s.OpenToAll && name != DemoData.NobodyName)))
                 .OrderBy(s => s.Phase).ThenBy(s => s.RegistrationDeadline)
                 .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
-                .ToListAsync();
+                .ToListAsync());
         });
 
         // The own allocation once the organisers have published it.
-        api.MapPost("/slots/{id:guid}/my-result", async (Guid id, LookupRequest req, AppDbContext db) =>
+        api.MapPost("/slots/{id:guid}/my-result", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            var name = (req.Name ?? "").Trim();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase != Phase.Published) return Errors("notPublished");
             var result = await AdminEndpoints.AllocateAsync(db, slot);
@@ -62,19 +64,19 @@ public static class Endpoints
         });
 
         // Interim status while voting is open: what the person would get if the allocation ran now.
-        api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db) =>
+        api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            var name = (req.Name ?? "").Trim();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
         // Which not-yet-fixed activities the person wants to keep following on the waiting list.
-        api.MapPost("/slots/{id:guid}/waitlist", async (Guid id, WaitlistRequest req, AppDbContext db) =>
+        api.MapPost("/slots/{id:guid}/waitlist", async (Guid id, WaitlistRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            var name = (req.Name ?? "").Trim();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase is not (Phase.Open or Phase.Closed)) return Errors("registrationClosed");
             var ballot = await db.Ballots.Include(b => b.Points)
@@ -93,12 +95,12 @@ public static class Endpoints
         api.MapGet("/slots/{id:guid}/activities", async (Guid id, AppDbContext db) =>
             (await Database.LoadActivitiesAsync(db, id)).Select(ToDto));
 
-        api.MapPost("/slots/{id:guid}/ballots", async (Guid id, BallotRequest req, AppDbContext db) =>
+        api.MapPost("/slots/{id:guid}/ballots", async (Guid id, BallotRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             if (slot.Phase != Phase.Open) return Errors("registrationClosed");
-            var name = (req.Name ?? "").Trim();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (!await Database.CanTakePartAsync(db, id, name)) return Errors("notListed");
 
             var activities = await Database.LoadActivitiesAsync(db, id);
@@ -107,7 +109,7 @@ public static class Endpoints
             var errors = Validation.Check(new Ballot("new", name, points, unavailable), slot.ToRules(), activities);
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
-            // Demo behaviour: the same name replaces its previous ballot. Step 2 replaces this with personal links.
+            // A new ballot of the same person replaces the previous one.
             var existing = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower()).ToListAsync();
             db.Ballots.RemoveRange(existing);
             var entity = new BallotEntity

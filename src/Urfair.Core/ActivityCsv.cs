@@ -130,7 +130,7 @@ public static class ActivityCsv
         return sb.ToString();
     }
 
-    private static string Quote(string value) =>
+    internal static string Quote(string value) =>
         value.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"") + "\"" : value;
 
     private static ValidationError E(string code, int row, params (string Key, object Value)[] args) =>
@@ -143,7 +143,7 @@ public static class ActivityCsv
         return copy;
     }
 
-    private static string Normalise(string header) =>
+    internal static string Normalise(string header) =>
         new(header.Trim().ToLowerInvariant().Where(char.IsLetter).ToArray());
 
     private static string? OrNull(string value) => value.Length == 0 ? null : value;
@@ -173,7 +173,7 @@ public static class ActivityCsv
     }
 
     /// <summary>Splits CSV text into rows and cells; handles quotes, doubled quotes and line breaks inside quotes.</summary>
-    private static List<List<string>> ReadRows(string text)
+    internal static List<List<string>> ReadRows(string text)
     {
         var firstLine = text.Split('\n')[0];
         var separator = new[] { ';', ',', '\t' }.MaxBy(c => firstLine.Count(x => x == c));

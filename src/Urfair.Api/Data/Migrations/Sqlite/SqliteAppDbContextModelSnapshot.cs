@@ -157,13 +157,59 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.ToTable("FairSlots");
                 });
 
+            modelBuilder.Entity("Urfair.Api.Data.MailEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FairSlotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ParticipantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("To")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FairSlotId");
+
+                    b.ToTable("Mails");
+                });
+
             modelBuilder.Entity("Urfair.Api.Data.ParticipantEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("FairSlotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("InvitedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -171,7 +217,18 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Parish")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Token");
 
                     b.HasIndex("FairSlotId", "Name");
 
@@ -290,6 +347,15 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         });
 
                     b.Navigation("Groups");
+                });
+
+            modelBuilder.Entity("Urfair.Api.Data.MailEntity", b =>
+                {
+                    b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FairSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Urfair.Api.Data.ParticipantEntity", b =>

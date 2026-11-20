@@ -16,17 +16,21 @@ and English; keep both in sync.
 - Activity groups with quota per group (Firmung: 2 green, 1 blue)
 - Interim status after voting (fixed / waiting list with position / not needed) and a waiting-list flag (stored only)
 - Demo people B–D start with ballots
-- **Step 1 (this PR):** EF Core migrations (SQLite + PostgreSQL), demo switch `Demo__Enabled`, reset of the whole
+- **Step 1:** EF Core migrations (SQLite + PostgreSQL), demo switch `Demo__Enabled`, reset of the whole
   demo, description per activity, Excel/CSV import and export of activities (instead of a PDF importer)
 - Optional parish and person responsible per vote, parish and leader per activity (only where they differ);
   shown to participants and included in the CSV columns `Pfarre` and `Leitung`; parish chosen from the official list
   (short forms such as "St. Markus" are recognised in the import)
+- **Step 2:** participant list per vote with e-mail, date of birth and Pfarrgemeinde (by hand or CSV import/export,
+  filter by Pfarrgemeinde); personal link `/p/{token}` with a date-of-birth check (10 wrong tries lock it for 15 minutes),
+  afterwards the browser sends token and date with every participant request; outside demo mode only links work;
+  invitations with the link (demo mailbox, otherwise texts to copy until e-mail sending exists)
 
 ## Next steps (each ends with a demo that can be shown)
 
 | Step | Work packages | Visible in the demo |
 |---|---|---|
-| 2 | Participant import per vote via CSV (first name, last name, e-mail, date of birth, Pfarrgemeinde), also by hand; personal links with a check (date of birth or baptism); demo mailbox | invitations in the demo mailbox, sign-in via link |
+| 2 ✓ | done, see above | |
 | 3 | Login with roles (Junia admin, Pfarrgemeinde admin), visibility per vote (Pfarrgemeinde only / Junia shared / Junia read-only), participant import and editing limited by role, all checked on the server | demo accounts via buttons |
 | 4 | Freeze the allocation, move by hand, lock, recalculate; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
