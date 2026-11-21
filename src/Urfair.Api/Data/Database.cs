@@ -148,6 +148,7 @@ public static class Database
             }
             await db.SaveChangesAsync();
         }
+        if (phase == Phase.Published) await AllocationEndpoints.FreezeAsync(db, slot);
         return slot;
     }
 
@@ -189,7 +190,7 @@ public static class Database
             await db.Database.EnsureDeletedAsync();
     }
 
-    /// <summary>Replaces the sample ballots of a FairSlot according to its current rules.</summary>
+    /// <summary>Replaces the sample ballots of a FairSlot according to its current rules. A frozen allocation is calculated and stored anew.</summary>
     public static async Task ResetSamplesAsync(AppDbContext db, Guid slotId, bool removeRealBallots = false)
     {
         var slot = await db.FairSlots.SingleAsync(s => s.Id == slotId);
@@ -209,6 +210,7 @@ public static class Database
             }
         }
         await db.SaveChangesAsync();
+        if (slot.FrozenAt is not null) await AllocationEndpoints.FreezeAsync(db, slot);
     }
 
     public static async Task<List<Activity>> LoadActivitiesAsync(AppDbContext db, Guid slotId) =>

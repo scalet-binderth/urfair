@@ -35,6 +35,8 @@ public class FairSlotEntity
     public string? Parish { get; set; }
     public string? Organiser { get; set; }
     public Visibility Visibility { get; set; } = Visibility.JuniaShared;
+    /// <summary>Set when the allocation is frozen: from then on the stored <see cref="AssignmentEntity"/> rows count, nothing is recalculated on its own.</summary>
+    public DateTime? FrozenAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
@@ -149,6 +151,19 @@ public class BallotPoints
 {
     public string ActivityId { get; set; } = "";
     public int Points { get; set; }
+}
+
+/// <summary>One seat of a frozen allocation. Deleted together with its FairSlot, ballot or session.</summary>
+public class AssignmentEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public Guid BallotId { get; set; }
+    public string SessionId { get; set; } = "";
+    /// <summary>Fixed by the organisers (e.g. moved by hand): kept when recalculating.</summary>
+    public bool Locked { get; set; }
+
+    public FixedAssignment ToModel() => new(BallotId.ToString(), SessionId, Locked);
 }
 
 public static class Ids

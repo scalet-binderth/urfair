@@ -6,7 +6,7 @@ Principle: **`main` is always the running demo** (https://urfair.onrender.com). 
 requests; CI must be green; Render deploys `main` automatically. The same code later runs as a real instance
 with `Demo__Enabled=false`. Anything "outgoing" (e-mails, offers) shows up in an in-app demo mailbox in demo mode.
 
-Status as of 20 November 2026. Parish fields are a selection from the official list. The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
+Status as of 21 November 2026. Parish fields are a selection from the official list. The roadmap page in the app (`web/src/app/plan.ts`) shows the same plan in German
 and English; keep both in sync.
 
 ## Done
@@ -31,6 +31,10 @@ and English; keep both in sync.
   (Pfarrgemeinde only / Junia shared / Junia read-only) checked on the server for every organiser request;
   participants, import, invitations limited to the own Pfarrgemeinden in Junia-wide votes; demo accounts via buttons
 - Emergency access: with `Admin__Key` a new one-time link for an existing Junia admin (e.g. the only one forgot the password)
+- **Step 4, part 1:** freeze the allocation (from phase "closed"; publishing freezes automatically), move people by
+  hand (overbooking allowed, shown in orange), lock seats, recalculate everything that is not locked, unfreeze
+  (not while published); while frozen the vote cannot go back to draft/open, rules cannot change and activities
+  cannot be replaced by an import; participants and the interim status see the stored allocation
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -38,7 +42,7 @@ and English; keep both in sync.
 |---|---|---|
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
-| 4 | Freeze the allocation, move by hand, lock, recalculate; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
+| 4 | ~~Freeze the allocation, move by hand, lock, recalculate~~ ✓; lists for leaders (CSV/print); "not voted yet"; automatic deadline | finished lists for activity leaders |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 5 | Cancellations after the deadline (organiser and participant); moving up from the waiting list with a deadline to accept | offer in the demo mailbox |
 | 6 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit; interim status switchable per vote | Pfarrfest with missing people shown |

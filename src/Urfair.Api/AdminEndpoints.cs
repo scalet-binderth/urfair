@@ -15,10 +15,6 @@ public record DemandDto(string ActivityId, string Title, int? Seats, int Interes
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
 public record ImportRequest(string? Csv, bool Replace, bool Commit);
 public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyList<ValidationError> Errors, bool Saved);
-public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points, bool IsFallback);
-public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments);
-public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
-    IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants);
 
 /// <summary>Endpoints for organisers (signed-in accounts; permissions in Access.cs).</summary>
 public static class AdminEndpoints
@@ -84,9 +80,12 @@ public static class AdminEndpoints
                 errors.Add(new ValidationError("visibilityNotAllowed"));
             if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
+            // A frozen allocation must stay valid: no new ballots and no other rules.
+            var rulesChanged = slot.ToRules() != rules;
+            if (slot.FrozenAt is not null && (req.Phase is Phase.Draft or Phase.Open || rulesChanged))
+                errors.Add(new ValidationError("allocationFrozen"));
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
-            var rulesChanged = slot.ToRules() != rules;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
             (slot.Parish, slot.Organiser, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), req.Visibility);
             slot.Apply(rules);
@@ -96,6 +95,8 @@ public static class AdminEndpoints
                 if (!ids.Contains(a.GroupId!)) a.GroupId = null;
             await db.SaveChangesAsync();
             if (rulesChanged) await Database.ResetSamplesAsync(db, id); // sample ballots must follow the new rules
+            // Participants must see a result that no longer changes.
+            if (slot.Phase == Phase.Published && slot.FrozenAt is null) await AllocationEndpoints.FreezeAsync(db, slot);
             return Results.NoContent();
         });
 
@@ -165,6 +166,7 @@ public static class AdminEndpoints
             var result = ActivityCsv.Parse(req.Csv ?? "", slot.ToRules().GroupList);
             if (!req.Commit || result.Errors.Count > 0 || result.Activities.Count == 0)
                 return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToDto).ToList(), result.Errors, false));
+            if (req.Replace && slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
 
             var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
             if (req.Replace)
@@ -213,35 +215,11 @@ public static class AdminEndpoints
             return Results.Ok(new { slot.SampleCount, slot.Seed });
         });
 
-        admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
-            await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
+        // ---------- Allocation: live, frozen, moved by hand (AllocationEndpoints.cs) ----------
+        admin.MapAllocationAdmin();
 
         // ---------- Participant list, import, invitations (ParticipantEndpoints.cs) ----------
         admin.MapParticipantAdmin();
-    }
-
-    /// <summary>Runs both allocation procedures for a FairSlot and shapes the result for the UI.</summary>
-    public static async Task<AllocationDto> AllocateAsync(AppDbContext db, FairSlotEntity slot)
-    {
-        var activities = await Database.LoadActivitiesAsync(db, slot.Id);
-        var entities = await Database.LoadBallotsAsync(db, slot.Id);
-        var ballots = entities.Select(b => b.ToModel()).ToList();
-        var k = slot.PerParticipant;
-
-        var groups = slot.ToRules().Groups;
-        var pointBased = Allocator.PointBased(activities, ballots, k, slot.Seed, groups);
-        var fcfs = Allocator.FirstComeFirstServed(activities, ballots, k, slot.Seed, groups);
-        var titles = activities.ToDictionary(a => a.Id, a => a.Title);
-        var groupOf = activities.ToDictionary(a => a.Id, a => a.GroupId);
-        var isSample = entities.ToDictionary(b => b.Id.ToString(), b => b.IsSample);
-
-        var participants = ballots.Select(b => new ParticipantDto(b.Id, b.Name, isSample[b.Id], pointBased.Satisfaction(b, k),
-            pointBased.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
-                x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
-                x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback)).ToList())).ToList();
-
-        var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, pointBased.Load);
-        return new AllocationDto(slot.Seed, k, pointBased.Evaluate(k), fcfs.Evaluate(k), load, participants);
     }
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();

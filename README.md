@@ -30,6 +30,8 @@ system assigns the seats:
 
 - **Vote** (in code: `FairSlot`): one allocation round (e.g. "Confirmation preparation 2026/27") with its own rules, activities, dates, participant list and registrations.
 - **Phase**: Draft → Open (participants can vote) → Closed → Published (participants see their own result).
+- **Frozen allocation**: until frozen, the allocation is recalculated on every request. From "Closed" organisers
+  freeze it, move people by hand, lock seats and recalculate the rest; publishing freezes automatically.
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
 - **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
 - **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.

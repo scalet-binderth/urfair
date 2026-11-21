@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, Allocation, Api, ApiFailure, Metrics } from './api';
+import { Activity, Allocation, Api, ApiFailure, Metrics, Participant, Phase, Seat } from './api';
 import { I18n } from './i18n';
 import { Toast } from './toast';
 
@@ -27,6 +27,38 @@ interface Card {
     }
     @if (data(); as d) {
       <div class="stack">
+        <div class="card stack state" [class.frozen]="d.frozenAt">
+          @if (d.frozenAt) {
+            <p><b>{{ i18n.t('results.frozen', { date: i18n.date(d.frozenAt), n: lockedCount() }) }}</b></p>
+            @if (phase() === 'Published') { <p class="muted small">{{ i18n.t('results.frozenPublished') }}</p> }
+            @if (canEdit()) {
+              <p class="muted small">{{ i18n.t('results.recalculateHint') }}</p>
+              <div class="row">
+                <button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button>
+                @if (phase() !== 'Published') {
+                  @if (confirmUnfreeze()) {
+                    <span class="small">{{ i18n.t('results.unfreezeWarn') }}</span>
+                    <button class="btn danger small" type="button" [disabled]="busy()" (click)="unfreeze()">{{ i18n.t('results.unfreeze') }}</button>
+                    <button class="btn ghost small" type="button" (click)="confirmUnfreeze.set(false)">{{ i18n.t('common.cancel') }}</button>
+                  } @else {
+                    <button class="btn ghost" type="button" (click)="confirmUnfreeze.set(true)">{{ i18n.t('results.unfreeze') }}</button>
+                  }
+                }
+              </div>
+            }
+          } @else {
+            <p><b>{{ i18n.t('results.live') }}</b></p>
+            @if (canEdit()) {
+              <p class="muted small">{{ i18n.t('results.freezeHint') }}</p>
+              @if (phase() === 'Draft' || phase() === 'Open') {
+                <p class="muted small">{{ i18n.t('results.freezeNeedsClosed') }}</p>
+              } @else {
+                <div><button class="btn" type="button" [disabled]="busy()" (click)="freeze()">{{ i18n.t('results.freeze') }}</button></div>
+              }
+            }
+          }
+        </div>
+
         <div class="cmp">
           @for (c of cards(); track c.label) {
             <div class="card">
@@ -60,7 +92,7 @@ interface Card {
                 <div class="small">{{ a.title }}</div>
                 <div class="slots">
                   @for (s of a.sessions; track s.id) {
-                    <div class="slot small muted">
+                    <div class="slot small muted" [class.over]="s.capacity && (d.sessionLoad[s.id] ?? 0) > s.capacity">
                       {{ s.flexible ? i18n.t('results.flexible') : shortDate(s.start) }} ·
                       <b
                         >{{ d.sessionLoad[s.id] ?? 0 }}{{ s.capacity ? ' / ' + s.capacity : '' }}</b
@@ -108,6 +140,7 @@ interface Card {
                   <th>{{ i18n.t('results.col.name') }}</th>
                   <th>{{ i18n.t('results.col.assigned') }}</th>
                   <th>{{ i18n.t('results.col.satisfaction') }}</th>
+                  @if (editable()) { <th><span class="sr">{{ i18n.t('common.edit') }}</span></th> }
                 </tr>
               </thead>
               <tbody>
@@ -120,16 +153,36 @@ interface Card {
                       }
                     </td>
                     <td>
+                      @if (editingId() === p.ballotId) {
+                        <div class="seats">
+                          @for (seat of seats; track $index; let i = $index) {
+                            <div class="row seat">
+                              <select [attr.aria-label]="i18n.t('results.seat')" [ngModel]="seat.sessionId" (ngModelChange)="seat.sessionId = $event; seat.locked = true">
+                                @for (o of sessionOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
+                              </select>
+                              <label class="check small"><input type="checkbox" [(ngModel)]="seat.locked" />{{ i18n.t('results.lock') }}</label>
+                              <button class="btn ghost small" type="button" [attr.aria-label]="i18n.t('results.removeSeat')" (click)="seats.splice(i, 1)">✕</button>
+                            </div>
+                          }
+                          <p class="muted small">{{ i18n.t('results.editHint') }}</p>
+                          <div class="row">
+                            <button class="btn ghost small" type="button" (click)="addSeat()">{{ i18n.t('results.addSeat') }}</button>
+                            <button class="btn small" type="button" [disabled]="busy()" (click)="saveSeats(p.ballotId)">{{ i18n.t('common.save') }}</button>
+                            <button class="btn ghost small" type="button" (click)="editingId.set(null)">{{ i18n.t('common.cancel') }}</button>
+                          </div>
+                        </div>
+                      } @else {
                       <div class="chips">
                         @for (x of p.assignments; track x.sessionId) {
                           <span class="chip" [class.fb]="x.isFallback" [title]="i18n.when(x)"
-                            >{{ x.title
+                            >@if (x.locked) { <span class="lock" [title]="i18n.t('results.locked')" [attr.aria-label]="i18n.t('results.locked')">🔒</span> }{{ x.title
                             }}<b>{{
                               x.isFallback ? i18n.t('results.fallbackChip') : x.points
                             }}</b></span
                           >
                         }
                       </div>
+                      }
                     </td>
                     <td>
                       <div class="sat">
@@ -137,6 +190,11 @@ interface Card {
                         <span class="small">{{ i18n.percent(p.satisfaction) }}</span>
                       </div>
                     </td>
+                    @if (editable()) {
+                      <td>@if (editingId() !== p.ballotId) {
+                        <button class="btn ghost small" type="button" (click)="edit(p)">{{ i18n.t('common.edit') }}</button>
+                      }</td>
+                    }
                   </tr>
                 }
               </tbody>
@@ -155,6 +213,63 @@ interface Card {
   `,
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: `
+    .state {
+      border-left: 4px solid var(--warn);
+    }
+    .state.frozen {
+      border-left-color: var(--good);
+    }
+    .state p {
+      margin: 0;
+      max-width: 75ch;
+    }
+    .btn.small {
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+    .btn.danger {
+      background: var(--warn);
+      border-color: var(--warn);
+      color: var(--surface);
+    }
+    .slot.over b {
+      color: var(--warn);
+    }
+    .slot .meter {
+      overflow: hidden;
+    }
+    .slot.over .meter i {
+      background: var(--warn);
+    }
+    .seats {
+      display: grid;
+      gap: 6px;
+    }
+    .seat {
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+    .seat select {
+      min-width: 0;
+      max-width: 420px;
+      flex: 1;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .lock {
+      margin-right: 4px;
+      font-size: 11px;
+    }
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
     .lead {
       margin-bottom: 16px;
       max-width: 75ch;
@@ -285,6 +400,9 @@ interface Card {
 })
 export class ResultsPage implements OnInit {
   readonly slotId = input.required<string>();
+  /** Phase of the vote: freezing needs registration to be closed, unfreezing is not possible once published. */
+  readonly phase = input<Phase>('Closed');
+  readonly canEdit = input(true);
   protected i18n = inject(I18n);
   protected api = inject(Api);
   private toast = inject(Toast);
@@ -295,6 +413,26 @@ export class ResultsPage implements OnInit {
   protected query = signal('');
   protected showAll = signal(false);
   protected csv = signal('');
+  protected busy = signal(false);
+  protected confirmUnfreeze = signal(false);
+  protected editingId = signal<string | null>(null);
+  protected seats: Seat[] = [];
+
+  protected editable = computed(() => !!this.data()?.frozenAt && this.canEdit());
+  protected lockedCount = computed(() =>
+    (this.data()?.participants ?? []).reduce((n, p) => n + p.assignments.filter((x) => x.locked).length, 0),
+  );
+  /** Every session of the vote with its current load, for moving people by hand. */
+  protected sessionOptions = computed(() => {
+    const load = this.data()?.sessionLoad ?? {};
+    return this.activities().flatMap((a) =>
+      a.sessions.map((s) => ({
+        id: s.id,
+        activityId: a.id,
+        label: `${a.title} · ${this.i18n.when(s)} · ${load[s.id] ?? 0}${s.capacity ? ' / ' + s.capacity : ''}`,
+      })),
+    );
+  });
 
   protected cards = computed<Card[]>(() => {
     const d = this.data();
@@ -363,6 +501,51 @@ export class ResultsPage implements OnInit {
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(iso));
+  }
+
+  protected freeze(): Promise<void> {
+    return this.act(() => this.api.freezeAllocation(this.slotId()), 'results.frozenDone');
+  }
+
+  protected recalculate(): Promise<void> {
+    return this.act(() => this.api.recalculateAllocation(this.slotId()), 'results.recalculated');
+  }
+
+  protected unfreeze(): Promise<void> {
+    return this.act(() => this.api.unfreezeAllocation(this.slotId()), 'results.unfrozen');
+  }
+
+  protected edit(p: Participant): void {
+    this.seats = p.assignments.map((x) => ({ sessionId: x.sessionId, locked: !!x.locked }));
+    this.editingId.set(p.ballotId);
+  }
+
+  /** Adds a seat in the first activity the person does not have yet. */
+  protected addSeat(): void {
+    const options = this.sessionOptions();
+    const activityOf = new Map(options.map((o) => [o.id, o.activityId]));
+    const used = new Set(this.seats.map((s) => activityOf.get(s.sessionId)));
+    const next = options.find((o) => !used.has(o.activityId)) ?? options[0];
+    if (next) this.seats.push({ sessionId: next.id, locked: true });
+  }
+
+  protected saveSeats(ballotId: string): Promise<void> {
+    return this.act(() => this.api.setSeats(this.slotId(), ballotId, this.seats), 'common.saved');
+  }
+
+  private async act(call: () => Promise<Allocation>, message: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      this.data.set(await call());
+      this.editingId.set(null);
+      this.confirmUnfreeze.set(false);
+      this.toast.show(this.i18n.t(message));
+    } catch (e) {
+      this.error.set(this.i18n.errors(e).join(' '));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async copy(): Promise<void> {

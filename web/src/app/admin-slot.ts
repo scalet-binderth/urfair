@@ -188,7 +188,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
 
-        @case ('results') { <app-results [slotId]="s.id" /> }
+        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="canEdit()" /> }
 
         @case ('demo') {
           <div class="card stack">

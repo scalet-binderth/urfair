@@ -71,6 +71,54 @@ public class AllocatorTests
     }
 
     [Fact]
+    public void Locked_seats_stay_and_count_towards_capacity()
+    {
+        var ballots = SampleData.Participants(140, Default, Activities, 2027);
+        // Move someone by hand into a session they gave no points to and fix it there.
+        var b = ballots[0];
+        var target = Activities.Where(a => b.PointsFor(a.Id) == 0).SelectMany(a => a.Sessions)
+            .First(s => !b.UnavailableSessions.Contains(s.Id));
+        var locked = new FixedAssignment(b.Id, target.Id);
+
+        var result = Allocator.PointBased(Activities, ballots, 3, 2027, locked: [locked]);
+
+        var mine = result.Assignments[b.Id];
+        Assert.Equal(3, mine.Count);
+        Assert.Contains(mine, x => x.Session.Id == target.Id && x.Locked && x.IsFallback);
+        Assert.Single(mine, x => x.Locked);
+        Assert.Equal(result.Assignments.Values.Sum(l => l.Count(x => x.Session.Id == target.Id)), result.Load(target));
+        foreach (var s in Activities.SelectMany(x => x.Sessions).Where(s => s.Capacity is not null))
+            Assert.True(result.Load(s) <= s.Capacity, $"{s.Id}: {result.Load(s)} > {s.Capacity}");
+    }
+
+    [Fact]
+    public void Locked_seat_is_kept_even_if_someone_with_more_points_wants_it()
+    {
+        var a = new Activity("a", "A", [new Session("a#0", "a", new DateTime(2027, 1, 1, 10, 0, 0), new DateTime(2027, 1, 1, 12, 0, 0), "X", 1)]);
+        var b = new Activity("b", "B", [new Session("b#0", "b", new DateTime(2027, 2, 1, 10, 0, 0), new DateTime(2027, 2, 1, 12, 0, 0), "Y", null)]);
+        var low = new Ballot("low", "Low", new Dictionary<string, int> { ["a"] = 10, ["b"] = 90 }, new HashSet<string>());
+        var high = new Ballot("high", "High", new Dictionary<string, int> { ["a"] = 90, ["b"] = 10 }, new HashSet<string>());
+
+        var result = Allocator.PointBased([a, b], [low, high], 1, 1, locked: [new FixedAssignment("low", "a#0")]);
+
+        Assert.Equal("a", Assert.Single(result.Assignments["low"]).Session.ActivityId);
+        Assert.Equal("b", Assert.Single(result.Assignments["high"]).Session.ActivityId);
+    }
+
+    [Fact]
+    public void Stored_allocation_is_loaded_unchanged()
+    {
+        var ballots = SampleData.Participants(140, Default, Activities, 2027);
+        var original = Allocator.PointBased(Activities, ballots, 3, 2027);
+        var stored = original.Assignments.SelectMany(p => p.Value.Select(x => new FixedAssignment(p.Key, x.Session.Id))).ToList();
+
+        var loaded = Allocator.FromAssignments(Activities, ballots, stored.Append(new FixedAssignment("unknown", "nope")));
+
+        Assert.Equal(original.Evaluate(3), loaded.Evaluate(3));
+        foreach (var s in Activities.SelectMany(x => x.Sessions)) Assert.Equal(original.Load(s), loaded.Load(s));
+    }
+
+    [Fact]
     public void Same_seed_gives_same_result()
     {
         Assert.Equal(Run(100, 99).Evaluate(3), Run(100, 99).Evaluate(3));

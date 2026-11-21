@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
     public DbSet<ParticipantEntity> Participants => Set<ParticipantEntity>();
     public DbSet<MailEntity> Mails => Set<MailEntity>();
     public DbSet<AccountEntity> Accounts => Set<AccountEntity>();
+    public DbSet<AssignmentEntity> Assignments => Set<AssignmentEntity>();
     /// <summary>Keys for the sign-in cookies, so they stay valid when the server restarts.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -64,6 +65,15 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
             e.Property(x => x.Subject).HasMaxLength(200);
             e.HasIndex(x => x.FairSlotId);
             e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AssignmentEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SessionId).HasMaxLength(40);
+            e.HasIndex(x => x.FairSlotId);
+            e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<BallotEntity>().WithMany().HasForeignKey(x => x.BallotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<SessionEntity>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<ActivityEntity>(e =>
         {

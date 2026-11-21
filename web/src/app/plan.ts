@@ -17,12 +17,12 @@ interface PlanText {
   back: string;
 }
 
-/** Roadmap from the planning document (as of 20.11.2026), shown in the app for presentations. */
+/** Roadmap from the planning document (as of 21.11.2026), shown in the app for presentations. */
 const PLAN: Record<'de' | 'en', PlanText> = {
   de: {
     title: 'Umsetzungsplan',
     lead: 'Die Demo ist vorzeigbar. Bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlen vor allem Dinge, die man in der Vorführung nicht sieht.',
-    asOf: 'Stand: 20. November 2026',
+    asOf: 'Stand: 21. November 2026',
     nowTitle: 'Was die Demo schon kann',
     now: [
       'Anmeldung als Teilnehmer:in oder Organisation, Demo-Personen A bis D',
@@ -37,6 +37,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Datenbank mit Migrationen: Daten bleiben bei Updates erhalten; Demo per Knopf zurücksetzen',
       'Teilnehmerliste mit E-Mail, Geburtsdatum und Pfarrgemeinde, von Hand oder per CSV; persönliche Links und Einladungen',
       'Konten mit Rollen (Junia- und Pfarrgemeinde-Admins), Sichtbarkeit pro Wahl, Demo-Konten per Knopf',
+      'Zuteilung festschreiben, Personen von Hand verschieben, Plätze fixieren und den Rest neu rechnen',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
@@ -44,7 +45,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Schritt 1 · erledigt', kind: 'done', title: 'Sichere Grundlage', items: ['Datenbank-Migrationen', 'Demo-Schalter (Demo und echte Instanz aus demselben Code)', 'Beschreibung pro Veranstaltung', 'Veranstaltungen aus Excel/CSV importieren'] },
       { label: 'Schritt 2 · erledigt', kind: 'done', title: 'Teilnehmende', items: ['Teilnehmerliste pro Wahl per CSV oder von Hand, mit E-Mail und Pfarrgemeinde', 'Persönliche Links mit Prüfung des Geburtsdatums', 'Einladungen: Demo-Postfach, sonst zum Kopieren'] },
       { label: 'Schritt 3 · erledigt', kind: 'done', title: 'Login und Rollen', items: ['Junia- und Pfarrgemeinde-Admins', 'Sichtbarkeit pro Wahl', 'Import und Pflege der Teilnehmenden je nach Rolle', 'Demo-Konten per Knopf'] },
-      { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
+      { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['✓ Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
       { label: 'Schritt 5 und 6', title: 'Nach dem Probelauf', items: ['Abmelden und Nachrücken von der Warteliste', 'Pflichtbesetzung', '„Mehr als gefordert“', 'Zwischenstand ein- und ausschaltbar'] },
       { label: 'Parallel', kind: 'parallel', title: 'Mit der Diözese', items: ['Hosting: Diözesanserver oder EU-Anbieter', 'Datenschutz mit dem Datenschutzbeauftragten', 'Impressum und Datenschutzerklärung'] },
     ],
@@ -52,9 +53,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     mustLead: 'Ohne diese Punkte dürfen keine echten Daten von Firmlingen in die App.',
     mustHead: ['Thema', 'Was fehlt', 'Warum'],
     must: [
-      { cells: ['Identifikation', 'E-Mail, CSV-Import, Hinzufügen von Hand, persönlicher Link, Prüfung nach dem Klick (z. B. Geburts- oder Taufdatum)', 'Heute kann sich jede:r unter jedem Namen anmelden'] },
-      { cells: ['Login und Rollen', 'Echte Konten für mehrere Personen, Rollen pro Pfarre', 'Heute gibt es nur einen offenen Demo-Zugang'] },
-      { cells: ['Zuteilung festschreiben', 'Speichern, einfrieren, händisch verschieben, fixieren, neu rechnen', 'Heute wird bei jedem Aufruf neu gerechnet'] },
+      { cells: ['Identifikation', 'Erledigt (Schritt 2): Teilnehmerliste, persönlicher Link, Prüfung des Geburtsdatums', 'Sonst könnte sich jede:r unter jedem Namen anmelden'] },
+      { cells: ['Login und Rollen', 'Erledigt (Schritt 3): Konten für mehrere Personen, Rollen pro Pfarrgemeinde', 'Sonst gäbe es nur einen offenen Zugang'] },
+      { cells: ['Zuteilung festschreiben', 'Erledigt (Schritt 4): speichern, händisch verschieben, fixieren, neu rechnen; Veröffentlichen schreibt automatisch fest', 'Sonst würde bei jedem Aufruf neu gerechnet'] },
       { cells: ['Recht und Datenschutz', 'Impressum, Datenschutzerklärung, automatisches Löschen, Hosting in der EU', 'Daten von Minderjährigen'] },
     ],
     rolesTitle: 'Rollen und Rechte',
@@ -80,7 +81,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { cells: ['Teilnehmende importieren', 'Pro Wahl per CSV (Vorname, Nachname, E-Mail, Geburtsdatum, Pfarrgemeinde), keine zentrale Personenkartei: weniger Daten, wird mit der Wahl gelöscht. Die Pfarrgemeinde-Spalte erlaubt bei Junia-Wahlen Auswertungen pro Pfarrgemeinde. Ab Schritt 3 an die Rolle gekoppelt: Pfarrgemeinde-Admins importieren und pflegen nur Zeilen der eigenen Pfarrgemeinde, fremde Zeilen werden mit Zeilennummer abgelehnt.', 'mittel (Schritt 2 und 3)'] },
     ],
     shouldTitle: 'Sollte für den echten Einsatz dabei sein',
-    should: ['Beschreibung pro Veranstaltung (was, mitbringen, Leitung)', 'Teilnehmerlisten für Leiter:innen zum Exportieren oder Drucken', 'Anmeldeschluss automatisch', 'Überblick „noch nicht abgestimmt“ für Erinnerungen'],
+    should: ['Teilnehmerlisten für Leiter:innen zum Exportieren oder Drucken', 'Anmeldeschluss automatisch', 'Überblick „noch nicht abgestimmt“ für Erinnerungen'],
     laterTitle: 'Später, wenn es sich bewährt',
     later: ['E-Mails aus der App', '„Mit Freund:in zusammen“', 'Vorjahr als Vorlage kopieren', 'Teilnehmende aus einer anderen Wahl übernehmen', 'Wahlen „für alle offen“ mit Ausnahmeliste (z. B. alle außer den Teilnehmenden vom Vorjahr)'],
     questionsTitle: 'Offene Fragen',
@@ -90,7 +91,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
   en: {
     title: 'Roadmap',
     lead: 'The demo is ready to show. Before real use in the Pfarre Urfahr-St. Junia, mostly invisible things are missing.',
-    asOf: 'As of 20 November 2026',
+    asOf: 'As of 21 November 2026',
     nowTitle: 'What the demo can do',
     now: [
       'Sign in as participant or organiser, demo people A to D',
@@ -105,6 +106,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Database with migrations: data survives updates; reset the demo with one button',
       'Participant list with e-mail, date of birth and parish community, by hand or via CSV; personal links and invitations',
       'Accounts with roles (Junia and parish community admins), visibility per vote, demo accounts via buttons',
+      'Freeze the allocation, move people by hand, lock seats and recalculate the rest',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
@@ -112,7 +114,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Step 1 · done', kind: 'done', title: 'Safe foundation', items: ['Database migrations', 'Demo switch (demo and real instance from the same code)', 'Description per activity', 'Import activities from Excel/CSV'] },
       { label: 'Step 2 · done', kind: 'done', title: 'Participants', items: ['Participant list per vote via CSV or by hand, with e-mail and Pfarrgemeinde', 'Personal links with a date-of-birth check', 'Invitations: demo mailbox, otherwise to copy'] },
       { label: 'Step 3 · done', kind: 'done', title: 'Login and roles', items: ['Junia and parish community admins', 'Visibility per vote', 'Importing and editing participants by role', 'Demo accounts via buttons'] },
-      { label: 'Step 4', title: 'Allocation under control', items: ['Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'then: pilot with 20 to 30 confirmands'] },
+      { label: 'Step 4', title: 'Allocation under control', items: ['✓ Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'then: pilot with 20 to 30 confirmands'] },
       { label: 'Steps 5 and 6', title: 'After the pilot', items: ['Cancellations and moving up from the waiting list', 'Required staffing', '“More than required”', 'Interim status switchable'] },
       { label: 'In parallel', kind: 'parallel', title: 'With the diocese', items: ['Hosting: diocese server or EU provider', 'Data protection with the data protection officer', 'Legal notice and privacy policy'] },
     ],
@@ -120,9 +122,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     mustLead: 'Without these points no real data of confirmands may go into the app.',
     mustHead: ['Topic', 'Missing', 'Why'],
     must: [
-      { cells: ['Identification', 'E-mail, CSV import, manual entry, personal link, check after the click (e.g. date of birth or baptism)', 'Today anyone can sign in under any name'] },
-      { cells: ['Login and roles', 'Real accounts for several people, roles per parish', 'Today there is only an open demo access'] },
-      { cells: ['Freeze the allocation', 'Store, freeze, move by hand, lock, recalculate', 'Today it is recalculated on every request'] },
+      { cells: ['Identification', 'Done (step 2): participant list, personal link, date-of-birth check', 'Otherwise anyone could sign in under any name'] },
+      { cells: ['Login and roles', 'Done (step 3): accounts for several people, roles per parish community', 'Otherwise there would only be an open access'] },
+      { cells: ['Freeze the allocation', 'Done (step 4): store, move by hand, lock, recalculate; publishing freezes automatically', 'Otherwise it would be recalculated on every request'] },
       { cells: ['Legal and privacy', 'Legal notice, privacy policy, automatic deletion, hosting in the EU', 'Data of minors'] },
     ],
     rolesTitle: 'Roles and permissions',
@@ -148,7 +150,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { cells: ['Import participants', 'Per vote via CSV (first name, last name, e-mail, date of birth, Pfarrgemeinde); no central register of people: less data, deleted with the vote. The Pfarrgemeinde column allows evaluations per parish community in Junia votes. From step 3 tied to the role: parish community admins import and edit only rows of their own parish community; other rows are rejected with their row number.', 'medium (steps 2 and 3)'] },
     ],
     shouldTitle: 'Should be there for real use',
-    should: ['Description per activity (what, what to bring, who leads)', 'Participant lists for leaders to export or print', 'Automatic registration deadline', 'Overview “not voted yet” for reminders'],
+    should: ['Participant lists for leaders to export or print', 'Automatic registration deadline', 'Overview “not voted yet” for reminders'],
     laterTitle: 'Later, once it has proven itself',
     later: ['E-mails from the app', '“Together with a friend”', 'Copy last year as a template', 'Take over participants from another vote', 'Votes “open to everyone” with an exclusion list (e.g. everyone except last year’s participants)'],
     questionsTitle: 'Open questions',
