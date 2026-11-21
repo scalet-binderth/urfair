@@ -59,7 +59,7 @@ public static class Endpoints
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase != Phase.Published) return Errors("notPublished");
-            var result = await AdminEndpoints.AllocateAsync(db, slot);
+            var result = await AllocationEndpoints.AllocateAsync(db, slot);
             var mine = result.Participants.FirstOrDefault(p => !p.IsSample && p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             return Results.Ok(new { voted = mine is not null, assignments = mine?.Assignments ?? [] });
         });
@@ -139,17 +139,15 @@ public static class Endpoints
         a.Sessions.Select(s => new SessionDto(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(), a.GroupId, a.Description, a.Parish, a.Leader);
 
     /// <summary>
-    /// Runs the allocation with the ballots so far. Per activity the person gave points to:
+    /// Uses the valid allocation (stored once frozen, otherwise calculated with the ballots so far). Per activity the person gave points to:
     /// "fixed" (would get it), "waitlist" (all seats taken, position = people without a seat who gave more points + 1)
     /// or "free" (seats left, but the person already has enough higher-ranked activities, or the date clashes).
     /// </summary>
     private static async Task<MyStatusDto> StatusAsync(AppDbContext db, FairSlotEntity slot, string name)
     {
-        var activities = await Database.LoadActivitiesAsync(db, slot.Id);
-        var entities = await Database.LoadBallotsAsync(db, slot.Id);
+        var (allocation, activities, entities) = await AllocationEndpoints.CurrentAsync(db, slot);
         var mine = entities.Where(b => !b.IsSample && b.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).MaxBy(b => b.SubmittedAt);
         var ballots = entities.Select(b => b.ToModel()).ToList();
-        var allocation = Allocator.PointBased(activities, ballots, slot.PerParticipant, slot.Seed, slot.ToRules().Groups);
 
         bool Full(Activity a) => a.Sessions.All(s => s.Capacity is { } c && allocation.Load(s) >= c);
         var full = activities.Where(Full).Select(a => a.Id).ToList();

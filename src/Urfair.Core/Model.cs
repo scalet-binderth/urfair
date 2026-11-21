@@ -77,9 +77,14 @@ public sealed class Assignment(string ballotId, Session session, int points)
     public string BallotId { get; } = ballotId;
     public Session Session { get; internal set; } = session;
     public int Points { get; internal set; } = points;
+    /// <summary>Fixed by the organisers: kept when recalculating and never swapped.</summary>
+    public bool Locked { get; internal init; }
     /// <summary>Fallback: the participant gave no points to this activity.</summary>
     public bool IsFallback => Points == 0;
 }
+
+/// <summary>A stored seat of a frozen allocation (or one fixed by hand when recalculating).</summary>
+public sealed record FixedAssignment(string BallotId, string SessionId, bool Locked = false);
 
 public sealed record Metrics(
     int Count,

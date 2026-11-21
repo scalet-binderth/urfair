@@ -26,11 +26,12 @@ export interface Mail { id: string; to: string; subject: string; body: string; c
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
-export interface Assignment { activityId: string; title: string; groupId: string | null; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; points: number; isFallback: boolean; }
+export interface Assignment { activityId: string; title: string; groupId: string | null; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; points: number; isFallback: boolean; locked?: boolean; }
 export interface Participant { ballotId: string; name: string; isSample: boolean; satisfaction: number; assignments: Assignment[]; }
 export interface MyActivityStatus { activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free'; position: number | null; waitlisted: boolean; start: string | null; end: string | null; flexible: boolean; location: string | null; }
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
-export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; }
+export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
+export interface Seat { sessionId: string; locked: boolean; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
 export class ApiFailure extends Error {
@@ -134,6 +135,12 @@ export class Api {
   }
   resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
+  freezeAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/freeze`, {}, this.admin())); }
+  recalculateAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/recalculate`, {}, this.admin())); }
+  unfreezeAllocation(id: string) { return this.call(this.http.delete<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
+  setSeats(id: string, ballotId: string, seats: Seat[]) {
+    return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
+  }
 
   /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
   private admin() { return {}; }

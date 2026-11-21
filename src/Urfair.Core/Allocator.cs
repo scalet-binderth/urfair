@@ -27,9 +27,12 @@ public sealed class Allocator
 
     // ---------- public procedures ----------
 
-    public static Allocator PointBased(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed, IReadOnlyList<ActivityGroup>? groups = null)
+    /// <param name="locked">Seats fixed by the organisers; they are given first and stay as they are.</param>
+    public static Allocator PointBased(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, int perParticipant, int seed,
+        IReadOnlyList<ActivityGroup>? groups = null, IEnumerable<FixedAssignment>? locked = null)
     {
         var a = new Allocator(activities, ballots, groups);
+        a.Preassign((locked ?? []).Select(x => x with { Locked = true }));
         var rnd = new Random(seed);
         var lottery = ballots.ToDictionary(b => b.Id, _ => rnd.NextDouble());
         var ranking = ballots.ToDictionary(b => b.Id, a.Ranking);
@@ -76,6 +79,15 @@ public sealed class Allocator
             }
             while (a._assignments[b.Id].Count < perParticipant && a.AssignFallback(b)) { }
         }
+        return a;
+    }
+
+    /// <summary>A stored (frozen) allocation, e.g. after moves by hand; seats of unknown ballots or sessions are skipped.</summary>
+    public static Allocator FromAssignments(IReadOnlyList<Activity> activities, IReadOnlyList<Ballot> ballots, IEnumerable<FixedAssignment> assignments,
+        IReadOnlyList<ActivityGroup>? groups = null)
+    {
+        var a = new Allocator(activities, ballots, groups);
+        a.Preassign(assignments);
         return a;
     }
 
@@ -144,10 +156,19 @@ public sealed class Allocator
     private IEnumerable<Session> Available(Ballot b, Activity act, Assignment? except = null) =>
         act.Sessions.Where(s => Free(s) > 0 && Fits(b, s, except));
 
-    private void Assign(Ballot b, Session s)
+    private void Assign(Ballot b, Session s, bool locked = false)
     {
-        _assignments[b.Id].Add(new Assignment(b.Id, s, b.PointsFor(s.ActivityId)));
+        _assignments[b.Id].Add(new Assignment(b.Id, s, b.PointsFor(s.ActivityId)) { Locked = locked });
         _load[s.Id] = Load(s) + 1;
+    }
+
+    private void Preassign(IEnumerable<FixedAssignment> list)
+    {
+        var sessions = _activities.SelectMany(x => x.Sessions).ToDictionary(s => s.Id);
+        var ballots = _ballots.ToDictionary(b => b.Id);
+        foreach (var x in list)
+            if (ballots.TryGetValue(x.BallotId, out var b) && sessions.TryGetValue(x.SessionId, out var s))
+                Assign(b, s, x.Locked);
     }
 
     private void Move(Assignment x, Session target, Ballot b)
@@ -182,7 +203,7 @@ public sealed class Allocator
 
             // 1. Move into freed-up seats of higher-ranked activities
             foreach (var b in _ballots)
-            foreach (var x in _assignments[b.Id])
+            foreach (var x in _assignments[b.Id].Where(x => !x.Locked))
             {
                 foreach (var act in Ranking(b).Where(act => b.PointsFor(act.Id) > x.Points))
                 {
@@ -203,7 +224,7 @@ public sealed class Allocator
                 foreach (var x1 in _assignments[b1.Id])
                 foreach (var x2 in _assignments[b2.Id])
                 {
-                    if (x1.Session.ActivityId == x2.Session.ActivityId) continue;
+                    if (x1.Locked || x2.Locked || x1.Session.ActivityId == x2.Session.ActivityId) continue;
                     var g1 = b1.PointsFor(x2.Session.ActivityId) - x1.Points;
                     var g2 = b2.PointsFor(x1.Session.ActivityId) - x2.Points;
                     if (g1 < 0 || g2 < 0 || g1 + g2 == 0) continue;
