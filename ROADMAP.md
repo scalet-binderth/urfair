@@ -31,7 +31,8 @@ and English; keep both in sync.
   (Pfarrgemeinde only / Junia shared / Junia read-only) checked on the server for every organiser request;
   participants, import, invitations limited to the own Pfarrgemeinden in Junia-wide votes; demo accounts via buttons
 - Emergency access: with `Admin__Key` a new one-time link for an existing Junia admin (e.g. the only one forgot the password)
-- **Step 4, part 1:** freeze the allocation (from phase "closed"; publishing freezes automatically), move people by
+- **Step 4, part 1:** freeze the allocation (from phase "closed"; publishing freezes automatically; since step 5 the
+  phase decides), move people by
   hand (overbooking allowed, shown in orange), lock seats, recalculate everything that is not locked, unfreeze
   (not while published); while frozen the vote cannot go back to draft/open, rules cannot change and activities
   cannot be replaced by an import; participants and the interim status see the stored allocation
@@ -49,6 +50,13 @@ and English; keep both in sync.
   for accounts that see all participants)
 - Optional date of baptism per participant (by hand and CSV column `Taufdatum`); if stored, the personal link asks for
   it as well (same lock after wrong tries)
+- **Step 5, part 1:** phases Draft → Open (registration) → Allocation (internal) → Published (visible) → Closed →
+  Ended. At the deadline Urfair switches to Allocation and freezes by itself; after the last date it ends by itself
+  (background check every minute, Vienna time). Freezing follows the phase (no separate buttons); back to
+  registration only from the internal allocation (unfreezes, deadline must be in the future). Interim status during
+  registration only if switched on per vote; points locked after the deadline; waiting-list ticks only while visible
+  (or during registration with interim status). Ended is read only (back only while the last date has not passed).
+  Phase changes appear in the log. Demo dates are relative to the reset day, one vote per phase
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -57,7 +65,7 @@ and English; keep both in sync.
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
 | 4 ✓ | done, see above | |
-| 5 | New flow (see "Process model"): phases draft → registration → allocation (internal, then visible) → closed → ended; automatic deadline that calculates and freezes; no interim status while registering; points locked during allocation, waiting-list ticks and "give back a seat"; automatic moving up within the group (need before wish); ending after the last date or by hand, reopening | a vote from registration to ended |
+| 5 | New flow (see "Process model"). Part 1 ✓: phases, automatic deadline and end, no interim status while registering, points locked after the deadline. Part 2: waiting-list ticks and "give back a seat" while visible; automatic moving up within the group (need before wish) | a vote from registration to ended |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 | E-mails from the app (always with a direct link, reply-to the person responsible); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |

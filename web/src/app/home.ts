@@ -38,12 +38,12 @@ import { SessionService } from './session';
         <div class="slots">
           @for (s of done(); track s.id) {
             <div class="card slot">
-              <h3>{{ s.name }} <span class="phase" [attr.data-phase]="s.phase">{{ i18n.t('phase.' + s.phase) }}</span></h3>
-              @if (s.phase === 'Published') {
-                <p class="muted small">{{ i18n.t('home.published') }}</p>
-                <a class="btn ghost" [routerLink]="['/s', s.id, 'result']">{{ i18n.t('home.seeResult') }}</a>
-              } @else {
+              <h3>{{ s.name }} <span class="phase" [attr.data-phase]="s.phase">{{ i18n.t('home.phase.' + s.phase) }}</span></h3>
+              @if (s.phase === 'Allocation') {
                 <p class="muted small">{{ i18n.t('home.closed') }}</p>
+              } @else {
+                <p class="muted small">{{ i18n.t(s.phase === 'Ended' ? 'home.ended' : 'home.published') }}</p>
+                <a class="btn ghost" [routerLink]="['/s', s.id, 'result']">{{ i18n.t('home.seeResult') }}</a>
               }
             </div>
           }

@@ -8,7 +8,7 @@ public record CreateSlotRequest(string Name, bool WithSampleData);
 public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
     string? Parish, Visibility Visibility, bool CanEdit);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
-    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared);
+    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -80,23 +80,38 @@ public static class AdminEndpoints
                 errors.Add(new ValidationError("visibilityNotAllowed"));
             if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
-            // A frozen allocation must stay valid: no new ballots and no other rules.
+            // A frozen allocation must stay valid: no other rules. Back to registration only from the internal allocation
+            // (it is unfrozen then); once participants have seen it, it stays.
             var rulesChanged = slot.ToRules() != rules;
-            if (slot.FrozenAt is not null && (req.Phase is Phase.Draft or Phase.Open || rulesChanged))
+            var reopen = req.Phase is Phase.Draft or Phase.Open && Phases.HasAllocation(slot.Phase);
+            if (slot.FrozenAt is not null && rulesChanged && !reopen)
                 errors.Add(new ValidationError("allocationFrozen"));
+            if (reopen && slot.Phase != Phase.Allocation) errors.Add(new ValidationError("unpublishFirst"));
+            if (req.Phase == Phase.Open && req.RegistrationDeadline is { } deadline && deadline <= Phases.Now())
+                errors.Add(new ValidationError("deadlinePassed"));
+            // It would end again at once.
+            if (slot.Phase == Phase.Ended && req.Phase != Phase.Ended && await Phases.LastDayPassedAsync(db, id))
+                errors.Add(new ValidationError("endedFinal"));
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
-            (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll);
+            var before = slot.Phase;
+            (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
             (slot.Parish, slot.Organiser, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), req.Visibility);
             slot.Apply(rules);
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();
             foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())
                 if (!ids.Contains(a.GroupId!)) a.GroupId = null;
+            if (before != slot.Phase) AllocationEndpoints.Log(db, http, id, "phase", null, before.ToString(), slot.Phase.ToString());
             await db.SaveChangesAsync();
+            if (reopen)
+            {
+                AllocationEndpoints.Log(db, http, id, "unfrozen");
+                await AllocationEndpoints.UnfreezeAsync(db, slot);
+            }
             if (rulesChanged) await Database.ResetSamplesAsync(db, id); // sample ballots must follow the new rules
-            // Participants must see a result that no longer changes.
-            if (slot.Phase == Phase.Published && slot.FrozenAt is null)
+            // From the allocation on, the stored result counts.
+            if (Phases.HasAllocation(slot.Phase) && slot.FrozenAt is null)
             {
                 AllocationEndpoints.Log(db, http, id, "frozen");
                 await AllocationEndpoints.FreezeAsync(db, slot);

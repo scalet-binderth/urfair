@@ -19,31 +19,33 @@ import { Toast } from './toast';
         <p>{{ i18n.t('vote.lead', { budget: c.rules.pointBudget, min: c.rules.minActivities, max: c.rules.maxPerActivity, k: c.rules.perParticipant }) }}</p>
         @if (groups().length) { <p>{{ i18n.t('vote.leadGroups') }}</p> }
       </div>
-      @if (c.phase !== 'Open') { <p class="card">{{ i18n.t('vote.closed') }}</p> }
+      @if (!canVote()) { <p class="card">{{ i18n.t('vote.closed') }}</p> }
       <div class="mini">
         <span class="small">{{ left() }} {{ i18n.t('vote.of', { n: c.rules.pointBudget }) }} · {{ chosenCount() }}</span>
         <div class="meter"><i [style.width.%]="spentPercent()"></i></div>
       </div>
-      @if (status()?.voted) {
+      @if (status()?.activities?.length) {
         <section class="card stack status">
-          <h2>{{ i18n.t('status.title') }}</h2>
-          <p class="muted small">{{ i18n.t('status.lead') }}</p>
+          <h2>{{ i18n.t(interim() ? 'status.title' : 'status.titleFinal') }}</h2>
+          <p class="muted small">{{ i18n.t(interim() ? 'status.lead' : 'status.leadFinal') }}</p>
           <ul class="st">
             @for (x of status()!.activities; track x.activityId) {
               <li>
                 <span class="t">@if (groupFor(x.groupId); as g) { <span class="grp" [attr.data-color]="g.color"></span> }{{ x.title }}
                   <span class="muted small">· {{ i18n.t('status.points', { n: x.points }) }}</span></span>
-                <span class="chip" [attr.data-status]="x.status">{{ i18n.t('status.' + x.status, { n: x.position ?? 0 }) }}</span>
+                <span class="chip" [attr.data-status]="x.status">{{ i18n.t(x.status === 'fixed' && !interim() ? 'status.fixedFinal' : 'status.' + x.status, { n: x.position ?? 0 }) }}</span>
                 @if (x.status === 'fixed') {
                   <span class="muted small w">{{ i18n.when({ start: x.start!, end: x.end, flexible: x.flexible }) }}@if (x.location) { · {{ x.location }} }</span>
                 } @else {
-                  <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
+                  <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy() || !canWaitlist()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
                 }
               </li>
             }
           </ul>
           <p class="muted small">{{ i18n.t('status.note') }}</p>
         </section>
+      } @else if (status()?.voted && c.phase === 'Open') {
+        <p class="card small">{{ i18n.t('status.hidden') }}</p>
       }
       <div class="layout">
         <div class="list">
@@ -69,7 +71,7 @@ import { Toast } from './toast';
                     <li>
                       @if (a.sessions.length > 1) {
                         <label [class.off]="unavailable().has(s.id)">
-                          <input type="checkbox" [checked]="!unavailable().has(s.id)" (change)="toggleSession(s.id)" />
+                          <input type="checkbox" [checked]="!unavailable().has(s.id)" [disabled]="!canVote()" (change)="toggleSession(s.id)" />
                           <span>{{ sessionText(s) }}</span>
                         </label>
                       } @else { {{ sessionText(s) }} }
@@ -78,9 +80,9 @@ import { Toast } from './toast';
                 </ul>
               </div>
               <div class="stepper">
-                <button type="button" [disabled]="pointsFor(a.id) <= 0" (click)="change(a.id, -1)" [attr.aria-label]="i18n.t('vote.less', { title: a.title })">−</button>
+                <button type="button" [disabled]="!canVote() || pointsFor(a.id) <= 0" (click)="change(a.id, -1)" [attr.aria-label]="i18n.t('vote.less', { title: a.title })">−</button>
                 <output>{{ pointsFor(a.id) }}</output>
-                <button type="button" [disabled]="pointsFor(a.id) >= c.rules.maxPerActivity || left() <= 0" (click)="change(a.id, 1)" [attr.aria-label]="i18n.t('vote.more', { title: a.title })">+</button>
+                <button type="button" [disabled]="!canVote() || pointsFor(a.id) >= c.rules.maxPerActivity || left() <= 0" (click)="change(a.id, 1)" [attr.aria-label]="i18n.t('vote.more', { title: a.title })">+</button>
               </div>
             </div>
           }
@@ -112,8 +114,8 @@ import { Toast } from './toast';
             <p class="small">{{ i18n.t('vote.as', { name: name() }) }}</p>
             @if (loadedPrevious()) { <p class="small muted">{{ i18n.t('vote.loaded') }}</p> }
             @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
-            <button class="btn" type="button" [disabled]="!canSubmit() || busy() || c.phase !== 'Open'" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
-            <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button>
+            <button class="btn" type="button" [disabled]="!canSubmit() || busy() || !canVote()" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
+            @if (canVote()) { <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button> }
             <p class="muted small">{{ i18n.t('vote.note') }}</p>
             <a routerLink="/slots" class="small">{{ i18n.t('vote.back') }}</a>
           </div>
@@ -197,6 +199,14 @@ export class VotePage implements OnInit {
   protected noDateFits = computed(() =>
     this.activities().some(a => this.pointsFor(a.id) > 0 && a.sessions.every(s => this.unavailable().has(s.id))));
   protected status = signal<MyStatus | null>(null);
+  /** Points can only be given during registration, until the deadline. */
+  protected canVote = computed(() => {
+    const s = this.slot();
+    return s?.phase === 'Open' && (!s.registrationDeadline || new Date(s.registrationDeadline) > new Date());
+  });
+  /** During registration the status is an interim one; afterwards it is the allocation. */
+  protected interim = computed(() => this.slot()?.phase === 'Open');
+  protected canWaitlist = computed(() => this.slot()?.phase === 'Published' || (this.interim() && !!this.slot()?.showInterim));
   protected groups = computed(() => this.slot()?.rules.groups ?? []);
   protected groupFor(id: string | null): Group | undefined { return this.groups().find(g => g.id === id); }
 

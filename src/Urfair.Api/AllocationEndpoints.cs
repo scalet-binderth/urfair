@@ -21,10 +21,11 @@ public record LeaderListsDto(bool Frozen, IReadOnlyList<ListActivityDto> Activit
 public record LeaderMailRequest(List<string>? ActivityIds, bool WithEmail, bool WithBirthDate, bool WithBaptismDate = false);
 
 /// <summary>
-/// The allocation of a FairSlot. Until it is frozen it is calculated on every request (live, e.g. for the interim status).
-/// Freezing stores it; afterwards organisers move people by hand, fix seats and recalculate the rest, and participants
-/// see exactly the stored result. Publishing freezes automatically. Freezing also keeps the original result, and every
-/// change is logged, so organisers can see what a person had before and go back to it.
+/// The allocation of a FairSlot. During draft and registration it is calculated on every request (live preview).
+/// With the allocation phase (at the deadline or by hand) it is frozen; afterwards organisers move people by hand,
+/// fix seats and recalculate the rest, and participants see exactly the stored result once it is published. Going back
+/// to registration unfreezes it. Freezing also keeps the original result, and every change is logged, so organisers
+/// can see what a person had before and go back to it.
 /// </summary>
 public static class AllocationEndpoints
 {
@@ -32,18 +33,6 @@ public static class AllocationEndpoints
 	{
 		admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
 			await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
-
-		// Only after registration has closed, so no ballot can be missing or change afterwards.
-		admin.MapPost("/slots/{id:guid}/allocation/freeze", async (Guid id, AppDbContext db, HttpContext http) =>
-		{
-			var slot = await db.FairSlots.FindAsync(id);
-			if (slot is null) return Results.NotFound();
-			if (slot.Phase is Phase.Draft or Phase.Open) return Endpoints.Errors("freezeNeedsClosed");
-			if (slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
-			Log(db, http, id, "frozen");
-			await FreezeAsync(db, slot);
-			return Results.Ok(await AllocateAsync(db, slot));
-		});
 
 		// Fixed seats stay, everything else is allocated again. The original from freezing is kept.
 		admin.MapPost("/slots/{id:guid}/allocation/recalculate", async (Guid id, AppDbContext db, HttpContext http) =>
@@ -54,17 +43,6 @@ public static class AllocationEndpoints
 			var locked = await db.Assignments.Where(a => a.FairSlotId == id && a.Locked).ToListAsync();
 			Log(db, http, id, "recalculated");
 			await FreezeAsync(db, slot, locked.Select(a => a.ToModel()).ToList());
-			return Results.Ok(await AllocateAsync(db, slot));
-		});
-
-		// Back to the live calculation; moves by hand and the original are lost. Not once the result is published.
-		admin.MapDelete("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db, HttpContext http) =>
-		{
-			var slot = await db.FairSlots.FindAsync(id);
-			if (slot is null) return Results.NotFound();
-			if (slot.Phase == Phase.Published) return Endpoints.Errors("unpublishFirst");
-			Log(db, http, id, "unfrozen");
-			await UnfreezeAsync(db, slot);
 			return Results.Ok(await AllocateAsync(db, slot));
 		});
 

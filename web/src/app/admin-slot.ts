@@ -33,6 +33,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
       </div>
 
       @if (!canEdit()) { <p class="card small readonly no-print">{{ i18n.t('admin.readOnly') }}</p> }
+      @else if (s.phase === 'Ended') { <p class="card small readonly no-print">{{ i18n.t('admin.ended') }}</p> }
       <nav class="tabs no-print" role="tablist">
         @for (t of tabs; track t) {
           <button type="button" role="tab" [attr.aria-selected]="tab() === t" [class.on]="tab() === t" (click)="show(t)">
@@ -56,6 +57,10 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                   <input id="s-deadline" type="datetime-local" [(ngModel)]="form.deadline" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.phaseHint') }}</p>
+              @if (s.phase === 'Allocation' && (form.phase === 'Open' || form.phase === 'Draft')) { <p class="warn small">{{ i18n.t('admin.reopenWarn') }}</p> }
+              @if (form.phase === 'Ended') { <p class="muted small">{{ i18n.t('admin.endedHint') }}</p> }
+              <label class="check"><input type="checkbox" [(ngModel)]="form.showInterim" />{{ i18n.t('admin.showInterim') }}</label>
+              <p class="muted small">{{ i18n.t('admin.showInterimHint') }}</p>
               <div class="row">
                 <div class="field grow"><label for="s-parish">{{ i18n.t('admin.parish') }}</label>
                   <select id="s-parish" [(ngModel)]="form.parish">
@@ -121,8 +126,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
               <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" (saved)="afterSave()" (cancelled)="editing.set(null)" />
             } @else {
               <div class="row">
-                <button class="btn" type="button" [hidden]="!canEdit()" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
-                <button class="btn ghost" type="button" [hidden]="!canEdit()" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
+                <button class="btn" type="button" [hidden]="!changeable()" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
+                <button class="btn ghost" type="button" [hidden]="!changeable()" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
               </div>
             }
             @if (showImport()) { <app-activity-import [slotId]="s.id" [groups]="s.rules.groups ?? []" (imported)="afterImport()" /> }
@@ -147,8 +152,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                       <button class="btn danger small" type="button" (click)="deleteActivity(a.id)">{{ i18n.t('common.delete') }}</button>
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
-                      <button class="btn ghost small" type="button" [hidden]="!canEdit()" (click)="editing.set(a.id)">{{ i18n.t('common.edit') }}</button>
-                      <button class="btn ghost small" type="button" [hidden]="!canEdit()" (click)="confirmDelete.set(a.id)">{{ i18n.t('common.delete') }}</button>
+                      <button class="btn ghost small" type="button" [hidden]="!changeable()" (click)="editing.set(a.id)">{{ i18n.t('common.edit') }}</button>
+                      <button class="btn ghost small" type="button" [hidden]="!changeable()" (click)="confirmDelete.set(a.id)">{{ i18n.t('common.delete') }}</button>
                     }
                   </div>
                 </div>
@@ -189,7 +194,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
 
-        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="canEdit()" /> }
+        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" /> }
         @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" /> }
 
         @case ('demo') {
@@ -226,6 +231,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
     .link { align-items: center; gap: 8px }
     .link a { overflow-wrap: anywhere }
     .readonly { border-color: var(--warn); color: var(--warn) }
+    .warn { color: var(--warn) }
     .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px }
     .tabs button { padding: 9px 14px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; color: var(--muted); font-weight: 500 }
     .tabs button.on { color: var(--ink); border-bottom-color: var(--accent) }
@@ -260,6 +266,8 @@ export class AdminSlotPage implements OnInit {
   protected info = inject(AppInfo);
   protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'lists', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
   protected canEdit = computed(() => this.slot()?.canEdit !== false);
+  /** Ended votes are read only; only the settings stay (e.g. to go back while the last date has not passed). */
+  protected changeable = computed(() => this.canEdit() && this.slot()?.phase !== 'Ended');
   /** Pfarrgemeinde admins cannot make a vote read-only for themselves. */
   protected visibilities = computed(() => VISIBILITIES.filter(v => v !== 'JuniaReadOnly' || this.session.account()?.isJuniaAdmin || this.slot()?.visibility === v));
   protected readonly phases = PHASES;
@@ -274,8 +282,8 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; parish: string; organiser: string; visibility: Visibility; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, parish: '', organiser: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; showInterim: boolean; parish: string; organiser: string; visibility: Visibility; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
   protected formGroups: Group[] = [];
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
@@ -289,7 +297,7 @@ export class AdminSlotPage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll,
+      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, showInterim: slot.showInterim,
         parish: slot.parish ?? '', organiser: slot.organiser ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
@@ -325,7 +333,7 @@ export class AdminSlotPage implements OnInit {
   protected saveSettings(): Promise<void> {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
-        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll,
+        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim,
         parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, visibility: this.form.visibility,
         rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });

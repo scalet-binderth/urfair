@@ -5,7 +5,7 @@ public static class DemoData
 {
     public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
 
-    /// <summary>A: no FairSlot, B: two open, C: two open + one published, D: two open + one closed + one published.</summary>
+    /// <summary>A: no FairSlot, B: two in registration, C: two in registration + one published, D: additionally one closed.</summary>
     public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
     public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
     public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
@@ -63,6 +63,17 @@ public static class DemoData
         ("Sommerlager Woche 1 (8–10 Jahre)", 8, ("2027-07-11T10:00", "2027-07-17T12:00", "Jungscharhaus Kirchschlag", 40)),
         ("Sommerlager Woche 2 (11–13 Jahre)", 8, ("2027-07-18T10:00", "2027-07-24T12:00", "Jungscharhaus Kirchschlag", 40)),
         ("Schnuppertage (6–7 Jahre)", 5, ("2027-07-26T09:00", "2027-07-28T16:00", "Pfarrheim St. Magdalena", 20)));
+
+    /// <summary>
+    /// Moves all sessions by whole weeks (weekdays stay) so the first one is on <paramref name="firstDay"/> or within the week after,
+    /// so demo FairSlots fit their phase whenever the demo is reset.
+    /// </summary>
+    public static IReadOnlyList<Activity> MovedTo(this IReadOnlyList<Activity> activities, DateOnly firstDay)
+    {
+        var first = activities.SelectMany(a => a.Sessions).Min(s => s.Start).Date;
+        var shift = TimeSpan.FromDays(7 * Math.Ceiling((firstDay.ToDateTime(TimeOnly.MinValue) - first).TotalDays / 7));
+        return activities.Select(a => a with { Sessions = a.Sessions.Select(s => s with { Start = s.Start + shift, End = s.End + shift }).ToList() }).ToList();
+    }
 
     private static List<Activity> BuildMulti(string prefix, params (string Title, int Popularity, (string Start, string End, string Location, int Capacity)[] Sessions)[] items) =>
         items.Select((x, i) =>
