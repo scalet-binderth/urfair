@@ -27,11 +27,18 @@ export interface ApiError { code: string; args?: Record<string, string | number>
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
 export interface Assignment { activityId: string; title: string; groupId: string | null; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; points: number; isFallback: boolean; locked?: boolean; }
-export interface Participant { ballotId: string; name: string; isSample: boolean; satisfaction: number; assignments: Assignment[]; }
+export interface Participant {
+  ballotId: string; name: string; isSample: boolean; satisfaction: number; assignments: Assignment[];
+  /** Points per activity id from the ballot. */
+  points: Record<string, number | undefined>;
+  /** Session ids as calculated when the allocation was frozen (empty while live). */
+  original: string[];
+}
 export interface MyActivityStatus { activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free'; position: number | null; waitlisted: boolean; start: string | null; end: string | null; flexible: boolean; location: string | null; }
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
 export interface Seat { sessionId: string; locked: boolean; }
+export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats'; person: string | null; before: string | null; after: string | null; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
 export class ApiFailure extends Error {
@@ -141,6 +148,7 @@ export class Api {
   setSeats(id: string, ballotId: string, seats: Seat[]) {
     return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
   }
+  allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`, this.admin())); }
 
   /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
   private admin() { return {}; }

@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
     public DbSet<MailEntity> Mails => Set<MailEntity>();
     public DbSet<AccountEntity> Accounts => Set<AccountEntity>();
     public DbSet<AssignmentEntity> Assignments => Set<AssignmentEntity>();
+    public DbSet<OriginalAssignmentEntity> OriginalAssignments => Set<OriginalAssignmentEntity>();
+    public DbSet<AllocationLogEntity> AllocationLog => Set<AllocationLogEntity>();
     /// <summary>Keys for the sign-in cookies, so they stay valid when the server restarts.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -74,6 +76,26 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
             e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<BallotEntity>().WithMany().HasForeignKey(x => x.BallotId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<SessionEntity>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<OriginalAssignmentEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SessionId).HasMaxLength(40);
+            e.HasIndex(x => x.FairSlotId);
+            e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<BallotEntity>().WithMany().HasForeignKey(x => x.BallotId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<SessionEntity>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AllocationLogEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Actor).HasMaxLength(120);
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Person).HasMaxLength(120);
+            e.Property(x => x.Before).HasMaxLength(1000);
+            e.Property(x => x.After).HasMaxLength(1000);
+            e.HasIndex(x => x.FairSlotId);
+            e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<ActivityEntity>(e =>
         {
