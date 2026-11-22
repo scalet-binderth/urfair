@@ -33,7 +33,8 @@ system assigns the seats:
 - **Frozen allocation**: until frozen, the allocation is recalculated on every request. From "Closed" organisers
   freeze it, move people by hand, lock seats and recalculate the rest; publishing freezes automatically. Freezing
   keeps the original allocation (organisers can go back to it) and a log records every change.
-- **Lists for leaders**: tab "Listen" of a vote, one list per date to print or download as CSV.
+- **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
+  prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
 - **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
 - **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.
@@ -65,8 +66,8 @@ In demo mode the organisation area has a button to reset the whole demo.
 ### Participants and personal links
 
 The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
-`Geburtsdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
-if a date of birth is stored it is asked after the click. Invitations with the link are prepared in the vote's
+`Geburtsdatum`, `Taufdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
+if a date of birth and/or baptism is stored it is asked after the click. Invitations with the link are prepared in the vote's
 "Einladungen" tab: in demo mode as a demo mailbox, otherwise as texts to copy (the app does not send e-mails yet).
 While registration is open the same tab prepares reminders for everyone who has not voted yet; the participant
 list can be filtered to them.
@@ -85,7 +86,7 @@ their own Pfarrgemeinden in Junia-wide votes. In demo mode, three demo accounts 
 
 Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
 (preview first, then add or replace). One row per date; rows with the same title form one activity.
-Columns: `Titel;Beschreibung;Gruppe;Pfarre;Leitung;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too;
+Columns: `Titel;Beschreibung;Gruppe;Pfarre;Leitung;Leitung E-Mail;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too;
 only `Titel` and `Beginn` are required; `Pfarre` and `Leitung` are left empty when they match the vote).
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).

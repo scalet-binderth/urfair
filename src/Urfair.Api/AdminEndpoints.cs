@@ -10,7 +10,7 @@ public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? R
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
     string? Organiser = null, Visibility Visibility = Visibility.JuniaShared);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
-public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null);
+public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
 public record ImportRequest(string? Csv, bool Replace, bool Commit);
@@ -116,7 +116,7 @@ public static class AdminEndpoints
         // ---------- Activities and sessions ----------
 
         admin.MapGet("/slots/{id:guid}/activities", async (Guid id, AppDbContext db) =>
-            (await Database.LoadActivitiesAsync(db, id)).Select(Endpoints.ToDto));
+            (await Database.LoadActivitiesAsync(db, id)).Select(Endpoints.ToAdminDto));
 
         admin.MapPost("/slots/{id:guid}/activities", async (Guid id, ActivityRequest req, AppDbContext db) =>
         {
@@ -169,7 +169,7 @@ public static class AdminEndpoints
             if (slot is null) return Results.NotFound();
             var result = ActivityCsv.Parse(req.Csv ?? "", slot.ToRules().GroupList);
             if (!req.Commit || result.Errors.Count > 0 || result.Activities.Count == 0)
-                return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToDto).ToList(), result.Errors, false));
+                return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), result.Errors, false));
             if (req.Replace && slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
 
             var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
@@ -183,7 +183,7 @@ public static class AdminEndpoints
             foreach (var a in result.Activities) db.Activities.Add(Database.ToEntity(a, id, order++));
             await db.SaveChangesAsync();
             if (req.Replace) await Database.ResetSamplesAsync(db, id); // sample ballots must refer to the new activities
-            return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToDto).ToList(), [], true));
+            return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), [], true));
         });
 
         // ---------- Demand, demo data, allocation ----------
@@ -237,7 +237,7 @@ public static class AdminEndpoints
         var restricted = string.IsNullOrWhiteSpace(req.RestrictedTo) ? null : req.RestrictedTo;
         var sessions = (req.Sessions ?? []).Select(s =>
             new Session(s.Id ?? "", entity.Id, s.Start, s.Flexible ? null : s.End, (s.Location ?? "").Trim(), s.Capacity, s.Flexible)).ToList();
-        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Clean(req.Leader)));
+        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Clean(req.Leader), LeaderEmail: Clean(req.LeaderEmail)));
         if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
         entity.Title = req.Title!.Trim();
@@ -246,6 +246,7 @@ public static class AdminEndpoints
         entity.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
         entity.Parish = ParishOf(req.Parish);
         entity.Leader = Clean(req.Leader);
+        entity.LeaderEmail = Clean(req.LeaderEmail);
         var keep = new List<SessionEntity>();
         foreach (var s in sessions)
         {

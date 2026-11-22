@@ -73,12 +73,14 @@ public class ActivityEntity
     /// <summary>Optional, only when it differs from the FairSlot.</summary>
     public string? Parish { get; set; }
     public string? Leader { get; set; }
+    /// <summary>Where the lists for the leader go; only organisers see it.</summary>
+    public string? LeaderEmail { get; set; }
     public int SortOrder { get; set; }
     public List<SessionEntity> Sessions { get; set; } = [];
 
     public Activity ToModel() => new(Id, Title,
         Sessions.OrderBy(s => s.Start).Select(s => new Session(s.Id, Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(),
-        RestrictedTo, Popularity, GroupId, Description, Parish, Leader);
+        RestrictedTo, Popularity, GroupId, Description, Parish, Leader, LeaderEmail);
 }
 
 public class SessionEntity
@@ -120,6 +122,8 @@ public class ParticipantEntity
     public string Name { get; set; } = "";
     public string? Email { get; set; }
     public DateOnly? BirthDate { get; set; }
+    /// <summary>Optional (e.g. for confirmation); like the date of birth asked after the link click if stored.</summary>
+    public DateOnly? BaptismDate { get; set; }
     /// <summary>Official name of the Pfarrgemeinde (see Parishes), optional.</summary>
     public string? Parish { get; set; }
     /// <summary>Secret part of the personal link /p/{token}.</summary>

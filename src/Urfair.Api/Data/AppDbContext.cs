@@ -106,6 +106,7 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
             e.Property(x => x.Description).HasMaxLength(2000);
             e.Property(x => x.Parish).HasMaxLength(120);
             e.Property(x => x.Leader).HasMaxLength(120);
+            e.Property(x => x.LeaderEmail).HasMaxLength(200);
             e.HasMany(x => x.Sessions).WithOne().HasForeignKey(s => s.ActivityId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<SessionEntity>(e =>

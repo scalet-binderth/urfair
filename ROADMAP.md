@@ -44,6 +44,11 @@ and English; keep both in sync.
   and a column to tick off; print one page per date or download CSV; e-mail addresses only on request and only of
   the own Pfarrgemeinden); "not voted yet" (filter and count in the participant list, copy e-mail addresses for BCC,
   reminder e-mails with the personal link while registration is open)
+- Lists per leader: grouped and filtered by leader, optional dates of birth and baptism, e-mail address of the leader per activity
+  (internal, also in the CSV), "mail to the leaders" prepares one mail per leader with their lists (once frozen, only
+  for accounts that see all participants)
+- Optional date of baptism per participant (by hand and CSV column `Taufdatum`); if stored, the personal link asks for
+  it as well (same lock after wrong tries)
 
 ## Next steps (each ends with a demo that can be shown)
 

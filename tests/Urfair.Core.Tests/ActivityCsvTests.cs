@@ -62,6 +62,19 @@ public class ActivityCsvTests
         Assert.Equal(("Pfarrgemeinde Urfahr-St. Markus", "Eva"), (a[1].Parish, a[1].Leader));
     }
 
+    [Fact]
+    public void Leader_email_is_read_checked_and_written()
+    {
+        const string csv = "Titel;Leitung;Leitung E-Mail;Beginn;Ende\nGrillstand;Eva;eva@example.org;13.06.2027 10:00;13:00\nTombola;Max;kein-mail;13.06.2027 10:00;13:00\n";
+        var result = ActivityCsv.Parse(csv, []);
+        Assert.Equal("eva@example.org", result.Activities[0].LeaderEmail);
+        Assert.Contains(result.Errors, e => e.Code == "emailInvalid" && (int)e.Args!["row"] == 3);
+
+        var again = ActivityCsv.Parse(ActivityCsv.Write([result.Activities[0]], []), []);
+        Assert.Empty(again.Errors);
+        Assert.Equal("eva@example.org", again.Activities[0].LeaderEmail);
+    }
+
     [Theory]
     [InlineData("St. Markus", "Pfarrgemeinde Urfahr-St. Markus")]
     [InlineData("urfahr-hl. geist", "Pfarrgemeinde Urfahr-Hl. Geist")]

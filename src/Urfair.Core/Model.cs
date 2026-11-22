@@ -26,7 +26,8 @@ public sealed record Activity(
     string? GroupId = null,
     string? Description = null,
     string? Parish = null,
-    string? Leader = null)
+    string? Leader = null,
+    string? LeaderEmail = null)
 {
     public int? Seats => Sessions.Any(s => s.Capacity is null) ? null : Sessions.Sum(s => s.Capacity!.Value);
 }

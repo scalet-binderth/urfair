@@ -41,6 +41,8 @@ interface SessionForm { id: string | null; start: string; end: string; location:
           </select></div>
         <div class="field grow"><label [for]="uid + '-leader'">{{ i18n.t('editor.leader') }}</label>
           <input [id]="uid + '-leader'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="leader" /></div>
+        <div class="field grow"><label [for]="uid + '-leader-mail'">{{ i18n.t('editor.leaderEmail') }}</label>
+          <input [id]="uid + '-leader-mail'" type="email" maxlength="200" [placeholder]="i18n.t('editor.leaderEmailHint')" [(ngModel)]="leaderEmail" /></div>
       </div>
 
       <h3>{{ i18n.t('editor.sessions') }}</h3>
@@ -97,6 +99,7 @@ export class ActivityEditor implements OnInit {
   protected description = '';
   protected parish = '';
   protected leader = '';
+  protected leaderEmail = '';
   protected sessions: SessionForm[] = [];
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
@@ -110,6 +113,7 @@ export class ActivityEditor implements OnInit {
       this.description = a.description ?? '';
       this.parish = a.parish ?? '';
       this.leader = a.leader ?? '';
+      this.leaderEmail = a.leaderEmail ?? '';
       this.sessions = a.sessions.map(s => ({ id: s.id, start: toLocalInput(s.start), end: toLocalInput(s.end), location: s.location, capacity: s.capacity, flexible: s.flexible }));
     } else {
       this.addSession();
@@ -129,6 +133,7 @@ export class ActivityEditor implements OnInit {
       description: this.description.trim() || null,
       parish: this.parish.trim() || null,
       leader: this.leader.trim() || null,
+      leaderEmail: this.leaderEmail.trim() || null,
       sessions: this.sessions.map(s => ({
         id: s.id, start: s.start, end: s.flexible ? null : fromLocalInput(s.end), location: s.location.trim(),
         capacity: s.capacity === null || (s.capacity as unknown) === '' ? null : Number(s.capacity), flexible: s.flexible,
