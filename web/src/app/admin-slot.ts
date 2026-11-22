@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
 import { ActivityImport } from './activity-import';
+import { ListsTab } from './lists-tab';
 import { MailboxTab } from './mailbox-tab';
 import { ParticipantsTab } from './participants-tab';
 import { Activity, Api, ApiFailure, Demand, GROUP_COLORS, Group, PHASES, Phase, Rules, Slot, VISIBILITIES, Visibility, fromLocalInput, toLocalInput } from './api';
@@ -12,17 +13,17 @@ import { AppInfo } from './info';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
 
-type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'results' | 'demo';
+type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'results' | 'lists' | 'demo';
 
 /** Organisation view of one FairSlot. */
 @Component({
   selector: 'app-admin-slot',
-  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, MailboxTab, ParticipantsTab, ResultsPage],
+  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, ListsTab, MailboxTab, ParticipantsTab, ResultsPage],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
-    <p><a routerLink="/admin">{{ i18n.t('admin.back') }}</a></p>
+    <p class="no-print"><a routerLink="/admin">{{ i18n.t('admin.back') }}</a></p>
     @if (slot(); as s) {
-      <div class="head">
+      <div class="head no-print">
         <h1>{{ s.name }} <span class="phase" [attr.data-phase]="s.phase">{{ i18n.t('phase.' + s.phase) }}</span></h1>
         <div class="row link">
           <span class="muted small">{{ i18n.t('admin.participantLink') }}:</span>
@@ -31,8 +32,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         </div>
       </div>
 
-      @if (!canEdit()) { <p class="card small readonly">{{ i18n.t('admin.readOnly') }}</p> }
-      <nav class="tabs" role="tablist">
+      @if (!canEdit()) { <p class="card small readonly no-print">{{ i18n.t('admin.readOnly') }}</p> }
+      <nav class="tabs no-print" role="tablist">
         @for (t of tabs; track t) {
           <button type="button" role="tab" [attr.aria-selected]="tab() === t" [class.on]="tab() === t" (click)="show(t)">
             {{ i18n.t('admin.tab.' + t) }}@if (t === 'activities') { ({{ activities().length }}) }
@@ -159,7 +160,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         }
 
         @case ('participants') { <app-participants [slotId]="s.id" [demo]="info.demo()" /> }
-        @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" /> }
+        @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" [open]="s.phase === 'Open'" /> }
 
         @case ('demand') {
           <div class="card stack">
@@ -189,6 +190,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         }
 
         @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="canEdit()" /> }
+        @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" /> }
 
         @case ('demo') {
           <div class="card stack">
@@ -256,7 +258,7 @@ export class AdminSlotPage implements OnInit {
   private toast = inject(Toast);
 
   protected info = inject(AppInfo);
-  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
+  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'lists', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
   protected canEdit = computed(() => this.slot()?.canEdit !== false);
   /** Pfarrgemeinde admins cannot make a vote read-only for themselves. */
   protected visibilities = computed(() => VISIBILITIES.filter(v => v !== 'JuniaReadOnly' || this.session.account()?.isJuniaAdmin || this.slot()?.visibility === v));

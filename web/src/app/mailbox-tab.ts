@@ -15,6 +15,10 @@ import { Toast } from './toast';
       <div class="card stack">
         <p class="muted small">{{ i18n.t(demo() ? 'mail.leadDemo' : 'mail.lead') }}</p>
         <div><button class="btn" type="button" [disabled]="busy()" (click)="create()">{{ i18n.t('mail.create') }}</button></div>
+        @if (open()) {
+          <p class="muted small">{{ i18n.t('mail.remindHint') }}</p>
+          <div><button class="btn ghost" type="button" [disabled]="busy()" (click)="remind()">{{ i18n.t('mail.remind') }}</button></div>
+        }
         @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
       </div>
       @for (m of mails(); track m.id) {
@@ -43,6 +47,8 @@ import { Toast } from './toast';
 export class MailboxTab implements OnInit {
   readonly slotId = input.required<string>();
   readonly demo = input(false);
+  /** Registration is open: reminders can be sent. */
+  readonly open = input(false);
 
   protected i18n = inject(I18n);
   private api = inject(Api);
@@ -57,12 +63,20 @@ export class MailboxTab implements OnInit {
     try { this.mails.set(await this.api.mails(this.slotId())); } catch (e) { this.errors.set(this.i18n.errors(e)); }
   }
 
-  protected async create(): Promise<void> {
+  protected create(): Promise<void> {
+    return this.prepare(() => this.api.createInvitations(this.slotId()), 'mail.created');
+  }
+
+  protected remind(): Promise<void> {
+    return this.prepare(() => this.api.createReminders(this.slotId()), 'mail.reminded');
+  }
+
+  private async prepare(call: () => Promise<{ created: number }>, message: string): Promise<void> {
     this.busy.set(true);
     this.errors.set([]);
     try {
-      const { created } = await this.api.createInvitations(this.slotId());
-      this.toast.show(this.i18n.t('mail.created', { n: created }));
+      const { created } = await call();
+      this.toast.show(this.i18n.t(message, { n: created }));
       await this.load();
     } catch (e) {
       this.errors.set(this.i18n.errors(e));

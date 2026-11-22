@@ -35,7 +35,7 @@ import { Toast } from './toast';
 
       <div class="card stack">
         <div class="row between">
-          <h2>{{ i18n.t('participants.count', { n: filtered().length, v: votedCount() }) }}</h2>
+          <h2>{{ i18n.t('participants.count', { n: inParish().length, v: votedCount() }) }}</h2>
           <div class="row">
             @if (parishesInList().length > 1) {
               <select [(ngModel)]="parishFilter" (ngModelChange)="filter.set($event)" [attr.aria-label]="i18n.t('participants.filter')">
@@ -45,6 +45,10 @@ import { Toast } from './toast';
             }
             <button class="btn ghost small" type="button" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
           </div>
+        </div>
+        <div class="row center">
+          <label class="check"><input type="checkbox" [ngModel]="notVotedOnly()" (ngModelChange)="notVotedOnly.set($event)" />{{ i18n.t('participants.notVotedOnly', { n: notVotedCount() }) }}</label>
+          <button class="btn ghost small" type="button" (click)="copyMails()">{{ i18n.t('participants.copyMails') }}</button>
         </div>
 
         @if (showImport()) {
@@ -98,7 +102,7 @@ import { Toast } from './toast';
               }
             </tbody>
           </table></div>
-        } @else { <p class="muted">{{ i18n.t('admin.noParticipants') }}</p> }
+        } @else if (!inParish().length) { <p class="muted">{{ i18n.t('admin.noParticipants') }}</p> }
       </div>
     </div>
   `,
@@ -106,6 +110,7 @@ import { Toast } from './toast';
     .grow { flex: 1 1 200px }
     .form { align-items: end }
     .between { justify-content: space-between; align-items: center }
+    .center { align-items: center }
     select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px; max-width: 100% }
     .btn.small { padding: 6px 12px; font-size: 14px }
     .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
@@ -128,8 +133,11 @@ export class ParticipantsTab implements OnInit {
   protected list = signal<ListedParticipant[]>([]);
   protected filter = signal('');
   protected parishFilter = '';
-  protected filtered = computed(() => this.list().filter(p => !this.filter() || p.parish === this.filter()));
-  protected votedCount = computed(() => this.filtered().filter(p => p.hasVoted).length);
+  protected notVotedOnly = signal(false);
+  protected inParish = computed(() => this.list().filter(p => !this.filter() || p.parish === this.filter()));
+  protected filtered = computed(() => this.inParish().filter(p => !this.notVotedOnly() || !p.hasVoted));
+  protected votedCount = computed(() => this.inParish().filter(p => p.hasVoted).length);
+  protected notVotedCount = computed(() => this.inParish().length - this.votedCount());
   protected parishesInList = computed(() => [...new Set(this.list().map(p => p.parish).filter((p): p is string => !!p))].sort());
   protected form = { name: '', email: '', birthDate: '', parish: '' };
   protected editing = signal<string | null>(null);
@@ -177,6 +185,16 @@ export class ParticipantsTab implements OnInit {
       this.confirmDelete.set(null);
       await this.load();
     });
+  }
+
+  /** E-mail addresses of the people shown, e.g. to remind them via BCC in one's own mail program. */
+  protected async copyMails(): Promise<void> {
+    const mails = [...new Set(this.filtered().map(p => p.email).filter((m): m is string => !!m))];
+    if (!mails.length) { this.toast.show(this.i18n.t('participants.noMails')); return; }
+    try {
+      await navigator.clipboard.writeText(mails.join('; '));
+      this.toast.show(this.i18n.t('participants.mailsCopied', { n: mails.length }));
+    } catch { /* clipboard blocked */ }
   }
 
   protected async copyLink(p: ListedParticipant): Promise<void> {
