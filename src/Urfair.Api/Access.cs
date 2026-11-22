@@ -71,7 +71,7 @@ public static class Access
 
         var access = For(account, slot);
         http.Items[SlotKey] = access;
-        var participantArea = path.Contains("/participants") || path.EndsWith("/invitations") || path.EndsWith("/mails");
+        var participantArea = path.Contains("/participants") || path.EndsWith("/invitations") || path.EndsWith("/reminders") || path.EndsWith("/mails");
         var change = !HttpMethods.IsGet(http.Request.Method);
         if (change && !participantArea && !access.CanEdit) return Results.Forbid();
         if (participantArea && access.Scope is { Count: 0 }) return Results.Forbid();

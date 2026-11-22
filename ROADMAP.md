@@ -40,6 +40,10 @@ and English; keep both in sync.
   allocations frozen earlier); when moving people the organisers see the person's points and original seats, the
   table shows "Original: ..." where seats differ, "back to the original"; a log records freezing, recalculating,
   unfreezing and every seat change with who and when
+- **Step 4 finished:** lists for activity leaders (new tab "Lists": one list per date with leader, location, seats
+  and a column to tick off; print one page per date or download CSV; e-mail addresses only on request and only of
+  the own Pfarrgemeinden); "not voted yet" (filter and count in the participant list, copy e-mail addresses for BCC,
+  reminder e-mails with the personal link while registration is open)
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -47,7 +51,7 @@ and English; keep both in sync.
 |---|---|---|
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
-| 4 | ~~Freeze the allocation, move by hand, lock, recalculate~~ ✓; ~~names per date~~ ✓; ~~keep the original (points and original seats visible when moving, back to the original, log of changes)~~ ✓; lists for leaders (CSV/print); "not voted yet" | finished lists for activity leaders |
+| 4 ✓ | done, see above | |
 | 5 | New flow (see "Process model"): phases draft → registration → allocation (internal, then visible) → closed → ended; automatic deadline that calculates and freezes; no interim status while registering; points locked during allocation, waiting-list ticks and "give back a seat"; automatic moving up within the group (need before wish); ending after the last date or by hand, reopening | a vote from registration to ended |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 | E-mails from the app (always with a direct link, reply-to the person responsible); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
@@ -94,7 +98,7 @@ original allocation so organisers can see and restore it; a log records every ch
 
 ## Later
 
-- "Together with friends" (switchable per vote; concept still open, see open questions)
+- "Together with friends" (concept decided, see requirement notes)
 - Copy last year's vote as a template
 - Take over participants from another vote
 - "Open to everyone" with an exclusion list (e.g. last year's participants)
@@ -107,6 +111,11 @@ original allocation so organisers can see and restore it; a log records every ch
 - **Cancellations and moving up:** decided, see "Process model"; e-mails come in step 6.
 - **Required staffing:** first fill every date's minimum, preferring people who gave it points; show missing
   people while voting.
+- **Together with friends (decided 22 November 2026):** switchable per vote (off / pairs / groups, default up to 3).
+  A group forms by a code that every member enters (mutual consent, nobody can be added by others). It is only a
+  wish: after the normal allocation, seats are swapped so that the group shares at least one activity, and only an
+  activity every member gave points to; a swap is only made if nobody outside the group loses. Groups are never
+  allocated as a block, so friends cannot crowd out others.
 - **Import:** Excel/CSV instead of PDF (a PDF has no fields; reliable only for one fixed layout).
 - **Participant import:** the list belongs to one vote, never to a Pfarrgemeinde; each person carries a
   Pfarrgemeinde column (short forms recognised, as for activities), so Junia-wide votes such as the Firmung can be
@@ -128,4 +137,4 @@ original allocation so organisers can see and restore it; a log records every ch
 - ~~May one person be admin of several parishes?~~ Yes (an account can have several Pfarrgemeinden).
 - May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes? (proposal: yes, only rows of their own Pfarrgemeinde)
 - Pilot with 20–30 confirmands or the whole year group right away?
-- "Together with friends": pairs or small groups, how many, how strongly may it influence the allocation?
+- ~~"Together with friends": pairs or small groups, how many, how strongly may it influence the allocation?~~ Decided, see requirement notes.

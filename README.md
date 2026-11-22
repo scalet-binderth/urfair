@@ -31,7 +31,9 @@ system assigns the seats:
 - **Vote** (in code: `FairSlot`): one allocation round (e.g. "Confirmation preparation 2026/27") with its own rules, activities, dates, participant list and registrations.
 - **Phase**: Draft → Open (participants can vote) → Closed → Published (participants see their own result).
 - **Frozen allocation**: until frozen, the allocation is recalculated on every request. From "Closed" organisers
-  freeze it, move people by hand, lock seats and recalculate the rest; publishing freezes automatically.
+  freeze it, move people by hand, lock seats and recalculate the rest; publishing freezes automatically. Freezing
+  keeps the original allocation (organisers can go back to it) and a log records every change.
+- **Lists for leaders**: tab "Listen" of a vote, one list per date to print or download as CSV.
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
 - **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
 - **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.
@@ -66,6 +68,8 @@ The participant list of a vote is maintained by hand or imported from CSV (`Name
 `Geburtsdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
 if a date of birth is stored it is asked after the click. Invitations with the link are prepared in the vote's
 "Einladungen" tab: in demo mode as a demo mailbox, otherwise as texts to copy (the app does not send e-mails yet).
+While registration is open the same tab prepares reminders for everyone who has not voted yet; the participant
+list can be filtered to them.
 Outside demo mode participants can only sign in with their link.
 
 ### Organiser accounts and roles

@@ -13,6 +13,10 @@ public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Me
 public record SeatRequest(string SessionId, bool Locked);
 public record SeatsRequest(List<SeatRequest>? Seats);
 public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After);
+public record ListPersonDto(string Name, string? Parish, string? Email);
+public record ListSessionDto(string Id, DateTime Start, DateTime? End, bool Flexible, string Location, int? Capacity, IReadOnlyList<ListPersonDto> People);
+public record ListActivityDto(string Id, string Title, string? Leader, string? GroupId, IReadOnlyList<ListSessionDto> Sessions);
+public record LeaderListsDto(bool Frozen, IReadOnlyList<ListActivityDto> Activities);
 
 /// <summary>
 /// The allocation of a FairSlot. Until it is frozen it is calculated on every request (live, e.g. for the interim status).
@@ -90,6 +94,29 @@ public static class AllocationEndpoints
 			(await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id).ToListAsync())
 				.OrderByDescending(l => l.At).Take(300)
 				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After)));
+
+		// Who goes where, per activity and date, for the activity leaders. E-mail addresses only of participants in the
+		// account's own Pfarrgemeinden (as in the participant list).
+		admin.MapGet("/slots/{id:guid}/allocation/lists", async (Guid id, AppDbContext db, HttpContext http) =>
+		{
+			var slot = await db.FairSlots.FindAsync(id);
+			if (slot is null) return Results.NotFound();
+			var (allocation, activities, ballots) = await CurrentAsync(db, slot);
+			var access = Access.Slot(http);
+			var listed = (await db.Participants.AsNoTracking().Where(p => p.FairSlotId == id).ToListAsync())
+				.GroupBy(p => p.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First());
+			var person = ballots.ToDictionary(b => b.Id.ToString(), b =>
+				listed.GetValueOrDefault(b.Name.ToLowerInvariant()) is { } p
+					? new ListPersonDto(b.Name, p.Parish, access.InScope(p.Parish) ? p.Email : null)
+					: new ListPersonDto(b.Name, null, null));
+			var bySession = allocation.Assignments
+				.SelectMany(kv => kv.Value.Select(x => (x.Session.Id, Person: person[kv.Key])))
+				.GroupBy(x => x.Id)
+				.ToDictionary(g => g.Key, g => (IReadOnlyList<ListPersonDto>)g.Select(x => x.Person).OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
+			return Results.Ok(new LeaderListsDto(slot.FrozenAt is not null, activities.Select(a => new ListActivityDto(a.Id, a.Title, a.Leader, a.GroupId,
+				a.Sessions.OrderBy(s => s.Start).Select(s => new ListSessionDto(s.Id, s.Start, s.End, s.Flexible, s.Location, s.Capacity,
+					bySession.GetValueOrDefault(s.Id, []))).ToList())).ToList()));
+		});
 	}
 
 	/// <summary>Adds a log entry; it is saved with the next SaveChanges.</summary>

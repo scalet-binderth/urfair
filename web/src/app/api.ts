@@ -38,6 +38,10 @@ export interface MyActivityStatus { activityId: string; title: string; groupId: 
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
 export interface Seat { sessionId: string; locked: boolean; }
+export interface ListPerson { name: string; parish: string | null; email: string | null; }
+export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
+export interface ListActivity { id: string; title: string; leader: string | null; groupId: string | null; sessions: ListSession[]; }
+export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
 export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats'; person: string | null; before: string | null; after: string | null; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
@@ -149,6 +153,8 @@ export class Api {
     return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
   }
   allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`, this.admin())); }
+  leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
+  createReminders(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/reminders`, {}, this.admin())); }
 
   /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
   private admin() { return {}; }

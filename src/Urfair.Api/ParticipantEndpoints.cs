@@ -128,6 +128,27 @@ public static class ParticipantEndpoints
             return Results.Ok(new { created = due.Count });
         });
 
+        // Reminder with the personal link for everyone with an e-mail address who has not voted yet (only while registration is open).
+        admin.MapPost("/slots/{id:guid}/reminders", async (Guid id, AppDbContext db, HttpContext ctx, IConfiguration cfg) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            if (slot is null) return Results.NotFound();
+            if (slot.Phase != Phase.Open) return Endpoints.Errors("remindersNeedOpen");
+            var baseUrl = BaseUrl(ctx.Request, cfg);
+            var access = Access.Slot(ctx);
+            var voted = (await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample).Select(b => b.Name).ToListAsync())
+                .Select(n => n.ToLowerInvariant()).ToHashSet();
+            var due = (await db.Participants.Where(p => p.FairSlotId == id && p.Email != null).ToListAsync())
+                .Where(p => access.InScope(p.Parish) && !voted.Contains(p.Name.ToLowerInvariant())).ToList();
+            foreach (var p in due)
+            {
+                db.Mails.Add(Reminder(slot, p, baseUrl));
+                p.InvitedAt ??= DateTime.UtcNow;
+            }
+            await db.SaveChangesAsync();
+            return Results.Ok(new { created = due.Count });
+        });
+
         admin.MapGet("/slots/{id:guid}/mails", async (Guid id, AppDbContext db, HttpContext http) =>
         {
             var access = Access.Slot(http);
@@ -219,6 +240,22 @@ public static class ParticipantEndpoints
     private static string BaseUrl(HttpRequest http, IConfiguration cfg) =>
         cfg["App:BaseUrl"]?.TrimEnd('/') ??
         $"{(http.Host.Host is "localhost" or "127.0.0.1" ? http.Scheme : "https")}://{http.Host}";
+
+    private static MailEntity Reminder(FairSlotEntity slot, ParticipantEntity p, string baseUrl)
+    {
+        var body = new StringBuilder()
+            .Append($"Hallo {p.Name},\n\n")
+            .Append($"für „{slot.Name}“ haben wir von dir noch keine Wahl bekommen. Du verteilst Punkte auf das, was dir wichtig ist; ")
+            .Append("wann du abstimmst, macht keinen Unterschied, nur vor dem Anmeldeschluss muss es sein.\n\n")
+            .Append($"Dein persönlicher Link:\n{baseUrl}/p/{p.Token}\n\n");
+        if (slot.RegistrationDeadline is { } d) body.Append($"Anmeldeschluss: {d:dd.MM.yyyy, HH:mm} Uhr\n");
+        body.Append("\nBitte gib den Link nicht weiter.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
+        return new MailEntity
+        {
+            FairSlotId = slot.Id, ParticipantId = p.Id, To = p.Email!,
+            Subject = $"Erinnerung: {slot.Name}", Body = body.ToString(),
+        };
+    }
 
     private static MailEntity Invitation(FairSlotEntity slot, ParticipantEntity p, string baseUrl)
     {
