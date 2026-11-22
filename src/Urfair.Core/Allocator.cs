@@ -127,6 +127,104 @@ public sealed class Allocator
         return best == 0 ? 1 : Math.Min(1, got / (double)best);
     }
 
+    // ---------- moving up (frozen allocation) ----------
+
+    /// <summary>
+    /// Fills free seats step by step. Need before wish: first people missing a seat in the activity's group (unless they
+    /// declined a replacement) who gave the activity points, then people who ticked it on the waiting list; they give up
+    /// their weakest unfixed seat of the same group if it has fewer points (nothing if they lack a seat there). Within each
+    /// kind more points win, ties by lottery. A seat given up is free again for the next step. Every step adds a seat or
+    /// raises someone's points and nobody loses, so it ends.
+    /// </summary>
+    public List<MoveUp> FillFreeSeats(int perParticipant, int seed)
+    {
+        var rnd = new Random(seed);
+        var lottery = _ballots.ToDictionary(b => b.Id, _ => rnd.NextDouble());
+        var sessions = _activities.SelectMany(a => a.Sessions).ToList();
+        var moves = new List<MoveUp>();
+        for (var step = 0; step < 100_000; step++)
+        {
+            (Ballot Ballot, Session Session, Assignment? GiveUp, bool Need, int Points)? best = null;
+            foreach (var s in sessions.Where(s => Free(s) > 0))
+            foreach (var b in _ballots)
+            {
+                var (possible, giveUp) = Exchange(b, s, perParticipant);
+                if (!possible) continue;
+                var need = giveUp is null && b.WantsReplacement(GroupKey(s.ActivityId));
+                if (!need && !b.Ticked(s.ActivityId)) continue;
+                var points = b.PointsFor(s.ActivityId);
+                if (best is { } x && (x.Need, x.Points, -lottery[x.Ballot.Id]).CompareTo((need, points, -lottery[b.Id])) >= 0) continue;
+                best = (b, s, giveUp, need, points);
+            }
+            if (best is not { } m) break;
+            if (m.GiveUp is { } old)
+            {
+                _assignments[m.Ballot.Id].Remove(old);
+                _load[old.Session.Id] = Load(old.Session) - 1;
+            }
+            Assign(m.Ballot, m.Session);
+            moves.Add(new MoveUp(m.Ballot.Id, m.Session, m.GiveUp?.Session, m.Need));
+        }
+        return moves;
+    }
+
+    /// <summary>
+    /// Whether the person could move into a session of this activity if a seat were free, and which seat of theirs
+    /// would go for it (null if they lack a seat in the group).
+    /// </summary>
+    public (bool Possible, Session? GivesUp) MoveUpFor(Ballot b, Activity activity, int perParticipant)
+    {
+        foreach (var s in activity.Sessions)
+        {
+            var (possible, giveUp) = Exchange(b, s, perParticipant);
+            if (possible) return (true, giveUp?.Session);
+        }
+        return (false, null);
+    }
+
+    /// <summary>Missing seats per group (null = without groups) compared with what everyone gets.</summary>
+    public IReadOnlyList<(ActivityGroup? Group, int Count)> MissingSeats(Ballot b, int perParticipant) =>
+        _groupOf.Count == 0
+            ? _assignments[b.Id].Count < perParticipant ? [(null, perParticipant - _assignments[b.Id].Count)] : []
+            : _groupOf.Values.Distinct()
+                .Select(g => ((ActivityGroup?)g, g.PerParticipant - _assignments[b.Id].Count(x => GroupOf(x.Session.ActivityId) == g)))
+                .Where(x => x.Item2 > 0).ToList();
+
+    /// <summary>Free sessions a person missing a seat in that group may take (also without points), not given back, no clash.</summary>
+    public IEnumerable<Session> OpenSeats(Ballot b, int perParticipant) =>
+        _activities.Where(a => a.RestrictedTo is null || b.Gender is null || a.RestrictedTo == b.Gender)
+            .SelectMany(a => a.Sessions)
+            .Where(s => Free(s) > 0 && SameGroup(b, s.ActivityId).Count < Quota(s.ActivityId, perParticipant) && Fits(b, s));
+
+    /// <summary>Adds a seat (e.g. a free one the person took).</summary>
+    public void Add(string ballotId, Session s) => Assign(_ballots.Single(b => b.Id == ballotId), s);
+
+    /// <summary>Group of an activity for moving up: its id, or "" without a group.</summary>
+    public string GroupKey(string activityId) => GroupOf(activityId)?.Id ?? "";
+
+    private List<Assignment> SameGroup(Ballot b, string activityId) =>
+        _assignments[b.Id].Where(x => GroupKey(x.Session.ActivityId) == GroupKey(activityId)).ToList();
+
+    /// <summary>Seats per person in the activity's group (without groups: all seats).</summary>
+    private int Quota(string activityId, int perParticipant) =>
+        _groupOf.Count == 0 ? perParticipant
+        : GroupOf(activityId)?.PerParticipant ?? Math.Max(0, perParticipant - _groupOf.Values.Distinct().Sum(g => g.PerParticipant));
+
+    /// <summary>
+    /// Moving into a session: only with points, not given back and without a clash. With a full group a seat of it with
+    /// fewer points goes (the weakest, never a fixed one).
+    /// </summary>
+    private (bool Possible, Assignment? GiveUp) Exchange(Ballot b, Session s, int perParticipant)
+    {
+        var points = b.PointsFor(s.ActivityId);
+        if (points <= 0) return (false, null);
+        var same = SameGroup(b, s.ActivityId);
+        if (same.Count < Quota(s.ActivityId, perParticipant)) return (Fits(b, s), null);
+        var giveUp = same.Where(x => !x.Locked && x.Points < points && Fits(b, s, x))
+            .OrderBy(x => x.Points).ThenByDescending(x => x.Session.Start).FirstOrDefault();
+        return (giveUp is not null, giveUp);
+    }
+
     // ---------- internals ----------
 
     private List<Activity> Ranking(Ballot b) => _activities
@@ -138,7 +236,7 @@ public sealed class Allocator
 
     private bool Fits(Ballot b, Session s, Assignment? except = null)
     {
-        if (b.UnavailableSessions.Contains(s.Id)) return false;
+        if (b.UnavailableSessions.Contains(s.Id) || b.HasDeclined(s.ActivityId)) return false;
         foreach (var x in _assignments[b.Id])
         {
             if (ReferenceEquals(x, except)) continue;

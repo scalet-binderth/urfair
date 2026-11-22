@@ -116,6 +116,7 @@ public static class AdminEndpoints
                 AllocationEndpoints.Log(db, http, id, "frozen");
                 await AllocationEndpoints.FreezeAsync(db, slot);
             }
+            await MovingUp.FillAsync(db, slot);
             return Results.NoContent();
         });
 
@@ -149,6 +150,8 @@ public static class AdminEndpoints
             if (entity is null) return Results.NotFound();
             if (Apply(entity, req) is { } error) return error;
             await db.SaveChangesAsync();
+            // More seats while visible: they fill from the waiting list.
+            if (await db.FairSlots.FindAsync(entity.FairSlotId) is { } slot) await MovingUp.FillAsync(db, slot);
             return Results.NoContent();
         });
 

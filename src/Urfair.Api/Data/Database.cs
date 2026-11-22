@@ -107,7 +107,8 @@ public static class Database
     /// C two in registration and one with a visible allocation, D additionally one closed.
     /// B, C and D have already voted in their open FairSlots and can change their ballots.
     /// Dates are relative to the day of seeding, so deadlines and sessions fit the phases whenever the demo is reset.
-    /// "Pfarrfest" shows the interim status during registration.
+    /// "Pfarrfest" shows the interim status during registration; in the visible "Ministrantenausflug" sample people are on
+    /// waiting lists, so a seat given back moves up.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
@@ -166,7 +167,23 @@ public static class Database
             await db.SaveChangesAsync();
         }
         if (Phases.HasAllocation(phase)) await AllocationEndpoints.FreezeAsync(db, slot);
+        if (phase == Phase.Published) await TickWaitlistsAsync(db, slot);
         return slot;
+    }
+
+    /// <summary>Demo: two of three sample people tick the activities they gave more points than their seat, so seats given back move up.</summary>
+    private static async Task TickWaitlistsAsync(AppDbContext db, FairSlotEntity slot)
+    {
+        var rnd = new Random(slot.Seed + 2);
+        var (allocation, _, _) = await AllocationEndpoints.CurrentAsync(db, slot);
+        foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == slot.Id && b.IsSample).ToListAsync())
+        {
+            if (rnd.Next(3) == 0) continue;
+            var lowest = allocation.Assignments[b.Id.ToString()].Select(x => x.Points).DefaultIfEmpty(0).Min();
+            b.Waitlist = b.Points.Where(p => p.Points > lowest && allocation.Assignments[b.Id.ToString()].All(x => x.Session.ActivityId != p.ActivityId))
+                .Select(p => p.ActivityId).ToList();
+        }
+        await db.SaveChangesAsync();
     }
 
     /// <summary>Creates the database rows for a model activity (new ids for the activity and its sessions).</summary>
@@ -227,7 +244,16 @@ public static class Database
             }
         }
         await db.SaveChangesAsync();
-        if (slot.FrozenAt is not null) await AllocationEndpoints.FreezeAsync(db, slot);
+        if (slot.FrozenAt is null) return;
+        // A fresh allocation: seats given back count again.
+        foreach (var b in await db.Ballots.Where(b => b.FairSlotId == slotId).ToListAsync())
+        {
+            b.Declined = [];
+            b.NoReplacement = [];
+        }
+        await db.SaveChangesAsync();
+        await AllocationEndpoints.FreezeAsync(db, slot);
+        if (slot.Phase == Phase.Published) await TickWaitlistsAsync(db, slot);
     }
 
     public static async Task<List<Activity>> LoadActivitiesAsync(AppDbContext db, Guid slotId) =>

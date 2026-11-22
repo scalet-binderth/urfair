@@ -8,7 +8,7 @@ namespace Urfair.Api;
 public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points,
 	bool IsFallback, bool Locked);
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments,
-	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original);
+	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original, IReadOnlyList<string> Waitlist, IReadOnlyList<string> Declined);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
 	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt);
 public record SeatRequest(string SessionId, bool Locked);
@@ -34,12 +34,14 @@ public static class AllocationEndpoints
 		admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
 			await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
 
-		// Fixed seats stay, everything else is allocated again. The original from freezing is kept.
+		// Fixed seats stay, everything else is allocated again. The original from freezing is kept. Only while internal:
+		// once participants see the allocation, free seats move up instead (MovingUp).
 		admin.MapPost("/slots/{id:guid}/allocation/recalculate", async (Guid id, AppDbContext db, HttpContext http) =>
 		{
 			var slot = await db.FairSlots.FindAsync(id);
 			if (slot is null) return Results.NotFound();
 			if (slot.FrozenAt is null) return Endpoints.Errors("notFrozen");
+			if (slot.Phase != Phase.Allocation) return Endpoints.Errors("recalculateInternal");
 			var locked = await db.Assignments.Where(a => a.FairSlotId == id && a.Locked).ToListAsync();
 			Log(db, http, id, "recalculated");
 			await FreezeAsync(db, slot, locked.Select(a => a.ToModel()).ToList());
@@ -64,8 +66,13 @@ public static class AllocationEndpoints
 			var after = SeatText(activities, seats.Select(s => s.SessionId));
 			db.Assignments.RemoveRange(old);
 			db.Assignments.AddRange(seats.Select(s => new AssignmentEntity { FairSlotId = id, BallotId = ballotId, SessionId = s.SessionId, Locked = s.Locked }));
+			// What organisers set counts: a seat they leave missing is not filled on its own (the person can still take a free one).
+			var model = Allocator.FromAssignments(activities, [ballot.ToModel()],
+				seats.Select(s => new FixedAssignment(ballot.Id.ToString(), s.SessionId)), slot.ToRules().Groups);
+			ballot.NoReplacement = model.MissingSeats(ballot.ToModel(), slot.PerParticipant).Select(m => m.Group?.Id ?? "").ToList();
 			if (before != after) Log(db, http, id, "seats", ballot.Name, before, after);
 			await db.SaveChangesAsync();
+			await MovingUp.FillAsync(db, slot);
 			return Results.Ok(await AllocateAsync(db, slot));
 		});
 
@@ -157,10 +164,14 @@ public static class AllocationEndpoints
 
 	/// <summary>Adds a log entry; it is saved with the next SaveChanges.</summary>
 	public static void Log(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null) =>
-		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = Access.Account(http).Name, Kind = kind, Person = person, Before = before, After = after });
+		Log(db, slotId, Access.Account(http).Name, kind, person, before, after);
+
+	/// <summary>Adds a log entry with a given actor (a participant, or Urfair for automatic changes).</summary>
+	public static void Log(AppDbContext db, Guid slotId, string actor, string kind, string? person = null, string? before = null, string? after = null) =>
+		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after });
 
 	/// <summary>Seats as readable text for the log: activity titles in date order, with the date where an activity has several.</summary>
-	static string SeatText(List<Activity> activities, IEnumerable<string> sessionIds)
+	public static string SeatText(List<Activity> activities, IEnumerable<string> sessionIds)
 	{
 		var ids = sessionIds.ToHashSet();
 		return string.Join(", ", activities
@@ -222,6 +233,7 @@ public static class AllocationEndpoints
 		var titles = activities.ToDictionary(a => a.Id, a => a.Title);
 		var groupOf = activities.ToDictionary(a => a.Id, a => a.GroupId);
 		var isSample = entities.ToDictionary(b => b.Id.ToString(), b => b.IsSample);
+		var entity = entities.ToDictionary(b => b.Id.ToString());
 		var original = slot.FrozenAt is null ? [] : (await db.OriginalAssignments.AsNoTracking().Where(a => a.FairSlotId == slot.Id).ToListAsync())
 			.GroupBy(a => a.BallotId.ToString()).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(a => a.SessionId).ToList());
 
@@ -229,7 +241,7 @@ public static class AllocationEndpoints
 			allocation.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
 				x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
 				x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback, x.Locked)).ToList(),
-			b.Points, original.GetValueOrDefault(b.Id, []))).ToList();
+			b.Points, original.GetValueOrDefault(b.Id, []), entity[b.Id].Waitlist, entity[b.Id].Declined)).ToList();
 
 		var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, allocation.Load);
 		// Stored as UTC; the database returns it without a kind.
