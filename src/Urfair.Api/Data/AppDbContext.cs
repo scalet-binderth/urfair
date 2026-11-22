@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Parish).HasMaxLength(120);
             e.Property(x => x.Organiser).HasMaxLength(120);
+            e.Property(x => x.OrganiserEmail).HasMaxLength(200);
             e.Property(x => x.Visibility).HasConversion<string>().HasMaxLength(20).HasDefaultValue(Visibility.JuniaShared);
             e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(20);
             e.HasMany(x => x.Activities).WithOne().HasForeignKey(a => a.FairSlotId).OnDelete(DeleteBehavior.Cascade);
@@ -64,7 +65,10 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.To).HasMaxLength(200);
+            e.Property(x => x.ReplyTo).HasMaxLength(200);
             e.Property(x => x.Subject).HasMaxLength(200);
+            e.Property(x => x.Error).HasMaxLength(500);
+            e.HasIndex(x => new { x.Outbox, x.SentAt });
             e.HasIndex(x => x.FairSlotId);
             e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
         });

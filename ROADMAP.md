@@ -24,7 +24,7 @@ and English; keep both in sync.
 - **Step 2:** participant list per vote with e-mail, date of birth and Pfarrgemeinde (by hand or CSV import/export,
   filter by Pfarrgemeinde); personal link `/p/{token}` with a date-of-birth check (10 wrong tries lock it for 15 minutes),
   afterwards the browser sends token and date with every participant request; outside demo mode only links work;
-  invitations with the link (demo mailbox, otherwise texts to copy until e-mail sending exists)
+  invitations with the link (demo mailbox, otherwise texts to copy; sent by the app since step 6)
 - **Step 3:** organiser accounts (e-mail and password, PBKDF2 hashes, cookie with keys in the database, 10 wrong
   logins lock for 15 minutes); Junia admins create accounts for Junia or one or more Pfarrgemeinden with a one-time
   link to set the password; the first Junia admin of a real instance is created with `Admin__Key`; visibility per vote
@@ -65,6 +65,12 @@ and English; keep both in sync.
   unlocked seat of that group, which fills again (chain). Triggered at once and checked every minute; each step is
   in the log with "Urfair" as actor. Recalculating is only possible in the internal allocation. Organisers see ticks
   and seats given back per person. Demo: the visible "Ministrantenausflug" has full activities and ticked sample people
+- **Step 6, part 1:** e-mails from the app. All mails (invitations, reminders, leader lists, new: allocation and moved
+  up) are kept as an outbox; with a mail server (`Mail__Host`, built-in .NET SMTP client, STARTTLS) and outside demo
+  mode a background job sends them every 20 seconds with retries (1, 5, 30, 120 minutes, then "not sent" with the
+  error and "send again"). Replies go to the optional "E-Mail für Antworten" of the vote. While the allocation is
+  visible, "send the allocation" mails everyone who voted their seats and personal link; whoever moves up gets an
+  e-mail with the new seats. Without a mail server everything stays to copy; the demo always shows the mailbox
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -75,7 +81,7 @@ and English; keep both in sync.
 | 4 ✓ | done, see above | |
 | 5 ✓ | done, see above (still open: choosing a different seat to give up when moving up; for now the weakest one goes) | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
-| 6 | E-mails from the app (always with a direct link, reply-to the person responsible); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
+| 6 | ~~E-mails from the app (always with a direct link, reply-to the person responsible)~~ done (part 1); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection

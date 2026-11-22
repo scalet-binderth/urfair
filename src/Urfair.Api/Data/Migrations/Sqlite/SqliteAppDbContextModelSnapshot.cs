@@ -280,6 +280,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OrganiserEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Parish")
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
@@ -325,6 +329,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -332,10 +339,27 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Outbox")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid?>("ParticipantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReplyTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("SentAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Subject")
@@ -351,6 +375,8 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.HasKey("Id");
 
                     b.HasIndex("FairSlotId");
+
+                    b.HasIndex("Outbox", "SentAt");
 
                     b.ToTable("Mails");
                 });

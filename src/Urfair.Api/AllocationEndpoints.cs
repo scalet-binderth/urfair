@@ -100,7 +100,7 @@ public static class AllocationEndpoints
 			var mails = chosen.Where(a => a.LeaderEmail is not null)
 				.GroupBy(a => a.LeaderEmail!.ToLowerInvariant())
 				.Select(g => LeaderMail(slot, g.ToList(), req)).ToList();
-			db.Mails.AddRange(mails);
+			foreach (var mail in mails) Mailing.Add(db, slot, mail);
 			await db.SaveChangesAsync();
 			return Results.Ok(new { created = mails.Count, withoutEmail = chosen.Count(a => a.LeaderEmail is null) });
 		});

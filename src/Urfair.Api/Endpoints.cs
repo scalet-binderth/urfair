@@ -8,7 +8,7 @@ public record SessionDto(string Id, DateTime Start, DateTime? End, string Locati
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
-    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null);
+    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
@@ -32,7 +32,11 @@ public static class Endpoints
         var api = app.MapGroup("/api");
 
         // Tells the start page whether the organisation area needs an access key.
-        api.MapGet("/info", (IConfiguration cfg) => new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), parishes = Parishes.All });
+        api.MapGet("/info", (IConfiguration cfg, HttpRequest http) =>
+        {
+            Mailing.BaseUrl(http); // remembered for links in mails made without a request
+            return new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), mailSending = Mailing.Enabled, parishes = Parishes.All };
+        });
 
         // Reloads the own previously submitted ballot so it can be changed.
         api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>

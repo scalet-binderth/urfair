@@ -69,8 +69,9 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                     @if (form.parish && !info.parishes().includes(form.parish)) { <option [value]="form.parish">{{ form.parish }}</option> }
                   </select></div>
                 <div class="field grow"><label for="s-organiser">{{ i18n.t('admin.organiser') }}</label><input id="s-organiser" maxlength="120" [(ngModel)]="form.organiser" /></div>
+                <div class="field grow"><label for="s-organiser-email">{{ i18n.t('admin.organiserEmail') }}</label><input id="s-organiser-email" type="email" maxlength="200" [(ngModel)]="form.organiserEmail" /></div>
               </div>
-              <p class="muted small">{{ i18n.t('admin.parishHint') }}</p>
+              <p class="muted small">{{ i18n.t('admin.parishHint') }} {{ i18n.t('admin.organiserEmailHint') }}</p>
               <div class="field"><label for="s-visibility">{{ i18n.t('admin.visibility') }}</label>
                 <select id="s-visibility" [(ngModel)]="form.visibility">
                   @for (v of visibilities(); track v) { <option [value]="v">{{ i18n.t('visibility.' + v) }}</option> }
@@ -165,7 +166,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         }
 
         @case ('participants') { <app-participants [slotId]="s.id" [demo]="info.demo()" /> }
-        @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" [open]="s.phase === 'Open'" /> }
+        @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" [sending]="info.mailSending()" [phase]="s.phase" /> }
 
         @case ('demand') {
           <div class="card stack">
@@ -282,8 +283,8 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; showInterim: boolean; parish: string; organiser: string; visibility: Visibility; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; showInterim: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
   protected formGroups: Group[] = [];
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
@@ -298,7 +299,7 @@ export class AdminSlotPage implements OnInit {
       this.slot.set(slot);
       this.activities.set(activities);
       this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, showInterim: slot.showInterim,
-        parish: slot.parish ?? '', organiser: slot.organiser ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
+        parish: slot.parish ?? '', organiser: slot.organiser ?? '', organiserEmail: slot.organiserEmail ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
@@ -334,7 +335,7 @@ export class AdminSlotPage implements OnInit {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
         name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim,
-        parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, visibility: this.form.visibility,
+        parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, organiserEmail: this.form.organiserEmail.trim() || null, visibility: this.form.visibility,
         rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));
