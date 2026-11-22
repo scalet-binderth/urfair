@@ -142,6 +142,10 @@ const texts: Record<Lang, Record<string, string>> = {
     'results.seat': 'Termin', 'results.lock': 'fixiert', 'results.locked': 'Fixiert: bleibt beim Neu-Rechnen',
     'results.removeSeat': 'Platz entfernen', 'results.addSeat': 'Platz hinzufügen',
     'results.editHint': 'Geänderte Plätze werden fixiert. Volle Termine dürfen bewusst überbucht werden (dann orange).',
+    'results.original': 'Original: {seats}', 'results.originalMark': 'Original', 'results.restore': 'Zurück zum Original',
+    'results.pts': '{n} P.', 'results.pointsOf': 'Punkte: {list}', 'results.noPoints': 'Keine Punkte vergeben.',
+    'log.title': 'Protokoll', 'log.frozen': 'Zuteilung festgeschrieben (Original gespeichert).', 'log.recalculated': 'Neu gerechnet (fixierte Plätze bleiben).',
+    'log.unfrozen': 'Festschreibung aufgehoben.', 'log.seats': '{person}: {before} → {after}',
 
     'error.nameRequired': 'Bitte gib einen Namen an.',
     'error.unknownActivity': 'Unbekannte Veranstaltung.',
@@ -392,6 +396,10 @@ const texts: Record<Lang, Record<string, string>> = {
     'results.seat': 'Date', 'results.lock': 'fixed', 'results.locked': 'Fixed: kept when recalculating',
     'results.removeSeat': 'Remove seat', 'results.addSeat': 'Add seat',
     'results.editHint': 'Changed seats are fixed. Full dates may be overbooked on purpose (then shown in orange).',
+    'results.original': 'Original: {seats}', 'results.originalMark': 'original', 'results.restore': 'Back to original',
+    'results.pts': '{n} pts', 'results.pointsOf': 'Points: {list}', 'results.noPoints': 'No points given.',
+    'log.title': 'Log', 'log.frozen': 'Allocation frozen (original kept).', 'log.recalculated': 'Recalculated (fixed seats stay).',
+    'log.unfrozen': 'Allocation unfrozen.', 'log.seats': '{person}: {before} → {after}',
 
     'error.nameRequired': 'Please enter a name.',
     'error.unknownActivity': 'Unknown activity.',

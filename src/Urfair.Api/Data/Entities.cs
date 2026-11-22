@@ -166,6 +166,31 @@ public class AssignmentEntity
     public FixedAssignment ToModel() => new(BallotId.ToString(), SessionId, Locked);
 }
 
+/// <summary>A seat as calculated when the allocation was frozen, so organisers can see and restore it after moving people.</summary>
+public class OriginalAssignmentEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public Guid BallotId { get; set; }
+    public string SessionId { get; set; } = "";
+}
+
+/// <summary>One change to a frozen allocation (who, when, what). Deleted with its FairSlot.</summary>
+public class AllocationLogEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public DateTime At { get; set; } = DateTime.UtcNow;
+    /// <summary>Name of the organiser account.</summary>
+    public string Actor { get; set; } = "";
+    /// <summary>frozen, recalculated, unfrozen or seats.</summary>
+    public string Kind { get; set; } = "";
+    /// <summary>For <c>seats</c>: the participant and their seats before and after (activity titles, with date if needed).</summary>
+    public string? Person { get; set; }
+    public string? Before { get; set; }
+    public string? After { get; set; }
+}
+
 public static class Ids
 {
     /// <summary>Short random id for activities and sessions.</summary>

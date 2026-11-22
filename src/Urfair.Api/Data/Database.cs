@@ -75,6 +75,17 @@ public static class Database
         foreach (var p in withoutToken) p.Token = ParticipantEntity.NewToken();
         if (withoutToken.Count > 0) await db.SaveChangesAsync();
 
+        // Allocations frozen before the original was kept: the stored seats become the original.
+        var frozenIds = await db.FairSlots.Where(s => s.FrozenAt != null).Select(s => s.Id).ToListAsync();
+        var withOriginal = await db.OriginalAssignments.Select(a => a.FairSlotId).Distinct().ToListAsync();
+        var missing = frozenIds.Except(withOriginal).ToList();
+        if (missing.Count > 0)
+        {
+            db.OriginalAssignments.AddRange((await db.Assignments.AsNoTracking().Where(a => missing.Contains(a.FairSlotId)).ToListAsync())
+                .Select(a => new OriginalAssignmentEntity { FairSlotId = a.FairSlotId, BallotId = a.BallotId, SessionId = a.SessionId }));
+            await db.SaveChangesAsync();
+        }
+
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         if (IsDemo(config))
         {

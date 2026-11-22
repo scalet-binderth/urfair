@@ -96,7 +96,11 @@ public static class AdminEndpoints
             await db.SaveChangesAsync();
             if (rulesChanged) await Database.ResetSamplesAsync(db, id); // sample ballots must follow the new rules
             // Participants must see a result that no longer changes.
-            if (slot.Phase == Phase.Published && slot.FrozenAt is null) await AllocationEndpoints.FreezeAsync(db, slot);
+            if (slot.Phase == Phase.Published && slot.FrozenAt is null)
+            {
+                AllocationEndpoints.Log(db, http, id, "frozen");
+                await AllocationEndpoints.FreezeAsync(db, slot);
+            }
             return Results.NoContent();
         });
 

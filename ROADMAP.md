@@ -36,6 +36,10 @@ and English; keep both in sync.
   (not while published); while frozen the vote cannot go back to draft/open, rules cannot change and activities
   cannot be replaced by an import; participants and the interim status see the stored allocation
 - Utilisation shows who is assigned to each date (click to expand, tooltip on hover)
+- Keep the original: freezing stores the calculated allocation (kept when recalculating, filled in at start-up for
+  allocations frozen earlier); when moving people the organisers see the person's points and original seats, the
+  table shows "Original: ..." where seats differ, "back to the original"; a log records freezing, recalculating,
+  unfreezing and every seat change with who and when
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -43,7 +47,7 @@ and English; keep both in sync.
 |---|---|---|
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
-| 4 | ~~Freeze the allocation, move by hand, lock, recalculate~~ ✓; ~~names per date~~ ✓; keep the original (points and original seats visible when moving, back to the original, log of changes); lists for leaders (CSV/print); "not voted yet" | finished lists for activity leaders |
+| 4 | ~~Freeze the allocation, move by hand, lock, recalculate~~ ✓; ~~names per date~~ ✓; ~~keep the original (points and original seats visible when moving, back to the original, log of changes)~~ ✓; lists for leaders (CSV/print); "not voted yet" | finished lists for activity leaders |
 | 5 | New flow (see "Process model"): phases draft → registration → allocation (internal, then visible) → closed → ended; automatic deadline that calculates and freezes; no interim status while registering; points locked during allocation, waiting-list ticks and "give back a seat"; automatic moving up within the group (need before wish); ending after the last date or by hand, reopening | a vote from registration to ended |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 | E-mails from the app (always with a direct link, reply-to the person responsible); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |

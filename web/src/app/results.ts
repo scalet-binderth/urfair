@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, Allocation, Api, ApiFailure, Metrics, Participant, Phase, Seat } from './api';
+import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Participant, Phase, Seat } from './api';
 import { I18n } from './i18n';
 import { Toast } from './toast';
 
@@ -168,18 +168,25 @@ interface Card {
                     <td>
                       @if (editingId() === p.ballotId) {
                         <div class="seats">
+                          <p class="muted small">{{ pointsText(p) }}</p>
                           @for (seat of seats; track $index; let i = $index) {
                             <div class="row seat">
                               <select [attr.aria-label]="i18n.t('results.seat')" [ngModel]="seat.sessionId" (ngModelChange)="seat.sessionId = $event; seat.locked = true">
-                                @for (o of sessionOptions(); track o.id) { <option [value]="o.id">{{ o.label }}</option> }
+                                @for (o of editOptions; track o.id) { <option [value]="o.id">{{ o.label }}</option> }
                               </select>
                               <label class="check small"><input type="checkbox" [(ngModel)]="seat.locked" />{{ i18n.t('results.lock') }}</label>
                               <button class="btn ghost small" type="button" [attr.aria-label]="i18n.t('results.removeSeat')" (click)="seats.splice(i, 1)">✕</button>
                             </div>
                           }
+                          @if (p.original.length) {
+                            <p class="muted small">{{ i18n.t('results.original', { seats: seatText(p.original) }) }}</p>
+                          }
                           <p class="muted small">{{ i18n.t('results.editHint') }}</p>
                           <div class="row">
                             <button class="btn ghost small" type="button" (click)="addSeat()">{{ i18n.t('results.addSeat') }}</button>
+                            @if (p.original.length) {
+                              <button class="btn ghost small" type="button" (click)="restore(p)">{{ i18n.t('results.restore') }}</button>
+                            }
                             <button class="btn small" type="button" [disabled]="busy()" (click)="saveSeats(p.ballotId)">{{ i18n.t('common.save') }}</button>
                             <button class="btn ghost small" type="button" (click)="editingId.set(null)">{{ i18n.t('common.cancel') }}</button>
                           </div>
@@ -195,6 +202,9 @@ interface Card {
                           >
                         }
                       </div>
+                      @if (changed(p)) {
+                        <p class="muted small orig">{{ i18n.t('results.original', { seats: seatText(p.original) }) }}</p>
+                      }
                       }
                     </td>
                     <td>
@@ -219,6 +229,20 @@ interface Card {
             </button>
           }
         </div>
+
+        @if (log().length) {
+          <div class="card stack">
+            <h2>{{ i18n.t('log.title') }}</h2>
+            <ul class="log">
+              @for (l of log(); track $index) {
+                <li>
+                  <span class="muted small">{{ i18n.date(l.at) }} · {{ l.actor }}</span><br />
+                  {{ i18n.t('log.' + l.kind, { person: l.person ?? '', before: l.before || '–', after: l.after || '–' }) }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
       </div>
     } @else if (!error()) {
       <p class="muted">{{ i18n.t('common.loading') }}</p>
@@ -255,6 +279,21 @@ interface Card {
       background: var(--warn);
     }
     .seats {
+      display: grid;
+      gap: 6px;
+    }
+    .seats p,
+    p.orig {
+      margin: 0;
+    }
+    p.orig {
+      margin-top: 4px;
+    }
+    .log {
+      margin: 0;
+      padding-left: 18px;
+      max-height: 360px;
+      overflow: auto;
       display: grid;
       gap: 6px;
     }
@@ -449,6 +488,9 @@ export class ResultsPage implements OnInit {
   protected confirmUnfreeze = signal(false);
   protected editingId = signal<string | null>(null);
   protected seats: Seat[] = [];
+  /** Session choices for the person being edited, with their points and original seats. */
+  protected editOptions: { id: string; activityId: string; label: string }[] = [];
+  protected log = signal<LogEntry[]>([]);
 
   protected editable = computed(() => !!this.data()?.frozenAt && this.canEdit());
   protected lockedCount = computed(() =>
@@ -526,6 +568,7 @@ export class ResultsPage implements OnInit {
       const [data, activities] = await Promise.all([this.api.allocation(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.data.set(data);
       this.activities.set(activities);
+      await this.loadLog();
     } catch (e) {
       this.error.set(
         e instanceof ApiFailure ? this.i18n.error(e.errors[0]) : this.i18n.t('error.generic'),
@@ -557,12 +600,59 @@ export class ResultsPage implements OnInit {
 
   protected edit(p: Participant): void {
     this.seats = p.assignments.map((x) => ({ sessionId: x.sessionId, locked: !!x.locked }));
+    const original = new Set(p.original);
+    this.editOptions = this.sessionOptions().map((o) => {
+      const pts = p.points[o.activityId] ?? 0;
+      const extra = [pts ? this.i18n.t('results.pts', { n: pts }) : '', original.has(o.id) ? this.i18n.t('results.originalMark') : '']
+        .filter((x) => x).join(' · ');
+      return { ...o, label: extra ? `${o.label} · ${extra}` : o.label };
+    });
     this.editingId.set(p.ballotId);
+  }
+
+  /** Puts the seats back as calculated when freezing (not fixed); saving makes it count. */
+  protected restore(p: Participant): void {
+    this.seats = p.original.map((sessionId) => ({ sessionId, locked: false }));
+  }
+
+  /** True if the seats differ from the original (only once frozen). */
+  protected changed(p: Participant): boolean {
+    if (!this.data()?.frozenAt) return false;
+    const now = p.assignments.map((x) => x.sessionId);
+    return now.length !== p.original.length || now.some((id) => !p.original.includes(id));
+  }
+
+  /** "Title (date)" for session ids, the date only where an activity has several sessions. */
+  protected seatText(sessionIds: string[]): string {
+    if (!sessionIds.length) return '–';
+    return this.activities()
+      .flatMap((a) => a.sessions.filter((s) => sessionIds.includes(s.id)).map((s) => ({ a, s })))
+      .sort((x, y) => x.s.start.localeCompare(y.s.start))
+      .map(({ a, s }) => (a.sessions.length > 1 ? `${a.title} (${this.i18n.when(s)})` : a.title))
+      .join(', ');
+  }
+
+  /** The person's points, highest first. */
+  protected pointsText(p: Participant): string {
+    const list = this.activities()
+      .map((a) => ({ title: a.title, n: p.points[a.id] ?? 0 }))
+      .filter((x) => x.n > 0)
+      .sort((x, y) => y.n - x.n)
+      .map((x) => `${x.title} ${x.n}`);
+    return list.length ? this.i18n.t('results.pointsOf', { list: list.join(' · ') }) : this.i18n.t('results.noPoints');
+  }
+
+  private async loadLog(): Promise<void> {
+    try {
+      this.log.set(await this.api.allocationLog(this.slotId()));
+    } catch {
+      this.log.set([]);
+    }
   }
 
   /** Adds a seat in the first activity the person does not have yet. */
   protected addSeat(): void {
-    const options = this.sessionOptions();
+    const options = this.editOptions;
     const activityOf = new Map(options.map((o) => [o.id, o.activityId]));
     const used = new Set(this.seats.map((s) => activityOf.get(s.sessionId)));
     const next = options.find((o) => !used.has(o.activityId)) ?? options[0];
@@ -581,6 +671,7 @@ export class ResultsPage implements OnInit {
       this.editingId.set(null);
       this.confirmUnfreeze.set(false);
       this.toast.show(this.i18n.t(message));
+      await this.loadLog();
     } catch (e) {
       this.error.set(this.i18n.errors(e).join(' '));
     } finally {
