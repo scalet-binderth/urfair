@@ -8,7 +8,7 @@ public record CreateSlotRequest(string Name, bool WithSampleData);
 public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
     string? Parish, Visibility Visibility, bool CanEdit);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
-    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false);
+    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false, string? OrganiserEmail = null);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -55,7 +55,9 @@ public static class AdminEndpoints
         });
 
         admin.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg, HttpContext http) =>
-            await Endpoints.ToDto(db, id, cfg) is { } dto ? Results.Ok(dto with { CanEdit = Access.Slot(http).CanEdit }) : Results.NotFound());
+            await Endpoints.ToDto(db, id, cfg) is { } dto
+                ? Results.Ok(dto with { CanEdit = Access.Slot(http).CanEdit, OrganiserEmail = await db.FairSlots.Where(s => s.Id == id).Select(s => s.OrganiserEmail).SingleAsync() })
+                : Results.NotFound());
 
         admin.MapPut("/slots/{id:guid}", async (Guid id, UpdateSlotRequest req, AppDbContext db, HttpContext http) =>
         {
@@ -80,6 +82,8 @@ public static class AdminEndpoints
                 errors.Add(new ValidationError("visibilityNotAllowed"));
             if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
+            if (Clean(req.OrganiserEmail) is { } organiserEmail && !ParticipantCsv.IsEmail(organiserEmail))
+                errors.Add(new ValidationError("emailInvalid"));
             // A frozen allocation must stay valid: no other rules. Back to registration only from the internal allocation
             // (it is unfrozen then); once participants have seen it, it stays.
             var rulesChanged = slot.ToRules() != rules;
@@ -96,7 +100,7 @@ public static class AdminEndpoints
 
             var before = slot.Phase;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
-            (slot.Parish, slot.Organiser, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), req.Visibility);
+            (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();

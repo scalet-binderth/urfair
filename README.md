@@ -75,9 +75,12 @@ In demo mode the organisation area has a button to reset the whole demo.
 The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
 `Geburtsdatum`, `Taufdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
 if a date of birth and/or baptism is stored it is asked after the click. Invitations with the link are prepared in the vote's
-"Einladungen" tab: in demo mode as a demo mailbox, otherwise as texts to copy (the app does not send e-mails yet).
+"Einladungen" tab: in demo mode as a demo mailbox; on a real instance the app sends them itself if a mail server is
+set up (see `Mail__*` below), otherwise they are texts to copy. Each mail shows its status (waiting, sent, not sent with
+the error and "send again"). Replies go to the vote's "E-Mail für Antworten" (settings, optional).
 While registration is open the same tab prepares reminders for everyone who has not voted yet; the participant
-list can be filtered to them.
+list can be filtered to them. While the allocation is visible it sends everyone who voted their seats; whoever moves up
+gets an e-mail by themselves.
 Outside demo mode participants can only sign in with their link.
 
 ### Organiser accounts and roles
@@ -108,7 +111,15 @@ Tests: `dotnet test Urfair.slnx`
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
 | `Admin__Key` | Real instance only: creates the very first Junia admin account (start page, while no account exists); afterwards only for the emergency access ("Notfall-Zugang": new one-time link for an existing Junia admin). Keep it secret. |
 | `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
-| `App__BaseUrl` | Public address used in invitation links (e.g. `https://urfair-prod.onrender.com`). Default: the request host. |
+| `App__BaseUrl` | Public address used in links in e-mails (e.g. `https://urfair-prod.onrender.com`). Default: the request host (remembered for mails made in the background). Recommended on a real instance. |
+| `Mail__Host` | SMTP server. If set (and `Demo__Enabled=false`), the app sends its e-mails itself; in demo mode they always stay in the demo mailbox. |
+| `Mail__Port` | SMTP port, default `587` (STARTTLS). Implicit TLS on port 465 is not supported. |
+| `Mail__User`, `Mail__Password` | SMTP login (optional). Keep the password secret. |
+| `Mail__From`, `Mail__FromName` | Sender address (default `Mail__User`) and name (default `Urfair`). |
+| `Mail__Ssl` | `true` (default): STARTTLS. `false` only for a local test server. |
+
+E-mails are kept in the database as an outbox and sent in the background every 20 seconds; failed attempts are retried
+after 1, 5, 30 and 120 minutes, then they are shown as "not sent" until an organiser clicks "send again".
 
 See [ROADMAP.md](ROADMAP.md) for the plan and [CLAUDE.md](CLAUDE.md) for the working rules of this project.
 

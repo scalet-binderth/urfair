@@ -288,6 +288,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("OrganiserEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Parish")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -333,6 +337,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasColumnType("text");
@@ -340,11 +347,28 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("Outbox")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("ParticipantId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ReplyTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("Subject")
                         .IsRequired()
@@ -359,6 +383,8 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.HasKey("Id");
 
                     b.HasIndex("FairSlotId");
+
+                    b.HasIndex("Outbox", "SentAt");
 
                     b.ToTable("Mails");
                 });

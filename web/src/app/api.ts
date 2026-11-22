@@ -9,12 +9,12 @@ export interface Group { id: string; name: string; perParticipant: number; minAc
 export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail: string | null; }
-export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; }
+export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; organiserEmail: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; }
 export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
 export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
@@ -22,7 +22,9 @@ export interface AccountInput { email: string; name: string; isJuniaAdmin: boole
 export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; }
 export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; baptismDate: string | null; parish: string | null; }
 export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
-export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; }
+/** manual: copied by hand; pending: waiting to be sent (also after an error); sent; failed: gave up. */
+export type MailStatus = 'manual' | 'pending' | 'sent' | 'failed';
+export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; status: MailStatus; sentAt: string | null; error: string | null; replyTo: string | null; }
 /** check = confirmed date of birth, baptism = confirmed date of baptism ('' if none is asked). */
 export interface ParticipantLink { token: string; check: string; baptism?: string; }
 export interface LinkInfo { slotId: string; slotName: string; needsCheck: boolean; needsBaptism: boolean; }
@@ -81,7 +83,7 @@ export class Api {
   deleteAccount(id: string) { return this.call(this.http.delete(`/api/admin/accounts/${id}`)); }
 
   // ---------- general ----------
-  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; parishes: string[] }>('/api/info')); }
+  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[] }>('/api/info')); }
 
   // ---------- participants ----------
   /** Personal link of the signed-in participant (token and confirmed dates of birth and baptism), sent with participant requests. */
@@ -174,6 +176,8 @@ export class Api {
     return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body, this.admin()));
   }
   createReminders(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/reminders`, {}, this.admin())); }
+  createResultMails(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/result-mails`, {}, this.admin())); }
+  retryMail(id: string, mailId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/mails/${mailId}/retry`, {}, this.admin())); }
 
   /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
   private admin() { return {}; }

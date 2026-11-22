@@ -40,6 +40,8 @@ public class FairSlotEntity
     /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>
     public string? Parish { get; set; }
     public string? Organiser { get; set; }
+    /// <summary>Replies to the app's e-mails go here (optional; only organisers see it).</summary>
+    public string? OrganiserEmail { get; set; }
     public Visibility Visibility { get; set; } = Visibility.JuniaShared;
     /// <summary>Set when the allocation is frozen: from then on the stored <see cref="AssignmentEntity"/> rows count, nothing is recalculated on its own.</summary>
     public DateTime? FrozenAt { get; set; }
@@ -146,8 +148,8 @@ public class ParticipantEntity
 }
 
 /// <summary>
-/// A message prepared by the app (e.g. an invitation with the personal link). Not sent automatically: in demo mode it is
-/// shown in the demo mailbox, in real use organisers copy it into their own mail program until e-mail sending exists.
+/// A message prepared by the app (e.g. an invitation with the personal link), kept as an outbox (see <see cref="Mailing"/>).
+/// With a mail server set up it is sent in the background; otherwise it is shown in the demo mailbox or copied by the organisers.
 /// </summary>
 public class MailEntity
 {
@@ -155,9 +157,18 @@ public class MailEntity
     public Guid FairSlotId { get; set; }
     public Guid? ParticipantId { get; set; }
     public string To { get; set; } = "";
+    /// <summary>Replies go to the vote's person responsible.</summary>
+    public string? ReplyTo { get; set; }
     public string Subject { get; set; } = "";
     public string Body { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>To be sent by the app (a mail server was set up when it was created); otherwise copied by hand.</summary>
+    public bool Outbox { get; set; }
+    public DateTime? SentAt { get; set; }
+    /// <summary>Failed sending attempts; the last error is kept and the next attempt waits longer.</summary>
+    public int Attempts { get; set; }
+    public DateTime? NextAttemptAt { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>Points a ballot gives to one activity (owned by <see cref="BallotEntity"/>).</summary>

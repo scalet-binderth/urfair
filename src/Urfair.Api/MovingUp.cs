@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Urfair.Api.Data;
 using Urfair.Core;
@@ -22,10 +23,12 @@ public static class MovingUp
 		if (moves.Count == 0) return 0;
 
 		var byId = ballots.ToDictionary(b => b.Id.ToString());
+		var seatsBefore = new Dictionary<Guid, HashSet<string>>();
 		foreach (var m in moves)
 		{
 			var ballot = byId[m.BallotId];
 			var seats = stored.Where(a => a.BallotId == ballot.Id).ToList();
+			seatsBefore.TryAdd(ballot.Id, seats.Select(a => a.SessionId).ToHashSet());
 			var before = AllocationEndpoints.SeatText(activities, seats.Select(a => a.SessionId));
 			if (m.GaveUp is { } old && seats.FirstOrDefault(a => a.SessionId == old.Id) is { } gone)
 			{
@@ -39,7 +42,35 @@ public static class MovingUp
 			var after = AllocationEndpoints.SeatText(activities, stored.Where(a => a.BallotId == ballot.Id).Select(a => a.SessionId));
 			AllocationEndpoints.Log(db, slot.Id, Phases.Clock, "movedUp", ballot.Name, before, after);
 		}
+		await NotifyAsync(db, slot, activities, stored, ballots.Where(b => seatsBefore.ContainsKey(b.Id)).ToList(), seatsBefore);
 		await db.SaveChangesAsync();
 		return moves.Count;
+	}
+
+	/// <summary>Everyone who moved up and is on the participant list with an e-mail address gets their new seats.</summary>
+	static async Task NotifyAsync(AppDbContext db, FairSlotEntity slot, List<Activity> activities, List<AssignmentEntity> stored,
+		List<BallotEntity> moved, Dictionary<Guid, HashSet<string>> seatsBefore)
+	{
+		var listed = (await db.Participants.Where(p => p.FairSlotId == slot.Id && p.Email != null).ToListAsync())
+			.GroupBy(p => p.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First());
+		foreach (var ballot in moved)
+		{
+			if (!listed.TryGetValue(ballot.Name.ToLowerInvariant(), out var p)) continue;
+			var before = seatsBefore[ballot.Id];
+			var after = stored.Where(a => a.BallotId == ballot.Id).Select(a => a.SessionId).ToHashSet();
+			var gained = AllocationEndpoints.SeatText(activities, after.Except(before));
+			if (gained.Length == 0) continue; // moved up and back within one chain
+			var lost = AllocationEndpoints.SeatText(activities, before.Except(after));
+			var body = new StringBuilder()
+				.Append($"Hallo {p.Name},\n\n")
+				.Append($"bei „{slot.Name}“ ist ein Platz frei geworden und du bist nachgerückt: {gained}.\n");
+			if (lost.Length > 0) body.Append($"Dafür hast du deinen Platz bei {lost} abgegeben, wie bei deiner Vormerkung angegeben.\n");
+			body.Append($"\nDeine Plätze jetzt: {AllocationEndpoints.SeatText(activities, after)}\n\n");
+			body.Append(Mailing.KnownBaseUrl is { } url
+				? $"Alle Termine siehst du unter deinem persönlichen Link:\n{url}/p/{p.Token}\n\nBitte gib den Link nicht weiter.\n\n"
+				: "Alle Termine siehst du unter deinem persönlichen Link aus der Einladung.\n\n");
+			body.Append(slot.Organiser ?? "Dein Organisationsteam");
+			Mailing.Add(db, slot, new MailEntity { ParticipantId = p.Id, To = p.Email!, Subject = $"Nachgerückt: {slot.Name}", Body = body.ToString() });
+		}
 	}
 }

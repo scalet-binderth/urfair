@@ -10,6 +10,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 builder.Services.AddHealthChecks();
 builder.Services.AddMemoryCache(); // counts failed link checks and logins
 builder.Services.AddHostedService<PhaseClock>(); // registration deadline and end after the last date
+builder.Services.AddHostedService<MailSender>(); // outbox, only with a mail server (Mail:Host) outside demo mode
 builder.AddAppAuthentication();
 // Keys for the sign-in cookies live in the database, so sign-ins survive restarts of the (free) server.
 builder.Services.AddDataProtection().SetApplicationName("Urfair").PersistKeysToDbContext<AppDbContext>();
@@ -17,6 +18,7 @@ builder.Services.AddDataProtection().SetApplicationName("Urfair").PersistKeysToD
 var app = builder.Build();
 
 await Database.InitialiseAsync(app.Services, app.Logger);
+Mailing.Configure(app.Configuration, app.Logger);
 
 // The Angular app is built into wwwroot; unknown paths fall back to index.html (client-side routing).
 app.UseDefaultFiles();
