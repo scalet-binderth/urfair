@@ -103,36 +103,42 @@ public static class Database
     }
 
     /// <summary>
-    /// Five demo FairSlots for presentations. Demo people: A sees nothing, B two open FairSlots,
-    /// C two open and one published, D two open, one closed and one published.
+    /// Five demo FairSlots for presentations, one per phase. Demo people: A sees nothing, B two in registration,
+    /// C two in registration and one with a visible allocation, D additionally one closed.
     /// B, C and D have already voted in their open FairSlots and can change their ballots.
-    /// "Pfarrfest" has no sample ballots, to try voting live.
+    /// Dates are relative to the day of seeding, so deadlines and sessions fit the phases whenever the demo is reset.
+    /// "Pfarrfest" shows the interim status during registration.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
-        await CreateSlotAsync(db, "Firmvorbereitung Urfahr 2026/27 (Demo)", Phase.Open, new DateTime(2026, 11, 18, 23, 59, 0),
-            SampleData.FirmungRules, SampleData.Activities(), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
-        await CreateSlotAsync(db, "Ministrantenausflug Herbst 2026", Phase.Published, new DateTime(2026, 9, 15, 23, 59, 0),
-            DemoData.ExcursionRules, DemoData.Excursion(), 40, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly);
-        await CreateSlotAsync(db, "Ferienprogramm Sommer 2026", Phase.Closed, new DateTime(2026, 6, 30, 23, 59, 0),
-            DemoData.HolidayRules, DemoData.HolidayProgramme(), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber");
-        await CreateSlotAsync(db, "Jungschar-Sommerlager 2027", Phase.Draft, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.CampRules, DemoData.Camp(), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
-        await CreateSlotAsync(db, "Pfarrfest 2027 – Mithelfen", Phase.Open, new DateTime(2027, 5, 31, 23, 59, 0),
-            DemoData.FestivalRules, DemoData.ParishFestival(), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler", visibility: Visibility.ParishOnly);
+        var today = DateOnly.FromDateTime(Phases.Now());
+        await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
+            SampleData.FirmungRules, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
+        await CreateSlotAsync(db, "Ministrantenausflug", Phase.Published, DeadlineIn(-7),
+            DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly);
+        await CreateSlotAsync(db, "Ferienprogramm", Phase.Closed, DeadlineIn(-21),
+            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber");
+        await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
+            DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
+        await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
+            DemoData.FestivalRules, DemoData.ParishFestival().MovedTo(today.AddDays(45)), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler", visibility: Visibility.ParishOnly, showInterim: true);
     }
+
+    /// <summary>A registration deadline at the end of the day, relative to today.</summary>
+    private static DateTime DeadlineIn(int days) => Phases.Now().Date.AddDays(days).AddMinutes(23 * 60 + 59);
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
-        CreateSlotAsync(db, name, phase, new DateTime(2026, 11, 18, 23, 59, 0), SampleData.FirmungRules, SampleData.Activities(), sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
+        CreateSlotAsync(db, name, phase, DeadlineIn(14), SampleData.FirmungRules, SampleData.Activities().MovedTo(DateOnly.FromDateTime(Phases.Now()).AddDays(17)),
+            sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
         IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false,
-        string? parish = null, string? organiser = null, Visibility visibility = Visibility.JuniaShared)
+        string? parish = null, string? organiser = null, Visibility visibility = Visibility.JuniaShared, bool showInterim = false)
     {
-        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser, Visibility = visibility };
+        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser, Visibility = visibility, ShowInterim = showInterim };
         slot.Apply(rules);
         var order = 0;
         foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));
@@ -159,7 +165,7 @@ public static class Database
             }
             await db.SaveChangesAsync();
         }
-        if (phase == Phase.Published) await AllocationEndpoints.FreezeAsync(db, slot);
+        if (Phases.HasAllocation(phase)) await AllocationEndpoints.FreezeAsync(db, slot);
         return slot;
     }
 

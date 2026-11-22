@@ -8,7 +8,7 @@ public record SessionDto(string Id, DateTime Start, DateTime? End, string Locati
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
-    Visibility Visibility, bool? CanEdit = null);
+    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null);
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
@@ -58,18 +58,20 @@ public static class Endpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
-            if (slot.Phase != Phase.Published) return Errors("notPublished");
+            if (!Phases.ShowsResult(slot.Phase)) return Errors("notPublished");
             var result = await AllocationEndpoints.AllocateAsync(db, slot);
             var mine = result.Participants.FirstOrDefault(p => !p.IsSample && p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             return Results.Ok(new { voted = mine is not null, assignments = mine?.Assignments ?? [] });
         });
 
-        // Interim status while voting is open: what the person would get if the allocation ran now.
+        // What the person would get if registration closed now (only if the organisers show it), later the published allocation.
         api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
+            if (!ShowsStatus(slot))
+                return Results.Ok(new MyStatusDto(await db.Ballots.AnyAsync(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower()), [], []));
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
@@ -79,7 +81,7 @@ public static class Endpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
-            if (slot.Phase is not (Phase.Open or Phase.Closed)) return Errors("registrationClosed");
+            if (!(slot.Phase == Phase.Published || slot.Phase == Phase.Open && slot.ShowInterim)) return Errors("waitlistClosed");
             var ballot = await db.Ballots.Include(b => b.Points)
                 .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower())
                 .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
@@ -100,7 +102,7 @@ public static class Endpoints
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
-            if (slot.Phase != Phase.Open) return Errors("registrationClosed");
+            if (slot.Phase != Phase.Open || Phases.DeadlinePassed(slot)) return Errors("registrationClosed");
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (!await Database.CanTakePartAsync(db, id, name)) return Errors("notListed");
 
@@ -132,7 +134,7 @@ public static class Endpoints
         var s = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (s is null) return null;
         var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
-        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility);
+        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim);
     }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
@@ -174,6 +176,9 @@ public static class Endpoints
             }).ToList();
         return new MyStatusDto(true, list, full);
     }
+
+    /// <summary>Interim status during registration only if the organisers switched it on; the allocation once published.</summary>
+    private static bool ShowsStatus(FairSlotEntity slot) => slot.Phase == Phase.Open && slot.ShowInterim || Phases.ShowsResult(slot.Phase);
 
     public static IResult Errors(string code) => Results.BadRequest(new ErrorsDto([new ValidationError(code)]));
 }

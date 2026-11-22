@@ -2,19 +2,19 @@ import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, firstValueFrom } from 'rxjs';
 
-export type Phase = 'Draft' | 'Open' | 'Closed' | 'Published';
-export const PHASES: Phase[] = ['Draft', 'Open', 'Closed', 'Published'];
+export type Phase = 'Draft' | 'Open' | 'Allocation' | 'Published' | 'Closed' | 'Ended';
+export const PHASES: Phase[] = ['Draft', 'Open', 'Allocation', 'Published', 'Closed', 'Ended'];
 
 export interface Group { id: string; name: string; perParticipant: number; minActivities: number; color: string; }
 export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; canEdit?: boolean | null; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail: string | null; }
-export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; rules: Rules; }
+export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; }
 export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
 export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
@@ -45,7 +45,7 @@ export interface ListPerson { name: string; parish: string | null; email: string
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
-export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats'; person: string | null; before: string | null; after: string | null; }
+export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase'; person: string | null; before: string | null; after: string | null; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
 export class ApiFailure extends Error {
@@ -149,9 +149,7 @@ export class Api {
   }
   resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
-  freezeAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/freeze`, {}, this.admin())); }
   recalculateAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/recalculate`, {}, this.admin())); }
-  unfreezeAllocation(id: string) { return this.call(this.http.delete<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
   setSeats(id: string, ballotId: string, seats: Seat[]) {
     return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
   }

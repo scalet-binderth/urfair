@@ -30,32 +30,14 @@ interface Card {
         <div class="card stack state" [class.frozen]="d.frozenAt">
           @if (d.frozenAt) {
             <p><b>{{ i18n.t('results.frozen', { date: i18n.date(d.frozenAt), n: lockedCount() }) }}</b></p>
-            @if (phase() === 'Published') { <p class="muted small">{{ i18n.t('results.frozenPublished') }}</p> }
+            <p class="muted small">{{ i18n.t(phase() === 'Allocation' ? 'results.frozenInternal' : phase() === 'Ended' ? 'results.frozenEnded' : 'results.frozenPublished') }}</p>
             @if (canEdit()) {
               <p class="muted small">{{ i18n.t('results.recalculateHint') }}</p>
-              <div class="row">
-                <button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button>
-                @if (phase() !== 'Published') {
-                  @if (confirmUnfreeze()) {
-                    <span class="small">{{ i18n.t('results.unfreezeWarn') }}</span>
-                    <button class="btn danger small" type="button" [disabled]="busy()" (click)="unfreeze()">{{ i18n.t('results.unfreeze') }}</button>
-                    <button class="btn ghost small" type="button" (click)="confirmUnfreeze.set(false)">{{ i18n.t('common.cancel') }}</button>
-                  } @else {
-                    <button class="btn ghost" type="button" (click)="confirmUnfreeze.set(true)">{{ i18n.t('results.unfreeze') }}</button>
-                  }
-                }
-              </div>
+              <div><button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button></div>
             }
           } @else {
             <p><b>{{ i18n.t('results.live') }}</b></p>
-            @if (canEdit()) {
-              <p class="muted small">{{ i18n.t('results.freezeHint') }}</p>
-              @if (phase() === 'Draft' || phase() === 'Open') {
-                <p class="muted small">{{ i18n.t('results.freezeNeedsClosed') }}</p>
-              } @else {
-                <div><button class="btn" type="button" [disabled]="busy()" (click)="freeze()">{{ i18n.t('results.freeze') }}</button></div>
-              }
-            }
+            <p class="muted small">{{ i18n.t('results.freezeHint') }}</p>
           }
         </div>
 
@@ -237,7 +219,7 @@ interface Card {
               @for (l of log(); track $index) {
                 <li>
                   <span class="muted small">{{ i18n.date(l.at) }} · {{ l.actor }}</span><br />
-                  {{ i18n.t('log.' + l.kind, { person: l.person ?? '', before: l.before || '–', after: l.after || '–' }) }}
+                  {{ logText(l) }}
                 </li>
               }
             </ul>
@@ -471,8 +453,8 @@ interface Card {
 })
 export class ResultsPage implements OnInit {
   readonly slotId = input.required<string>();
-  /** Phase of the vote: freezing needs registration to be closed, unfreezing is not possible once published. */
-  readonly phase = input<Phase>('Closed');
+  /** Phase of the vote: from the allocation phase on the allocation is frozen. */
+  readonly phase = input<Phase>('Allocation');
   readonly canEdit = input(true);
   protected i18n = inject(I18n);
   protected api = inject(Api);
@@ -485,7 +467,6 @@ export class ResultsPage implements OnInit {
   protected showAll = signal(false);
   protected csv = signal('');
   protected busy = signal(false);
-  protected confirmUnfreeze = signal(false);
   protected editingId = signal<string | null>(null);
   protected seats: Seat[] = [];
   /** Session choices for the person being edited, with their points and original seats. */
@@ -586,16 +567,14 @@ export class ResultsPage implements OnInit {
     }).format(new Date(iso));
   }
 
-  protected freeze(): Promise<void> {
-    return this.act(() => this.api.freezeAllocation(this.slotId()), 'results.frozenDone');
-  }
-
   protected recalculate(): Promise<void> {
     return this.act(() => this.api.recalculateAllocation(this.slotId()), 'results.recalculated');
   }
 
-  protected unfreeze(): Promise<void> {
-    return this.act(() => this.api.unfreezeAllocation(this.slotId()), 'results.unfrozen');
+  /** Phase changes name the phases in the current language. */
+  protected logText(l: LogEntry): string {
+    const name = (x: string | null | undefined) => (l.kind === 'phase' && x ? this.i18n.t('phase.' + x) : x || '–');
+    return this.i18n.t('log.' + l.kind, { person: l.person ?? '', before: name(l.before), after: name(l.after) });
   }
 
   protected edit(p: Participant): void {
@@ -669,7 +648,6 @@ export class ResultsPage implements OnInit {
     try {
       this.data.set(await call());
       this.editingId.set(null);
-      this.confirmUnfreeze.set(false);
       this.toast.show(this.i18n.t(message));
       await this.loadLog();
     } catch (e) {

@@ -296,6 +296,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<int>("Seed")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ShowInterim")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Visibility")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

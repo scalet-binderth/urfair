@@ -29,10 +29,14 @@ system assigns the seats:
 ## Concepts
 
 - **Vote** (in code: `FairSlot`): one allocation round (e.g. "Confirmation preparation 2026/27") with its own rules, activities, dates, participant list and registrations.
-- **Phase**: Draft → Open (participants can vote) → Closed → Published (participants see their own result).
-- **Frozen allocation**: until frozen, the allocation is recalculated on every request. From "Closed" organisers
-  freeze it, move people by hand, lock seats and recalculate the rest; publishing freezes automatically. Freezing
-  keeps the original allocation (organisers can go back to it) and a log records every change.
+- **Phase**: Draft → Open (registration: participants give points) → Allocation (internal) → Published (allocation
+  visible to participants) → Closed (lists final) → Ended (read only). At the registration deadline an open vote
+  switches to Allocation by itself; after the last date it becomes Ended (checked every minute, Vienna time).
+  Participants see an interim status during registration only if the vote has "show interim status" switched on.
+- **Frozen allocation**: during draft and registration the allocation is recalculated on every request (live preview).
+  From Allocation on it is frozen; organisers move people by hand, lock seats and recalculate the rest. Going back to
+  registration is possible only from the internal allocation and unfreezes it. Freezing
+  keeps the original allocation (organisers can go back to it) and a log records every change, including phase changes.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
   prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.

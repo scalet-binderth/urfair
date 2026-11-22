@@ -304,6 +304,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<int>("Seed")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("ShowInterim")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Visibility")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

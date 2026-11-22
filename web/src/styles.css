@@ -57,8 +57,9 @@ a { color: var(--accent) }
 
 .phase { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bar); color: var(--muted); white-space: nowrap }
 .phase[data-phase="Open"] { background: var(--good-soft); color: var(--good) }
-.phase[data-phase="Closed"] { background: var(--warn-soft); color: var(--warn) }
+.phase[data-phase="Allocation"] { background: var(--warn-soft); color: var(--warn) }
 .phase[data-phase="Published"] { background: var(--accent-soft); color: var(--accent) }
+.phase[data-phase="Closed"] { color: var(--ink) }
 
 .tbl-wrap { overflow-x: auto }
 table { border-collapse: collapse; width: 100%; font-size: 14px }

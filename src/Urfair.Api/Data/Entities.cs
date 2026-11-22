@@ -2,8 +2,12 @@ using Urfair.Core;
 
 namespace Urfair.Api.Data;
 
-/// <summary>Lifecycle of a FairSlot.</summary>
-public enum Phase { Draft, Open, Closed, Published }
+/// <summary>
+/// Lifecycle of a FairSlot: draft ? registration (Open) ? allocation, first internal (Allocation), then visible
+/// to participants (Published) ? lists final (Closed) ? read only, deletion period starts (Ended).
+/// From Allocation on the allocation is frozen. Open ends at the deadline and Ended starts after the last date, both on their own.
+/// </summary>
+public enum Phase { Draft, Open, Allocation, Published, Closed, Ended }
 
 /// <summary>Who sees and edits a FairSlot in the organisation area (Junia admins always may).</summary>
 public enum Visibility
@@ -31,6 +35,8 @@ public class FairSlotEntity
     public int SampleCount { get; set; }
     /// <summary>Anyone who signs in may see and vote, without being on the participant list (demo playground, later self-registration).</summary>
     public bool OpenToAll { get; set; }
+    /// <summary>Participants see their interim status while registration is open. Off by default: it invites tactics.</summary>
+    public bool ShowInterim { get; set; }
     /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>
     public string? Parish { get; set; }
     public string? Organiser { get; set; }

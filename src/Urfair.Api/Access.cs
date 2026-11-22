@@ -75,6 +75,10 @@ public static class Access
         var change = !HttpMethods.IsGet(http.Request.Method);
         if (change && !participantArea && !access.CanEdit) return Results.Forbid();
         if (participantArea && access.Scope is { Count: 0 }) return Results.Forbid();
+        // Ended is read only; only the settings (e.g. back to Closed) and deleting stay possible.
+        if (change && slot.Phase == Phase.Ended && !HttpMethods.IsDelete(http.Request.Method)
+            && !(HttpMethods.IsPut(http.Request.Method) && path.TrimEnd('/').Equals($"/api/admin/slots/{slot.Id}", StringComparison.OrdinalIgnoreCase)))
+            return Results.BadRequest(new ErrorsDto([new ValidationError("slotEnded")]));
         return await next(ctx);
     }
 

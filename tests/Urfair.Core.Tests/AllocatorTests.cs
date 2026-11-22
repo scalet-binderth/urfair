@@ -146,6 +146,27 @@ public class AllocatorTests
     }
 
     [Theory]
+    [InlineData("2026-11-22")]
+    [InlineData("2031-02-03")]
+    public void Moved_demo_dates_keep_weekdays_and_start_in_the_week_from_the_given_day(string day)
+    {
+        var firstDay = DateOnly.Parse(day);
+        var before = SampleData.Activities();
+        var moved = before.MovedTo(firstDay);
+        var first = DateOnly.FromDateTime(moved.SelectMany(a => a.Sessions).Min(s => s.Start));
+        Assert.InRange(first.DayNumber - firstDay.DayNumber, 0, 6);
+        var pairs = before.SelectMany(a => a.Sessions).Zip(moved.SelectMany(a => a.Sessions)).ToList();
+        var shift = pairs[0].Second.Start - pairs[0].First.Start;
+        Assert.All(pairs, p =>
+        {
+            Assert.Equal(p.First.Id, p.Second.Id);
+            Assert.Equal(shift, p.Second.Start - p.First.Start);
+            Assert.Equal(p.First.End is null, p.Second.End is null);
+            Assert.Equal(p.First.Start.DayOfWeek, p.Second.Start.DayOfWeek);
+        });
+    }
+
+    [Theory]
     [InlineData(2027)]
     [InlineData(4711)]
     public void Groups_give_everyone_two_green_and_one_blue(int seed)
