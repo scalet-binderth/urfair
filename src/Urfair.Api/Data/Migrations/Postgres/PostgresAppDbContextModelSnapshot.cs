@@ -218,6 +218,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.PrimitiveCollection<List<string>>("Declined")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("uuid");
 
@@ -231,6 +235,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.PrimitiveCollection<List<string>>("NoReplacement")
+                        .IsRequired()
+                        .HasColumnType("text[]");
 
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("timestamp without time zone");

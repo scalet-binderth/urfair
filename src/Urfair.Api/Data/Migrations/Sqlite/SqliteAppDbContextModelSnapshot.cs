@@ -210,6 +210,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("Declined")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("TEXT");
 
@@ -222,6 +226,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("NoReplacement")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("SubmittedAt")

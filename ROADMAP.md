@@ -57,6 +57,14 @@ and English; keep both in sync.
   registration only if switched on per vote; points locked after the deadline; waiting-list ticks only while visible
   (or during registration with interim status). Ended is read only (back only while the last date has not passed).
   Phase changes appear in the log. Demo dates are relative to the reset day, one vote per phase
+- **Step 5, part 2:** moving up while the allocation is visible. Participants tick activities to move up into (only
+  where it can help; the tick names the seat they would give up), give back a seat (with or without wanting a
+  replacement; an activity given back is never allocated to them again) and take a free seat where they lack one.
+  Free seats (given back, removed, more capacity) fill by themselves within the group: first people who need a seat
+  and gave the activity points, then ticks; more points win, ties by lottery; whoever moves up gives up their weakest
+  unlocked seat of that group, which fills again (chain). Triggered at once and checked every minute; each step is
+  in the log with "Urfair" as actor. Recalculating is only possible in the internal allocation. Organisers see ticks
+  and seats given back per person. Demo: the visible "Ministrantenausflug" has full activities and ticked sample people
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -65,7 +73,7 @@ and English; keep both in sync.
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
 | 4 ✓ | done, see above | |
-| 5 | New flow (see "Process model"). Part 1 ✓: phases, automatic deadline and end, no interim status while registering, points locked after the deadline. Part 2: waiting-list ticks and "give back a seat" while visible; automatic moving up within the group (need before wish) | a vote from registration to ended |
+| 5 ✓ | done, see above (still open: choosing a different seat to give up when moving up; for now the weakest one goes) | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 | E-mails from the app (always with a direct link, reply-to the person responsible); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |

@@ -36,13 +36,47 @@ import { Toast } from './toast';
                 <span class="chip" [attr.data-status]="x.status">{{ i18n.t(x.status === 'fixed' && !interim() ? 'status.fixedFinal' : 'status.' + x.status, { n: x.position ?? 0 }) }}</span>
                 @if (x.status === 'fixed') {
                   <span class="muted small w">{{ i18n.when({ start: x.start!, end: x.end, flexible: x.flexible }) }}@if (x.location) { · {{ x.location }} }</span>
-                } @else {
-                  <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy() || !canWaitlist()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
+                  @if (x.canGiveBack) {
+                    @if (givingBack() === x.activityId) {
+                      <div class="w back">
+                        <p class="small">{{ i18n.t('status.giveBackConfirm', { title: x.title }) }}</p>
+                        <label class="small"><input type="checkbox" [checked]="replacement()" (change)="replacement.set(!replacement())" />{{ i18n.t('status.replacement') }}</label>
+                        <div class="row">
+                          <button class="btn small" type="button" [disabled]="busy()" (click)="giveBack(x.activityId)">{{ i18n.t('status.giveBack') }}</button>
+                          <button class="btn ghost small" type="button" (click)="givingBack.set(null)">{{ i18n.t('common.cancel') }}</button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div class="w"><button class="btn ghost small" type="button" [disabled]="busy()" (click)="givingBack.set(x.activityId); replacement.set(true)">{{ i18n.t('status.giveBack') }}</button></div>
+                    }
+                  }
+                } @else if (x.status !== 'givenBack') {
+                  @if (!published()) {
+                    <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy() || !canWaitlist()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
+                  } @else if (x.canMoveUp) {
+                    <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{
+                      x.givesUp ? i18n.t('status.keepSwap', { title: x.givesUp }) : i18n.t('status.keepFinal') }}</label>
+                  }
                 }
               </li>
             }
           </ul>
-          <p class="muted small">{{ i18n.t('status.note') }}</p>
+          @for (m of status()!.missing ?? []; track m.groupId) {
+            <div class="missing stack">
+              <p class="small"><b>{{ i18n.t('status.missing', { n: m.count, group: groupFor(m.groupId) ? ' (' + groupFor(m.groupId)!.name + ')' : '' }) }}</b></p>
+              @if (m.open.length) {
+                <ul class="open">
+                  @for (o of m.open; track o.sessionId) {
+                    <li>
+                      <span>{{ o.title }} <span class="muted small">· {{ i18n.when(o) }}@if (o.location) { · {{ o.location }} }@if (o.points) { · {{ i18n.t('status.points', { n: o.points }) }} }</span></span>
+                      <button class="btn ghost small" type="button" [disabled]="busy()" (click)="takeSeat(o.sessionId)">{{ i18n.t('status.take') }}</button>
+                    </li>
+                  }
+                </ul>
+              } @else { <p class="muted small">{{ i18n.t('status.nothingOpen') }}</p> }
+            </div>
+          }
+          <p class="muted small">{{ i18n.t(published() ? 'status.noteFinal' : 'status.note') }}</p>
         </section>
       } @else if (status()?.voted && c.phase === 'Open') {
         <p class="card small">{{ i18n.t('status.hidden') }}</p>
@@ -138,6 +172,14 @@ import { Toast } from './toast';
     .chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bar); color: var(--muted); white-space: nowrap; align-self: start }
     .chip[data-status="fixed"] { background: var(--good-soft); color: var(--good) }
     .chip[data-status="waitlist"] { background: var(--warn-soft); color: var(--warn) }
+    .chip[data-status="givenBack"] { text-decoration: line-through }
+    .back { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px }
+    .back p { margin: 0 }
+    .btn.small { padding: 5px 10px; font-size: 13px }
+    .missing { gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--warn-soft) }
+    .missing p { margin: 0 }
+    .open { color: var(--ink); font-size: 14px; gap: 6px }
+    .open li { display: flex; justify-content: space-between; align-items: center; gap: 10px }
     .tag.full { background: var(--warn-soft); color: var(--warn) }
     .gh { font-size: 18px; margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px }
     .gh:first-child { margin-top: 0 }
@@ -207,6 +249,10 @@ export class VotePage implements OnInit {
   /** During registration the status is an interim one; afterwards it is the allocation. */
   protected interim = computed(() => this.slot()?.phase === 'Open');
   protected canWaitlist = computed(() => this.slot()?.phase === 'Published' || (this.interim() && !!this.slot()?.showInterim));
+  /** Visible allocation: seats can be given back, ticks move up at once and free seats can be taken. */
+  protected published = computed(() => this.slot()?.phase === 'Published');
+  protected givingBack = signal<string | null>(null);
+  protected replacement = signal(true);
   protected groups = computed(() => this.slot()?.rules.groups ?? []);
   protected groupFor(id: string | null): Group | undefined { return this.groups().find(g => g.id === id); }
 
@@ -217,12 +263,28 @@ export class VotePage implements OnInit {
   protected async toggleWaitlist(activityId: string): Promise<void> {
     const current = this.status()?.activities.filter(x => x.waitlisted).map(x => x.activityId) ?? [];
     const next = current.includes(activityId) ? current.filter(x => x !== activityId) : [...current, activityId];
+    await this.update(() => this.api.setWaitlist(this.slotId(), this.name(), next), 'status.saved');
+  }
+
+  protected async giveBack(activityId: string): Promise<void> {
+    await this.update(() => this.api.giveBack(this.slotId(), this.name(), activityId, this.replacement()), 'status.givenBackSaved');
+    this.givingBack.set(null);
+  }
+
+  protected takeSeat(sessionId: string): Promise<void> {
+    return this.update(() => this.api.takeSeat(this.slotId(), this.name(), sessionId), 'status.taken');
+  }
+
+  /** Saves a change of the allocation status; free seats may move up at once, so the full status comes back. */
+  private async update(call: () => Promise<MyStatus>, done: string): Promise<void> {
     this.busy.set(true);
+    this.errors.set([]);
     try {
-      this.status.set(await this.api.setWaitlist(this.slotId(), this.name(), next));
-      this.toast.show(this.i18n.t('status.saved'));
+      this.status.set(await call());
+      this.toast.show(this.i18n.t(done));
     } catch (e) {
       this.errors.set(this.i18n.errors(e));
+      await this.loadStatus();
     } finally {
       this.busy.set(false);
     }

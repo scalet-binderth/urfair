@@ -42,11 +42,11 @@ public static class DemoData
             ("Musik und Ton am Abend", 8, [S("17:00", "21:00", "Bühne Pfarrgarten", 2)]));
     }
 
-    /// <summary>Two leaders with two activities each, to show the lists per leader.</summary>
+    /// <summary>Two leaders with two activities each, to show the lists per leader. Few seats in the popular ones, to show moving up.</summary>
     public static IReadOnlyList<Activity> Excursion() => Build("mini",
-        ("Tiergarten Walding", 9, ("2026-10-03T09:00", "2026-10-03T16:00", "Tiergarten Walding", 25)),
-        ("Pöstlingbergbahn und Grottenbahn", 7, ("2026-10-03T09:00", "2026-10-03T13:00", "Hauptplatz Linz", 20)),
-        ("Kletterwald Linz", 8, ("2026-10-03T10:00", "2026-10-03T15:00", "Kletterwald Pöstlingberg", 15)),
+        ("Tiergarten Walding", 9, ("2026-10-03T09:00", "2026-10-03T16:00", "Tiergarten Walding", 10)),
+        ("Pöstlingbergbahn und Grottenbahn", 7, ("2026-10-03T09:00", "2026-10-03T13:00", "Hauptplatz Linz", 8)),
+        ("Kletterwald Linz", 8, ("2026-10-03T10:00", "2026-10-03T15:00", "Kletterwald Pöstlingberg", 6)),
         ("Ars Electronica Center", 5, ("2026-10-03T10:00", "2026-10-03T14:00", "Ars Electronica Center", 30)))
         .Select((a, i) => i % 2 == 0
             ? a with { Leader = "Miriam Koller", LeaderEmail = "miriam.koller@example.org" }

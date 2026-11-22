@@ -31,9 +31,11 @@ interface Card {
           @if (d.frozenAt) {
             <p><b>{{ i18n.t('results.frozen', { date: i18n.date(d.frozenAt), n: lockedCount() }) }}</b></p>
             <p class="muted small">{{ i18n.t(phase() === 'Allocation' ? 'results.frozenInternal' : phase() === 'Ended' ? 'results.frozenEnded' : 'results.frozenPublished') }}</p>
-            @if (canEdit()) {
+            @if (canEdit() && phase() === 'Allocation') {
               <p class="muted small">{{ i18n.t('results.recalculateHint') }}</p>
               <div><button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button></div>
+            } @else if (phase() === 'Published') {
+              <p class="muted small">{{ i18n.t('results.movingUpHint') }}</p>
             }
           } @else {
             <p><b>{{ i18n.t('results.live') }}</b></p>
@@ -186,6 +188,9 @@ interface Card {
                       </div>
                       @if (changed(p)) {
                         <p class="muted small orig">{{ i18n.t('results.original', { seats: seatText(p.original) }) }}</p>
+                      }
+                      @if (p.waitlist.length || p.declined.length) {
+                        <p class="muted small orig">{{ waitText(p) }}</p>
                       }
                       }
                     </td>
@@ -619,6 +624,15 @@ export class ResultsPage implements OnInit {
       .sort((x, y) => y.n - x.n)
       .map((x) => `${x.title} ${x.n}`);
     return list.length ? this.i18n.t('results.pointsOf', { list: list.join(' · ') }) : this.i18n.t('results.noPoints');
+  }
+
+  /** Waiting-list ticks and seats given back, by title. */
+  protected waitText(p: Participant): string {
+    const titles = (ids: string[]) => this.activities().filter((a) => ids.includes(a.id)).map((a) => a.title).join(', ');
+    return [
+      p.waitlist.length ? this.i18n.t('results.waitlist', { list: titles(p.waitlist) }) : '',
+      p.declined.length ? this.i18n.t('results.declined', { list: titles(p.declined) }) : '',
+    ].filter((x) => x).join(' · ');
   }
 
   private async loadLog(): Promise<void> {

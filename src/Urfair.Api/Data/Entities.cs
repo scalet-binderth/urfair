@@ -110,12 +110,16 @@ public class BallotEntity
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     public List<BallotPoints> Points { get; set; } = [];
     public List<string> UnavailableSessions { get; set; } = [];
-    /// <summary>Activities the person wants to stay on the waiting list for, if they do not get a seat.</summary>
+    /// <summary>Activities the person ticked to move up into when a seat becomes free (while the allocation is visible).</summary>
     public List<string> Waitlist { get; set; } = [];
+    /// <summary>Activities the person gave back; they are never allocated to them again.</summary>
+    public List<string> Declined { get; set; } = [];
+    /// <summary>Groups (id, "" without a group) where a missing seat is not filled automatically: given back without a replacement or set by hand.</summary>
+    public List<string> NoReplacement { get; set; } = [];
 
     public Ballot ToModel() => new(Id.ToString(), Name,
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
-        UnavailableSessions.ToHashSet(), Gender);
+        UnavailableSessions.ToHashSet(), Gender, Declined.ToHashSet(), Waitlist.ToHashSet(), NoReplacement.ToHashSet());
 }
 /// <summary>
 /// A person allowed to vote in a FairSlot. Signs in with a personal link (token) and, if a date of birth is stored,

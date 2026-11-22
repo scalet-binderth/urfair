@@ -36,16 +36,25 @@ export interface Participant {
   points: Record<string, number | undefined>;
   /** Session ids as calculated when the allocation was frozen (empty while live). */
   original: string[];
+  /** Activity ids ticked on the waiting list and given back. */
+  waitlist: string[]; declined: string[];
 }
-export interface MyActivityStatus { activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free'; position: number | null; waitlisted: boolean; start: string | null; end: string | null; flexible: boolean; location: string | null; }
-export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
+export interface MyActivityStatus {
+  activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free' | 'givenBack'; position: number | null; waitlisted: boolean;
+  start: string | null; end: string | null; flexible: boolean; location: string | null;
+  /** While visible: a tick can move the person up, giving up the seat titled givesUp (null if a seat is missing). */
+  canMoveUp: boolean; givesUp: string | null; canGiveBack: boolean;
+}
+export interface OpenSeat { sessionId: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; points: number; }
+export interface Missing { groupId: string | null; count: number; open: OpenSeat[]; }
+export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
 export interface Seat { sessionId: string; locked: boolean; }
 export interface ListPerson { name: string; parish: string | null; email: string | null; birthDate: string | null; baptismDate: string | null; }
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
-export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase'; person: string | null; before: string | null; after: string | null; }
+export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'tookSeat'; person: string | null; before: string | null; after: string | null; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
 export class ApiFailure extends Error {
@@ -108,6 +117,12 @@ export class Api {
   myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name }, this.me())); }
   setWaitlist(id: string, name: string, activityIds: string[]) {
     return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds }, this.me()));
+  }
+  giveBack(id: string, name: string, activityId: string, replacement: boolean) {
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/give-back`, { name, activityId, replacement }, this.me()));
+  }
+  takeSeat(id: string, name: string, sessionId: string) {
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/take-seat`, { name, sessionId }, this.me()));
   }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }

@@ -32,15 +32,25 @@ public sealed record Activity(
     public int? Seats => Sessions.Any(s => s.Capacity is null) ? null : Sessions.Sum(s => s.Capacity!.Value);
 }
 
-/// <summary>The point distribution a participant submitted.</summary>
+/// <summary>
+/// The point distribution a participant submitted. For moving up after the allocation: <paramref name="Declined"/> activities
+/// were given back and are never allocated again, <paramref name="Waitlist"/> activities are ticked to move up into, and
+/// <paramref name="NoReplacement"/> holds the groups (id, "" without a group) where a missing seat is not filled on its own.
+/// </summary>
 public sealed record Ballot(
     string Id,
     string Name,
     IReadOnlyDictionary<string, int> Points,
     IReadOnlySet<string> UnavailableSessions,
-    string? Gender = null)
+    string? Gender = null,
+    IReadOnlySet<string>? Declined = null,
+    IReadOnlySet<string>? Waitlist = null,
+    IReadOnlySet<string>? NoReplacement = null)
 {
     public int PointsFor(string activityId) => Points.GetValueOrDefault(activityId);
+    public bool HasDeclined(string activityId) => Declined?.Contains(activityId) == true;
+    public bool Ticked(string activityId) => Waitlist?.Contains(activityId) == true;
+    public bool WantsReplacement(string groupKey) => NoReplacement?.Contains(groupKey) != true;
 }
 
 /// <summary>
@@ -86,6 +96,9 @@ public sealed class Assignment(string ballotId, Session session, int points)
 
 /// <summary>A stored seat of a frozen allocation (or one fixed by hand when recalculating).</summary>
 public sealed record FixedAssignment(string BallotId, string SessionId, bool Locked = false);
+
+/// <summary>One step of moving up: the person got <paramref name="Session"/> and gave up <paramref name="GaveUp"/> (null if they lacked a seat).</summary>
+public sealed record MoveUp(string BallotId, Session Session, Session? GaveUp, bool Need);
 
 public sealed record Metrics(
     int Count,
