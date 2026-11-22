@@ -86,25 +86,38 @@ interface Card {
 
         <div class="card stack">
           <h2>{{ i18n.t('results.load') }}</h2>
+          <p class="muted small">{{ i18n.t('results.loadHint') }}</p>
           <div class="fill">
             @for (a of activities(); track a.id) {
               <div class="act">
                 <div class="small">{{ a.title }}</div>
                 <div class="slots">
                   @for (s of a.sessions; track s.id) {
-                    <div class="slot small muted" [class.over]="s.capacity && (d.sessionLoad[s.id] ?? 0) > s.capacity">
-                      {{ s.flexible ? i18n.t('results.flexible') : shortDate(s.start) }} ·
-                      <b
-                        >{{ d.sessionLoad[s.id] ?? 0 }}{{ s.capacity ? ' / ' + s.capacity : '' }}</b
-                      >
-                      <div class="meter">
-                        <i
-                          [style.width.%]="
-                            s.capacity ? ((d.sessionLoad[s.id] ?? 0) / s.capacity) * 100 : 0
-                          "
-                        ></i>
-                      </div>
-                    </div>
+                    @let names = namesBySession()[s.id] ?? [];
+                    <details class="slot small muted" [class.over]="s.capacity && (d.sessionLoad[s.id] ?? 0) > s.capacity">
+                      <summary [title]="names.map((n) => n.name).join(', ')">
+                        {{ s.flexible ? i18n.t('results.flexible') : shortDate(s.start) }} ·
+                        <b
+                          >{{ d.sessionLoad[s.id] ?? 0 }}{{ s.capacity ? ' / ' + s.capacity : '' }}</b
+                        >
+                        <span class="meter">
+                          <i
+                            [style.width.%]="
+                              s.capacity ? ((d.sessionLoad[s.id] ?? 0) / s.capacity) * 100 : 0
+                            "
+                          ></i>
+                        </span>
+                      </summary>
+                      @if (names.length) {
+                        <ul class="names">
+                          @for (n of names; track $index) {
+                            <li>@if (n.locked) { <span class="lock" [attr.aria-label]="i18n.t('results.locked')">🔒</span> }{{ n.name }}</li>
+                          }
+                        </ul>
+                      } @else {
+                        <p class="names">{{ i18n.t('results.nobody') }}</p>
+                      }
+                    </details>
                   }
                 </div>
               </div>
@@ -341,8 +354,27 @@ interface Card {
       color: var(--ink);
     }
     .slot .meter {
+      display: block;
       height: 8px;
       margin-top: 3px;
+    }
+    .slot summary {
+      cursor: pointer;
+      list-style: none;
+    }
+    .slot summary::-webkit-details-marker {
+      display: none;
+    }
+    .slot[open] summary b {
+      text-decoration: underline;
+    }
+    .names {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      color: var(--ink);
+    }
+    p.names {
+      padding-left: 0;
     }
     .chips {
       display: flex;
@@ -422,6 +454,14 @@ export class ResultsPage implements OnInit {
   protected lockedCount = computed(() =>
     (this.data()?.participants ?? []).reduce((n, p) => n + p.assignments.filter((x) => x.locked).length, 0),
   );
+  /** Who is assigned to each session, sorted by name (shown when a session in the utilisation card is opened). */
+  protected namesBySession = computed(() => {
+    const map: Record<string, { name: string; locked: boolean }[]> = {};
+    for (const p of this.data()?.participants ?? [])
+      for (const x of p.assignments) (map[x.sessionId] ??= []).push({ name: p.name, locked: x.locked ?? false });
+    for (const list of Object.values(map)) list.sort((a, b) => a.name.localeCompare(b.name, this.i18n.locale()));
+    return map;
+  });
   /** Every session of the vote with its current load, for moving people by hand. */
   protected sessionOptions = computed(() => {
     const load = this.data()?.sessionLoad ?? {};

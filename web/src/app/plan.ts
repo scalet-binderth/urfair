@@ -17,12 +17,12 @@ interface PlanText {
   back: string;
 }
 
-/** Roadmap from the planning document (as of 21.11.2026), shown in the app for presentations. */
+/** Roadmap from the planning document (as of 22.11.2026), shown in the app for presentations. */
 const PLAN: Record<'de' | 'en', PlanText> = {
   de: {
     title: 'Umsetzungsplan',
     lead: 'Die Demo ist vorzeigbar. Bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlen vor allem Dinge, die man in der Vorführung nicht sieht.',
-    asOf: 'Stand: 21. November 2026',
+    asOf: 'Stand: 22. November 2026',
     nowTitle: 'Was die Demo schon kann',
     now: [
       'Anmeldung als Teilnehmer:in oder Organisation, Demo-Personen A bis D',
@@ -38,6 +38,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Teilnehmerliste mit E-Mail, Geburtsdatum und Pfarrgemeinde, von Hand oder per CSV; persönliche Links und Einladungen',
       'Konten mit Rollen (Junia- und Pfarrgemeinde-Admins), Sichtbarkeit pro Wahl, Demo-Konten per Knopf',
       'Zuteilung festschreiben, Personen von Hand verschieben, Plätze fixieren und den Rest neu rechnen',
+      'Auslastung mit den Namen der Zugeteilten pro Termin',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
@@ -45,8 +46,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Schritt 1 · erledigt', kind: 'done', title: 'Sichere Grundlage', items: ['Datenbank-Migrationen', 'Demo-Schalter (Demo und echte Instanz aus demselben Code)', 'Beschreibung pro Veranstaltung', 'Veranstaltungen aus Excel/CSV importieren'] },
       { label: 'Schritt 2 · erledigt', kind: 'done', title: 'Teilnehmende', items: ['Teilnehmerliste pro Wahl per CSV oder von Hand, mit E-Mail und Pfarrgemeinde', 'Persönliche Links mit Prüfung des Geburtsdatums', 'Einladungen: Demo-Postfach, sonst zum Kopieren'] },
       { label: 'Schritt 3 · erledigt', kind: 'done', title: 'Login und Rollen', items: ['Junia- und Pfarrgemeinde-Admins', 'Sichtbarkeit pro Wahl', 'Import und Pflege der Teilnehmenden je nach Rolle', 'Demo-Konten per Knopf'] },
-      { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['✓ Zuteilung festschreiben und anpassen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“', 'Anmeldeschluss automatisch', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
-      { label: 'Schritt 5 und 6', title: 'Nach dem Probelauf', items: ['Abmelden und Nachrücken von der Warteliste', 'Pflichtbesetzung', '„Mehr als gefordert“', 'Zwischenstand ein- und ausschaltbar'] },
+      { label: 'Schritt 4', title: 'Zuteilung im Griff', items: ['✓ Zuteilung festschreiben und anpassen', '✓ Namen pro Termin in der Auslastung', 'Original merken: Punkte und ursprüngliche Zuteilung beim Verschieben sichtbar, zurück zum Original, Protokoll der Änderungen', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“'] },
+      { label: 'Schritt 5', title: 'Neuer Ablauf', items: ['Phasen: Entwurf → Anmeldung → Zuteilung (erst intern, dann sichtbar) → Abgeschlossen → Beendet', 'Anmeldeschluss automatisch: Zuteilung wird gerechnet und festgeschrieben', 'Während der Anmeldung kein Zwischenstand (pro Wahl einschaltbar)', 'In der Zuteilung: Punkte gesperrt, nur Warteliste und „Platz zurückgeben“', 'Freie Plätze rücken automatisch nach, innerhalb der Gruppe, Bedarf vor Wunsch', 'Beendet nach dem letzten Termin oder von Hand (startet die Löschfrist)', 'danach: Probelauf mit 20 bis 30 Firmlingen'] },
+      { label: 'Schritt 6 und 7', title: 'Nachrichten und Sonderfälle', items: ['E-Mails aus der App, immer mit direktem Link', 'Nachricht an die Organisation', 'Absagen kurz vor dem Termin: „Platz nachbesetzen“ mit Angeboten und Frist, Mail auch bei Ablauf', 'Ersatz für die absagende Person, gezielt überbuchen', 'Pflichtbesetzung', '„Mehr als gefordert“'] },
       { label: 'Parallel', kind: 'parallel', title: 'Mit der Diözese', items: ['Hosting: Diözesanserver oder EU-Anbieter', 'Datenschutz mit dem Datenschutzbeauftragten', 'Impressum und Datenschutzerklärung'] },
     ],
     mustTitle: 'Muss vor echten Anmeldungen passieren',
@@ -74,8 +76,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     flowHead: ['Anforderung', 'Einschätzung', 'Aufwand'],
     flow: [
       { cells: ['Mehr als gefordert wählen', 'Ohne Angabe begrenzt der Algorithmus automatisch auf die geforderte Zahl (z. B. 3). Neu: Teilnehmende geben bewusst „ich nehme auch bis zu N“ an, die Obergrenze legt die Organisation fest. Zusatzplätze werden erst nach der Grundrunde vergeben, damit niemand wegen Vielwählern leer ausgeht.', 'klein bis mittel'] },
-      { cells: ['Zwischenstand und Warteliste', 'In der Demo umgesetzt: nach der Abgabe sieht man, was man fix hätte, wo man auf der Warteliste steht (mit Platz) und was ausgebucht ist; pro Projekt „auf Warteliste bleiben“. Achtung: ein sichtbarer Zwischenstand verleitet zum Taktieren, daher pro Wahl ein- und ausschaltbar machen.', 'Demo erledigt, Schalter klein'] },
-      { cells: ['Abmelden und Nachrücken nach Schluss', 'Organisation oder Teilnehmende melden ab. Der frei gewordene Platz wird der ersten Person auf der Warteliste (mit Häkchen) angeboten, mit Frist zum Annehmen, sonst der nächsten. Setzt festgeschriebene Zuteilung und E-Mails voraus.', 'mittel bis groß'] },
+      { cells: ['Zwischenstand und Warteliste', 'Entschieden: Während der Anmeldung sehen Teilnehmende keinen Zwischenstand (gegen Taktieren; pro Wahl einschaltbar). In der Zuteilung sehen sie ihre Plätze und ihren Wartelistenplatz; Punkte sind dann gesperrt, nur Wartelisten-Häkchen und „Platz zurückgeben“ sind möglich.', 'Demo erledigt, Umbau Schritt 5'] },
+      { cells: ['Abmelden und Nachrücken', 'Entschieden: Ein freier Platz geht innerhalb derselben Gruppe weiter (grün nur gegen grün). Zuerst an Personen, denen ein Pflichtplatz fehlt, dann an die Warteliste. Wer nachrückt, wählt, welchen Platz der Gruppe er abgibt (vorgewählt: wenigste Punkte); der wird wieder frei, bis niemand mehr wartet. In der Zuteilung läuft das automatisch; im Zustand „Abgeschlossen“ erst nach „Platz nachbesetzen“ als Angebot mit Frist (Mail auch bei Ablauf), ab 2 Tagen vor dem Termin nur noch von Hand. Wer absagt, bekommt auf Wunsch Ersatz: anderer Termin derselben Veranstaltung, dann freie Plätze der Gruppe; ist nichts frei, überbucht die Organisation gezielt.', 'mittel bis groß'] },
+      { cells: ['Original merken', 'Beim Festschreiben wird die ursprüngliche Zuteilung gespeichert. Beim Verschieben sieht die Organisation die Punkte der Person und ihre Original-Plätze und kann zum Original zurück; ein Protokoll zeigt, wer wann was geändert hat.', 'klein bis mittel'] },
       { cells: ['Pflichtbesetzung (Posten müssen besetzt sein)', 'Beim Anlegen wählbar: „freie Wahl“ oder „alle Posten müssen besetzt sein“ (z. B. Pfarrfest). Dann füllt der Algorithmus zuerst die Mindestbesetzung jedes Termins auf, bevorzugt mit Personen, die dort Punkte gegeben haben. In der Abstimmung steht „hier fehlen noch X Personen“, damit sich Leute gezielt melden.', 'mittel'] },
       { cells: ['Veranstaltungen importieren', 'Statt PDF über Excel/CSV, weil ein PDF keine Felder enthält. Umgesetzt in Schritt 1: Liste herunterladen, in Excel bearbeiten, hochladen, Vorschau prüfen, ergänzen oder ersetzen.', 'erledigt'] },
       { cells: ['Teilnehmende importieren', 'Pro Wahl per CSV (Vorname, Nachname, E-Mail, Geburtsdatum, Pfarrgemeinde), keine zentrale Personenkartei: weniger Daten, wird mit der Wahl gelöscht. Die Pfarrgemeinde-Spalte erlaubt bei Junia-Wahlen Auswertungen pro Pfarrgemeinde. Ab Schritt 3 an die Rolle gekoppelt: Pfarrgemeinde-Admins importieren und pflegen nur Zeilen der eigenen Pfarrgemeinde, fremde Zeilen werden mit Zeilennummer abgelehnt.', 'mittel (Schritt 2 und 3)'] },
@@ -83,15 +86,15 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     shouldTitle: 'Sollte für den echten Einsatz dabei sein',
     should: ['Teilnehmerlisten für Leiter:innen zum Exportieren oder Drucken', 'Anmeldeschluss automatisch', 'Überblick „noch nicht abgestimmt“ für Erinnerungen'],
     laterTitle: 'Später, wenn es sich bewährt',
-    later: ['E-Mails aus der App', '„Mit Freund:in zusammen“', 'Vorjahr als Vorlage kopieren', 'Teilnehmende aus einer anderen Wahl übernehmen', 'Wahlen „für alle offen“ mit Ausnahmeliste (z. B. alle außer den Teilnehmenden vom Vorjahr)'],
+    later: ['„Mit Freund:innen zusammen“ (pro Wahl einschaltbar, Konzept offen)', 'Vorjahr als Vorlage kopieren', 'Teilnehmende aus einer anderen Wahl übernehmen', 'Wahlen „für alle offen“ mit Ausnahmeliste (z. B. alle außer den Teilnehmenden vom Vorjahr)'],
     questionsTitle: 'Offene Fragen',
-    questions: ['Wer ist Ansprechperson für Hosting und Datenschutz in Pfarre und Diözese?', 'Dürfen Pfarrgemeinde-Admins bei „Junia, nur lesen“ die Teilnehmenden ihrer Pfarrgemeinde pflegen? (Vorschlag: ja, nur die eigenen Zeilen)', 'Probelauf mit 20 bis 30 Firmlingen oder gleich dem ganzen Jahrgang?'],
+    questions: ['Wer ist Ansprechperson für Hosting und Datenschutz in Pfarre und Diözese?', 'Dürfen Pfarrgemeinde-Admins bei „Junia, nur lesen“ die Teilnehmenden ihrer Pfarrgemeinde pflegen? (Vorschlag: ja, nur die eigenen Zeilen)', 'Probelauf mit 20 bis 30 Firmlingen oder gleich dem ganzen Jahrgang?', '„Mit Freund:innen zusammen“: Paare oder kleine Gruppen, wie viele, wie stark darf es die Zuteilung beeinflussen?'],
     back: '← Zur Startseite',
   },
   en: {
     title: 'Roadmap',
     lead: 'The demo is ready to show. Before real use in the Pfarre Urfahr-St. Junia, mostly invisible things are missing.',
-    asOf: 'As of 21 November 2026',
+    asOf: 'As of 22 November 2026',
     nowTitle: 'What the demo can do',
     now: [
       'Sign in as participant or organiser, demo people A to D',
@@ -107,6 +110,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Participant list with e-mail, date of birth and parish community, by hand or via CSV; personal links and invitations',
       'Accounts with roles (Junia and parish community admins), visibility per vote, demo accounts via buttons',
       'Freeze the allocation, move people by hand, lock seats and recalculate the rest',
+      'Utilisation with the names of the people assigned to each date',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
@@ -114,8 +118,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Step 1 · done', kind: 'done', title: 'Safe foundation', items: ['Database migrations', 'Demo switch (demo and real instance from the same code)', 'Description per activity', 'Import activities from Excel/CSV'] },
       { label: 'Step 2 · done', kind: 'done', title: 'Participants', items: ['Participant list per vote via CSV or by hand, with e-mail and Pfarrgemeinde', 'Personal links with a date-of-birth check', 'Invitations: demo mailbox, otherwise to copy'] },
       { label: 'Step 3 · done', kind: 'done', title: 'Login and roles', items: ['Junia and parish community admins', 'Visibility per vote', 'Importing and editing participants by role', 'Demo accounts via buttons'] },
-      { label: 'Step 4', title: 'Allocation under control', items: ['✓ Freeze and adjust the allocation', 'Lists for activity leaders', '“Not voted yet”', 'Automatic registration deadline', 'then: pilot with 20 to 30 confirmands'] },
-      { label: 'Steps 5 and 6', title: 'After the pilot', items: ['Cancellations and moving up from the waiting list', 'Required staffing', '“More than required”', 'Interim status switchable'] },
+      { label: 'Step 4', title: 'Allocation under control', items: ['✓ Freeze and adjust the allocation', '✓ Names per date in the utilisation', 'Keep the original: points and original seats visible when moving people, back to the original, log of changes', 'Lists for activity leaders', '“Not voted yet”'] },
+      { label: 'Step 5', title: 'New flow', items: ['Phases: draft → registration → allocation (internal first, then visible) → closed → ended', 'Automatic registration deadline: the allocation is calculated and frozen', 'No interim status during registration (switchable per vote)', 'During allocation: points locked, only waiting list and “give back a seat”', 'Free seats move up automatically, within the group, need before wish', 'Ended after the last date or by hand (starts the deletion period)', 'then: pilot with 20 to 30 confirmands'] },
+      { label: 'Steps 6 and 7', title: 'Messages and special cases', items: ['E-mails from the app, always with a direct link', 'Message to the organisers', 'Cancellations shortly before the date: “fill seat” with offers and a deadline, e-mail also when it expires', 'Replacement for the person cancelling, targeted overbooking', 'Required staffing', '“More than required”'] },
       { label: 'In parallel', kind: 'parallel', title: 'With the diocese', items: ['Hosting: diocese server or EU provider', 'Data protection with the data protection officer', 'Legal notice and privacy policy'] },
     ],
     mustTitle: 'Needed before real registrations',
@@ -143,8 +148,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     flowHead: ['Requirement', 'Assessment', 'Effort'],
     flow: [
       { cells: ['Choose more than required', 'Without it, the algorithm limits automatically to the required number (e.g. 3). New: participants deliberately state “I would also take up to N”; the organiser sets the upper limit. Extra seats are only given after the basic round, so nobody ends up empty because of people choosing many.', 'small to medium'] },
-      { cells: ['Interim status and waiting list', 'Done in the demo: after voting you see what you would get, where you are on the waiting list (with position) and what is fully booked; per activity “stay on the waiting list”. Note: a visible interim status invites tactics, so make it switchable per vote.', 'demo done, switch small'] },
-      { cells: ['Cancellations and moving up after the deadline', 'Organisers or participants cancel. The free seat is offered to the first person on the waiting list (with the tick), with a deadline to accept, otherwise to the next. Needs a frozen allocation and e-mails.', 'medium to large'] },
+      { cells: ['Interim status and waiting list', 'Decided: during registration participants see no interim status (against tactics; switchable per vote). During allocation they see their seats and waiting-list position; points are locked then, only waiting-list ticks and “give back a seat” are possible.', 'demo done, rework in step 5'] },
+      { cells: ['Cancellations and moving up', 'Decided: a free seat stays within the same group (green only for green). First to people missing a required seat, then to the waiting list. Whoever moves up chooses which seat of the group to give up (pre-selected: fewest points); it becomes free again until nobody is waiting. During allocation this is automatic; when closed only after “fill seat”, as an offer with a deadline (e-mail also when it expires), and only by hand from 2 days before the date. Whoever cancels gets a replacement on request: another date of the same activity, then free seats of the group; if nothing is free, the organisers overbook on purpose.', 'medium to large'] },
+      { cells: ['Keep the original', 'Freezing stores the original allocation. When moving people, organisers see the person’s points and original seats and can go back to the original; a log shows who changed what and when.', 'small to medium'] },
       { cells: ['Required staffing (all posts must be filled)', 'Chosen when creating a vote: “free choice” or “all posts must be filled” (e.g. parish festival). Then the algorithm first fills each date’s minimum staffing, preferring people who gave it points. While voting, “X people still missing here” is shown so people sign up where needed.', 'medium'] },
       { cells: ['Import activities', 'Via Excel/CSV instead of PDF, because a PDF has no fields. Done in step 1: download the list, edit it in Excel, upload, check the preview, add or replace.', 'done'] },
       { cells: ['Import participants', 'Per vote via CSV (first name, last name, e-mail, date of birth, Pfarrgemeinde); no central register of people: less data, deleted with the vote. The Pfarrgemeinde column allows evaluations per parish community in Junia votes. From step 3 tied to the role: parish community admins import and edit only rows of their own parish community; other rows are rejected with their row number.', 'medium (steps 2 and 3)'] },
@@ -152,9 +158,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     shouldTitle: 'Should be there for real use',
     should: ['Participant lists for leaders to export or print', 'Automatic registration deadline', 'Overview “not voted yet” for reminders'],
     laterTitle: 'Later, once it has proven itself',
-    later: ['E-mails from the app', '“Together with a friend”', 'Copy last year as a template', 'Take over participants from another vote', 'Votes “open to everyone” with an exclusion list (e.g. everyone except last year’s participants)'],
+    later: ['“Together with friends” (switchable per vote, concept open)', 'Copy last year as a template', 'Take over participants from another vote', 'Votes “open to everyone” with an exclusion list (e.g. everyone except last year’s participants)'],
     questionsTitle: 'Open questions',
-    questions: ['Who is the contact for hosting and data protection in the parish and diocese?', 'May parish community admins maintain their own participants in “Junia, read only” votes? (proposal: yes, only their own rows)', 'Pilot with 20 to 30 confirmands or the whole year group?'],
+    questions: ['Who is the contact for hosting and data protection in the parish and diocese?', 'May parish community admins maintain their own participants in “Junia, read only” votes? (proposal: yes, only their own rows)', 'Pilot with 20 to 30 confirmands or the whole year group?', '“Together with friends”: pairs or small groups, how many, how strongly may it influence the allocation?'],
     back: '← Back to the start page',
   },
 };
