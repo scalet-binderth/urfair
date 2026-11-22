@@ -103,6 +103,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LeaderEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Parish")
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
@@ -372,6 +376,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("BaptismDate")
                         .HasColumnType("TEXT");
 
                     b.Property<DateOnly?>("BirthDate")

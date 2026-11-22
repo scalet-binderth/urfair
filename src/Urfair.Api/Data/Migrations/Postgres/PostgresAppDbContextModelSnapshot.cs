@@ -111,6 +111,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("LeaderEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Parish")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
@@ -381,6 +385,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("BaptismDate")
+                        .HasColumnType("date");
 
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date");

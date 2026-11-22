@@ -11,18 +11,21 @@ export interface Rules { pointBudget: number; minActivities: number; maxPerActiv
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
 export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; canEdit?: boolean | null; }
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; }
+export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
-export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; }
+export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail: string | null; }
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; rules: Rules; }
 export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
 export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
 export interface AccountInput { email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; }
 export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; }
-export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; parish: string | null; }
+export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; baptismDate: string | null; parish: string | null; }
 export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
 export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; }
+/** check = confirmed date of birth, baptism = confirmed date of baptism ('' if none is asked). */
+export interface ParticipantLink { token: string; check: string; baptism?: string; }
+export interface LinkInfo { slotId: string; slotName: string; needsCheck: boolean; needsBaptism: boolean; }
 export interface ApiError { code: string; args?: Record<string, string | number> | null; }
 export interface Demand { activityId: string; title: string; seats: number | null; interested: number; totalPoints: number; averagePoints: number; }
 export interface Metrics { count: number; gotTopChoice: number; averageSatisfaction: number; worstTenPercentSatisfaction: number; withFallback: number; incomplete: number; }
@@ -38,9 +41,9 @@ export interface MyActivityStatus { activityId: string; title: string; groupId: 
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
 export interface Seat { sessionId: string; locked: boolean; }
-export interface ListPerson { name: string; parish: string | null; email: string | null; }
+export interface ListPerson { name: string; parish: string | null; email: string | null; birthDate: string | null; baptismDate: string | null; }
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
-export interface ListActivity { id: string; title: string; leader: string | null; groupId: string | null; sessions: ListSession[]; }
+export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
 export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats'; person: string | null; before: string | null; after: string | null; }
 
@@ -72,22 +75,22 @@ export class Api {
   info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; parishes: string[] }>('/api/info')); }
 
   // ---------- participants ----------
-  /** Personal link of the signed-in participant (token and confirmed date of birth), sent with participant requests. */
-  setParticipantLink(link: { token: string; check: string } | null): void {
+  /** Personal link of the signed-in participant (token and confirmed dates of birth and baptism), sent with participant requests. */
+  setParticipantLink(link: ParticipantLink | null): void {
     this.participantLink = link;
     try { if (link) sessionStorage.setItem('participantLink', JSON.stringify(link)); else sessionStorage.removeItem('participantLink'); } catch { /* ignore */ }
   }
-  private participantLink: { token: string; check: string } | null = Api.storedLink();
-  private static storedLink(): { token: string; check: string } | null {
+  private participantLink: ParticipantLink | null = Api.storedLink();
+  private static storedLink(): ParticipantLink | null {
     try { return JSON.parse(sessionStorage.getItem('participantLink') ?? 'null'); } catch { return null; }
   }
   private me() {
     const l = this.participantLink;
-    return { headers: new HttpHeaders(l ? { 'X-Participant': l.token, 'X-Participant-Check': l.check } : {}) };
+    return { headers: new HttpHeaders(l ? { 'X-Participant': l.token, 'X-Participant-Check': l.check, 'X-Participant-Baptism': l.baptism ?? '' } : {}) };
   }
-  linkInfo(token: string) { return this.call(this.http.get<{ slotId: string; slotName: string; needsCheck: boolean }>(`/api/p/${token}`)); }
-  linkCheck(token: string, birthDate: string | null) {
-    return this.call(this.http.post<{ name: string; slotId: string }>(`/api/p/${token}/check`, { birthDate }));
+  linkInfo(token: string) { return this.call(this.http.get<LinkInfo>(`/api/p/${token}`)); }
+  linkCheck(token: string, birthDate: string | null, baptismDate: string | null) {
+    return this.call(this.http.post<{ name: string; slotId: string }>(`/api/p/${token}/check`, { birthDate, baptismDate }));
   }
   /** Previously submitted ballot of this name, or null. */
   async lookupBallot(id: string, name: string): Promise<{ points: Record<string, number>; unavailableSessions: string[] } | null> {
@@ -154,6 +157,9 @@ export class Api {
   }
   allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`, this.admin())); }
   leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
+  leaderMails(id: string, body: { activityIds: string[]; withEmail: boolean; withBirthDate: boolean; withBaptismDate: boolean }) {
+    return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body, this.admin()));
+  }
   createReminders(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/reminders`, {}, this.admin())); }
 
   /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */

@@ -26,7 +26,21 @@ public class ParticipantCsvTests
     [Fact]
     public void Written_list_can_be_read_again()
     {
-        var people = new[] { new ParticipantCsv.Person("Lena Huber", "lena@example.org", new DateOnly(2012, 5, 3), Parishes.Junia) };
+        var people = new[]
+        {
+            new ParticipantCsv.Person("Lena Huber", "lena@example.org", new DateOnly(2012, 5, 3), Parishes.Junia, new DateOnly(2012, 8, 19)),
+            new ParticipantCsv.Person("Paul Gruber", null, null, null),
+        };
         Assert.Equal(people, ParticipantCsv.Parse(ParticipantCsv.Write(people)).People);
+    }
+
+    [Fact]
+    public void Baptism_date_is_optional_and_checked()
+    {
+        var r = ParticipantCsv.Parse("Name;Taufdatum\nLena;19.08.2012\nPaul;\nAnna;31.02.2012\n");
+        Assert.Equal(new DateOnly(2012, 8, 19), r.People[0].BaptismDate);
+        Assert.Null(r.People[1].BaptismDate);
+        var error = Assert.Single(r.Errors);
+        Assert.Equal(("csvDateInvalid", 4, "31.02.2012"), (error.Code, (int)error.Args!["row"], (string)error.Args["value"]));
     }
 }

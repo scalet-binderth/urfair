@@ -22,6 +22,8 @@ import { Toast } from './toast';
             <input id="p-mail" name="email" type="email" maxlength="200" [(ngModel)]="form.email" /></div>
           <div class="field"><label for="p-birth">{{ i18n.t('participants.birthDate') }}</label>
             <input id="p-birth" name="birth" type="date" [(ngModel)]="form.birthDate" /></div>
+          <div class="field"><label for="p-baptism">{{ i18n.t('participants.baptismDate') }}</label>
+            <input id="p-baptism" name="baptism" type="date" [(ngModel)]="form.baptismDate" /></div>
           <div class="field"><label for="p-parish">{{ i18n.t('participants.parish') }}</label>
             <select id="p-parish" name="parish" [(ngModel)]="form.parish">
               <option value="">–</option>
@@ -75,7 +77,7 @@ import { Toast } from './toast';
           <div class="tbl-wrap"><table>
             <thead><tr>
               <th>{{ i18n.t('admin.col.name') }}</th><th>{{ i18n.t('participants.parish') }}</th><th>{{ i18n.t('participants.email') }}</th>
-              <th>{{ i18n.t('participants.birthDate') }}</th><th>{{ i18n.t('admin.col.voted') }}</th><th>{{ i18n.t('participants.link') }}</th><th></th>
+              <th>{{ i18n.t('participants.birthDate') }}</th><th>{{ i18n.t('participants.baptismDate') }}</th><th>{{ i18n.t('admin.col.voted') }}</th><th>{{ i18n.t('participants.link') }}</th><th></th>
             </tr></thead>
             <tbody>
               @for (p of filtered(); track p.id) {
@@ -84,6 +86,7 @@ import { Toast } from './toast';
                   <td class="small">{{ p.parish ?? '–' }}</td>
                   <td class="small">{{ p.email ?? '–' }}@if (p.invitedAt) { <span class="tag">{{ i18n.t('participants.invited') }}</span> }</td>
                   <td class="small">{{ i18n.day(p.birthDate) }}</td>
+                  <td class="small">{{ i18n.day(p.baptismDate) }}</td>
                   <td>@if (p.hasVoted) { <span class="phase" data-phase="Open">{{ i18n.t('admin.voted') }}</span> } @else { <span class="muted small">{{ i18n.t('admin.notVoted') }}</span> }</td>
                   <td class="nowrap">
                     <button class="btn ghost small" type="button" (click)="copyLink(p)">{{ i18n.t('admin.copyLink') }}</button>
@@ -139,7 +142,7 @@ export class ParticipantsTab implements OnInit {
   protected votedCount = computed(() => this.inParish().filter(p => p.hasVoted).length);
   protected notVotedCount = computed(() => this.inParish().length - this.votedCount());
   protected parishesInList = computed(() => [...new Set(this.list().map(p => p.parish).filter((p): p is string => !!p))].sort());
-  protected form = { name: '', email: '', birthDate: '', parish: '' };
+  protected form = { name: '', email: '', birthDate: '', baptismDate: '', parish: '' };
   protected editing = signal<string | null>(null);
   protected confirmDelete = signal<string | null>(null);
   protected errors = signal<string[]>([]);
@@ -157,18 +160,19 @@ export class ParticipantsTab implements OnInit {
 
   protected edit(p: ListedParticipant): void {
     this.editing.set(p.id);
-    this.form = { name: p.name, email: p.email ?? '', birthDate: p.birthDate ?? '', parish: p.parish ?? '' };
+    this.form = { name: p.name, email: p.email ?? '', birthDate: p.birthDate ?? '', baptismDate: p.baptismDate ?? '', parish: p.parish ?? '' };
   }
 
   protected reset(): void {
     this.editing.set(null);
-    this.form = { name: '', email: '', birthDate: '', parish: '' };
+    this.form = { name: '', email: '', birthDate: '', baptismDate: '', parish: '' };
     this.errors.set([]);
   }
 
   protected async save(): Promise<void> {
     const body: ParticipantInput = {
-      name: this.form.name.trim(), email: this.form.email.trim() || null, birthDate: this.form.birthDate || null, parish: this.form.parish || null,
+      name: this.form.name.trim(), email: this.form.email.trim() || null, birthDate: this.form.birthDate || null,
+      baptismDate: this.form.baptismDate || null, parish: this.form.parish || null,
     };
     await this.run(async () => {
       const id = this.editing();

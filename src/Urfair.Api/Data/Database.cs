@@ -137,7 +137,7 @@ public static class Database
         var order = 0;
         foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));
         slot.Participants = participants.Select(p => DemoData.People.FirstOrDefault(x => x.Name == p) is { } d
-            ? new ParticipantEntity { FairSlotId = slot.Id, Name = p, Email = d.Email, BirthDate = d.BirthDate, Parish = d.Parish }
+            ? new ParticipantEntity { FairSlotId = slot.Id, Name = p, Email = d.Email, BirthDate = d.BirthDate, BaptismDate = d.BaptismDate, Parish = d.Parish }
             : new ParticipantEntity { FairSlotId = slot.Id, Name = p }).ToList();
         db.FairSlots.Add(slot);
         await db.SaveChangesAsync();
@@ -169,7 +169,7 @@ public static class Database
         var entity = new ActivityEntity
         {
             FairSlotId = slotId, Title = a.Title, RestrictedTo = a.RestrictedTo, Popularity = a.Popularity,
-            GroupId = a.GroupId, Description = a.Description, Parish = a.Parish, Leader = a.Leader, SortOrder = sortOrder,
+            GroupId = a.GroupId, Description = a.Description, Parish = a.Parish, Leader = a.Leader, LeaderEmail = a.LeaderEmail, SortOrder = sortOrder,
         };
         entity.Sessions = a.Sessions.Select(s => new SessionEntity
         {

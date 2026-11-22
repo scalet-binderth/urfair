@@ -6,18 +6,22 @@ using Urfair.Core;
 
 namespace Urfair.Api;
 
-public record ParticipantListDto(Guid Id, string Name, string? Email, DateOnly? BirthDate, string? Parish, string Token, DateTime? InvitedAt, bool HasVoted);
-public record ParticipantRequest(string? Name, string? Email, DateOnly? BirthDate, string? Parish);
+public record ParticipantListDto(Guid Id, string Name, string? Email, DateOnly? BirthDate, string? Parish, string Token, DateTime? InvitedAt, bool HasVoted,
+    DateOnly? BaptismDate);
+public record ParticipantRequest(string? Name, string? Email, DateOnly? BirthDate, string? Parish, DateOnly? BaptismDate = null);
 public record ParticipantImportRequest(string? Csv, bool Commit);
 public record ParticipantImportDto(IReadOnlyList<ParticipantCsv.Person> People, IReadOnlyList<ValidationError> Errors, int New, int Updated, bool Saved);
 public record MailDto(Guid Id, string To, string Subject, string Body, DateTime CreatedAt);
-public record LinkInfoDto(Guid SlotId, string SlotName, bool NeedsCheck);
-public record LinkCheckRequest(DateOnly? BirthDate);
+/// <param name="NeedsCheck">The date of birth is asked.</param>
+/// <param name="NeedsBaptism">The date of baptism is asked.</param>
+public record LinkInfoDto(Guid SlotId, string SlotName, bool NeedsCheck, bool NeedsBaptism);
+public record LinkCheckRequest(DateOnly? BirthDate, DateOnly? BaptismDate = null);
 
 /// <summary>
 /// Participant list (by hand and via CSV), invitations with personal links, and the sign-in via such a link.
-/// A link is /p/{token}; if a date of birth is stored, it must be confirmed. Afterwards the browser sends
-/// token and date with every participant request (headers X-Participant, X-Participant-Check), so nothing is kept on the server.
+/// A link is /p/{token}; if a date of birth and/or baptism is stored, it must be confirmed. Afterwards the browser sends
+/// token and dates with every participant request (headers X-Participant, X-Participant-Check, X-Participant-Baptism),
+/// so nothing is kept on the server.
 /// </summary>
 public static class ParticipantEndpoints
 {
@@ -31,7 +35,7 @@ public static class ParticipantEndpoints
             var access = Access.Slot(http);
             return (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Parish).ThenBy(p => p.Name).ToListAsync())
                 .Where(p => access.InScope(p.Parish))
-                .Select(p => new ParticipantListDto(p.Id, p.Name, p.Email, p.BirthDate, p.Parish, p.Token, p.InvitedAt, voted.Contains(p.Name.ToLower())));
+                .Select(p => new ParticipantListDto(p.Id, p.Name, p.Email, p.BirthDate, p.Parish, p.Token, p.InvitedAt, voted.Contains(p.Name.ToLower()), p.BaptismDate));
         });
 
         admin.MapPost("/slots/{id:guid}/participants", async (Guid id, ParticipantRequest req, AppDbContext db, HttpContext http) =>
@@ -40,7 +44,7 @@ public static class ParticipantEndpoints
             if (Check(req, out var person) is { } error) return error;
             if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (await Database.IsParticipantAsync(db, id, person.Name)) return Endpoints.Errors("alreadyListed");
-            db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, Parish = person.Parish });
+            db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -53,7 +57,7 @@ public static class ParticipantEndpoints
             if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (!p.Name.Equals(person.Name, StringComparison.OrdinalIgnoreCase) && await Database.IsParticipantAsync(db, p.FairSlotId, person.Name))
                 return Endpoints.Errors("alreadyListed");
-            (p.Name, p.Email, p.BirthDate, p.Parish) = (person.Name, person.Email, person.BirthDate, person.Parish);
+            (p.Name, p.Email, p.BirthDate, p.BaptismDate, p.Parish) = (person.Name, person.Email, person.BirthDate, person.BaptismDate, person.Parish);
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -71,7 +75,7 @@ public static class ParticipantEndpoints
         admin.MapGet("/slots/{id:guid}/participants.csv", async (Guid id, AppDbContext db, HttpContext http) =>
         {
             var people = (await db.Participants.Where(p => p.FairSlotId == id).OrderBy(p => p.Name).ToListAsync()).Where(p => Access.Slot(http).InScope(p.Parish))
-                .Select(p => new ParticipantCsv.Person(p.Name, p.Email, p.BirthDate, p.Parish));
+                .Select(p => new ParticipantCsv.Person(p.Name, p.Email, p.BirthDate, p.Parish, p.BaptismDate));
             return Results.File(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(ParticipantCsv.Write(people))).ToArray(),
                 "text/csv; charset=utf-8", "teilnehmende.csv");
         });
@@ -102,9 +106,10 @@ public static class ParticipantEndpoints
                     // Only fill in what the list contains; empty cells keep the stored value.
                     p.Email = person.Email ?? p.Email;
                     p.BirthDate = person.BirthDate ?? p.BirthDate;
+                    p.BaptismDate = person.BaptismDate ?? p.BaptismDate;
                     p.Parish = person.Parish ?? p.Parish;
                 }
-                else db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, Parish = person.Parish });
+                else db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
             }
             await db.SaveChangesAsync();
             return Results.Ok(preview with { Saved = true });
@@ -162,18 +167,18 @@ public static class ParticipantEndpoints
 
     public static void MapParticipantLinks(this WebApplication app)
     {
-        // What the link page needs before the check: which vote, and whether a date of birth is asked.
+        // What the link page needs before the check: which vote, and which dates are asked.
         app.MapGet("/api/p/{token}", async (string token, AppDbContext db) =>
         {
             var p = await db.Participants.AsNoTracking().FirstOrDefaultAsync(x => x.Token == token && token != "");
             if (p is null) return Results.NotFound();
             var slot = await db.FairSlots.AsNoTracking().FirstAsync(s => s.Id == p.FairSlotId);
-            return Results.Ok(new LinkInfoDto(slot.Id, slot.Name, p.BirthDate is not null));
+            return Results.Ok(new LinkInfoDto(slot.Id, slot.Name, p.BirthDate is not null, p.BaptismDate is not null));
         });
 
         app.MapPost("/api/p/{token}/check", async (string token, LinkCheckRequest req, AppDbContext db, IMemoryCache cache) =>
         {
-            var p = await Verify(db, cache, token, req.BirthDate);
+            var p = await Verify(db, cache, token, req.BirthDate, req.BaptismDate);
             return p is null ? Endpoints.Errors("checkFailed") : Results.Ok(new { name = p.Name, slotId = p.FairSlotId });
         });
     }
@@ -189,15 +194,16 @@ public static class ParticipantEndpoints
         {
             var services = http.RequestServices;
             DateOnly? birth = DateOnly.TryParse(http.Request.Headers["X-Participant-Check"].ToString(), out var d) ? d : null;
-            var p = await Verify(services.GetRequiredService<AppDbContext>(), services.GetRequiredService<IMemoryCache>(), token, birth);
+            DateOnly? baptism = DateOnly.TryParse(http.Request.Headers["X-Participant-Baptism"].ToString(), out var t) ? t : null;
+            var p = await Verify(services.GetRequiredService<AppDbContext>(), services.GetRequiredService<IMemoryCache>(), token, birth, baptism);
             return p?.Name;
         }
         var name = (bodyName ?? "").Trim();
         return Database.IsDemo(http.RequestServices.GetRequiredService<IConfiguration>()) && name.Length > 0 ? name : null;
     }
 
-    /// <summary>Finds the participant for a token and checks the date of birth. Repeated wrong dates lock the link for a while.</summary>
-    private static async Task<ParticipantEntity?> Verify(AppDbContext db, IMemoryCache cache, string token, DateOnly? birthDate)
+    /// <summary>Finds the participant for a token and checks the stored dates. Repeated wrong dates lock the link for a while.</summary>
+    private static async Task<ParticipantEntity?> Verify(AppDbContext db, IMemoryCache cache, string token, DateOnly? birthDate, DateOnly? baptismDate)
     {
         if (token.Length == 0) return null;
         var key = "fails:" + token;
@@ -206,7 +212,7 @@ public static class ParticipantEndpoints
 
         var p = await db.Participants.AsNoTracking().FirstOrDefaultAsync(x => x.Token == token);
         if (p is null) return null;
-        if (p.BirthDate is not null && p.BirthDate != birthDate)
+        if ((p.BirthDate is not null && p.BirthDate != birthDate) || (p.BaptismDate is not null && p.BaptismDate != baptismDate))
         {
             cache.Set(key, fails + 1, TimeSpan.FromMinutes(15));
             return null;
@@ -227,7 +233,7 @@ public static class ParticipantEndpoints
         var name = (req.Name ?? "").Trim();
         var email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim();
         var parish = string.IsNullOrWhiteSpace(req.Parish) ? null : Parishes.Match(req.Parish);
-        person = new(name, email, req.BirthDate, parish);
+        person = new(name, email, req.BirthDate, parish, req.BaptismDate);
         if (name.Length == 0) return Endpoints.Errors("nameRequired");
         if (name.Length > Validation.MaxShortText) return Results.BadRequest(new ErrorsDto([new("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText })]));
         if (email is not null && !ParticipantCsv.IsEmail(email)) return Endpoints.Errors("emailInvalid");
@@ -264,7 +270,8 @@ public static class ParticipantEndpoints
             .Append($"bei „{slot.Name}“ kannst du jetzt deine Veranstaltungen wählen. Du verteilst Punkte auf das, was dir wichtig ist; ")
             .Append("zugeteilt wird erst nach dem Anmeldeschluss, wann du abstimmst, macht keinen Unterschied.\n\n")
             .Append($"Dein persönlicher Link:\n{baseUrl}/p/{p.Token}\n\n");
-        if (p.BirthDate is not null) body.Append("Zur Sicherheit wirst du nach deinem Geburtsdatum gefragt.\n");
+        if (p.BirthDate is not null || p.BaptismDate is not null)
+            body.Append($"Zur Sicherheit wirst du nach deinem {(p.BirthDate is null ? "Taufdatum" : p.BaptismDate is null ? "Geburtsdatum" : "Geburts- und Taufdatum")} gefragt.\n");
         if (slot.RegistrationDeadline is { } d) body.Append($"Anmeldeschluss: {d:dd.MM.yyyy, HH:mm} Uhr\n");
         body.Append("\nBitte gib den Link nicht weiter.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
         return new MailEntity

@@ -29,14 +29,14 @@ public static class SampleData
     };
 
     /// <summary>Invented parish and leader for some demo projects (the others inherit the vote's values).</summary>
-    private static readonly Dictionary<string, (string? Parish, string? Leader)> Leads = new()
+    private static readonly Dictionary<string, (string? Parish, string? Leader, string? Email)> Leads = new()
     {
-        ["advent"] = ("Pfarrgemeinde Urfahr-Hl. Geist", "Eva Leitner"),
-        ["krippe"] = ("Pfarrgemeinde Urfahr-Lichtenberg", "Josef Brandl"),
-        ["kitchen"] = (null, "Sarah Wimmer"),
-        ["hochseil"] = (null, "Jungschar-Team"),
-        ["kino"] = ("Pfarrgemeinde Urfahr-Christkönig", "Lukas Mayr"),
-        ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner"),
+        ["advent"] = ("Pfarrgemeinde Urfahr-Hl. Geist", "Eva Leitner", "eva.leitner@example.org"),
+        ["krippe"] = ("Pfarrgemeinde Urfahr-Lichtenberg", "Josef Brandl", "josef.brandl@example.org"),
+        ["kitchen"] = (null, "Sarah Wimmer", "sarah.wimmer@example.org"),
+        ["hochseil"] = (null, "Jungschar-Team", "jungschar@example.org"),
+        ["kino"] = ("Pfarrgemeinde Urfahr-Christkönig", "Lukas Mayr", "lukas.mayr@example.org"),
+        ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner", null),
     };
 
     public const string FirmungParish = Parishes.Junia;
@@ -88,7 +88,7 @@ public static class SampleData
         return list.Select(a => a with
         {
             GroupId = BlueProjects.Contains(a.Id) ? "blue" : "green", Description = Descriptions.GetValueOrDefault(a.Id),
-            Parish = Leads.GetValueOrDefault(a.Id).Parish, Leader = Leads.GetValueOrDefault(a.Id).Leader,
+            Parish = Leads.GetValueOrDefault(a.Id).Parish, Leader = Leads.GetValueOrDefault(a.Id).Leader, LeaderEmail = Leads.GetValueOrDefault(a.Id).Email,
         }).ToList();
     }
 

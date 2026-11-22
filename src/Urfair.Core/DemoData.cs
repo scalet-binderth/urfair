@@ -3,12 +3,12 @@ namespace Urfair.Core;
 /// <summary>Additional invented FairSlots and demo people for presentations.</summary>
 public static class DemoData
 {
-    public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish);
+    public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
 
     /// <summary>A: no FairSlot, B: two open, C: two open + one published, D: two open + one closed + one published.</summary>
     public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
-    public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus");
-    public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist");
+    public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
+    public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
     public static readonly Person D = new("D", "David Doppler", "david.doppler@example.org", new(2012, 1, 9), "Pfarrgemeinde Urfahr-Christkönig");
     public static readonly IReadOnlyList<Person> People = [A, B, C, D];
 
@@ -42,11 +42,15 @@ public static class DemoData
             ("Musik und Ton am Abend", 8, [S("17:00", "21:00", "Bühne Pfarrgarten", 2)]));
     }
 
+    /// <summary>Two leaders with two activities each, to show the lists per leader.</summary>
     public static IReadOnlyList<Activity> Excursion() => Build("mini",
         ("Tiergarten Walding", 9, ("2026-10-03T09:00", "2026-10-03T16:00", "Tiergarten Walding", 25)),
         ("Pöstlingbergbahn und Grottenbahn", 7, ("2026-10-03T09:00", "2026-10-03T13:00", "Hauptplatz Linz", 20)),
         ("Kletterwald Linz", 8, ("2026-10-03T10:00", "2026-10-03T15:00", "Kletterwald Pöstlingberg", 15)),
-        ("Ars Electronica Center", 5, ("2026-10-03T10:00", "2026-10-03T14:00", "Ars Electronica Center", 30)));
+        ("Ars Electronica Center", 5, ("2026-10-03T10:00", "2026-10-03T14:00", "Ars Electronica Center", 30)))
+        .Select((a, i) => i % 2 == 0
+            ? a with { Leader = "Miriam Koller", LeaderEmail = "miriam.koller@example.org" }
+            : a with { Leader = "Florian Stadler", LeaderEmail = "florian.stadler@example.org" }).ToList();
 
     public static IReadOnlyList<Activity> HolidayProgramme() => Build("ferien",
         ("Kochen mit Oma", 7, ("2026-07-14T09:00", "2026-07-14T13:00", "Pfarrheim St. Markus", 8)),

@@ -5,7 +5,7 @@ using Urfair.Core;
 namespace Urfair.Api;
 
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
-public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader);
+public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
     Visibility Visibility, bool? CanEdit = null);
@@ -137,6 +137,9 @@ public static class Endpoints
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
         a.Sessions.Select(s => new SessionDto(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(), a.GroupId, a.Description, a.Parish, a.Leader);
+
+    /// <summary>With the leader's e-mail address, which participants do not see.</summary>
+    public static ActivityDto ToAdminDto(Activity a) => ToDto(a) with { LeaderEmail = a.LeaderEmail };
 
     /// <summary>
     /// Uses the valid allocation (stored once frozen, otherwise calculated with the ballots so far). Per activity the person gave points to:
