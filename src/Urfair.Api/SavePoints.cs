@@ -30,16 +30,18 @@ public static class SavePoints
 		[property: JsonPropertyName("l")] List<string> Locked,
 		[property: JsonPropertyName("w")] List<string> Waitlist,
 		[property: JsonPropertyName("d")] List<string> Declined,
-		[property: JsonPropertyName("n")] List<string> NoReplacement);
+		[property: JsonPropertyName("n")] List<string> NoReplacement,
+		[property: JsonPropertyName("g")] List<string>? GiveUp = null);
 
 	/// <summary>What restoring changes for one ballot.</summary>
 	sealed record Change(BallotEntity Ballot, List<AssignmentEntity> Old, List<AssignmentEntity> New, List<string> Waitlist,
-		List<string> NoReplacement, List<string> KeptGivenBack)
+		List<string> NoReplacement, List<string> KeptGivenBack, List<string> GiveUp)
 	{
 		public bool SeatsChanged => !Old.Select(a => a.SessionId).ToHashSet().SetEquals(New.Select(a => a.SessionId));
 		public bool Changed => SeatsChanged
 			|| !Old.Where(a => a.Locked).Select(a => a.SessionId).ToHashSet().SetEquals(New.Where(a => a.Locked).Select(a => a.SessionId))
-			|| !Waitlist.ToHashSet().SetEquals(Ballot.Waitlist) || !NoReplacement.ToHashSet().SetEquals(Ballot.NoReplacement);
+			|| !Waitlist.ToHashSet().SetEquals(Ballot.Waitlist) || !NoReplacement.ToHashSet().SetEquals(Ballot.NoReplacement)
+			|| !GiveUp.ToHashSet().SetEquals(Ballot.GiveUp);
 	}
 
 	/// <summary>Per FairSlot the log entry about to be saved that a save point belongs to (a restore wins, otherwise the newest).</summary>
@@ -59,7 +61,7 @@ public static class SavePoints
 		var ballots = await db.Ballots.AsNoTracking().Where(b => b.FairSlotId == slotId).ToListAsync(ct);
 		var states = ballots.Select(b => new BallotState(b.Id,
 			seats[b.Id].Select(a => a.SessionId).ToList(), seats[b.Id].Where(a => a.Locked).Select(a => a.SessionId).ToList(),
-			b.Waitlist, b.Declined, b.NoReplacement)).ToList();
+			b.Waitlist, b.Declined, b.NoReplacement, b.GiveUp)).ToList();
 		db.AllocationSnapshots.Add(new AllocationSnapshotEntity { FairSlotId = slotId, LogId = logId, Data = JsonSerializer.Serialize(states) });
 	}
 
@@ -116,6 +118,7 @@ public static class SavePoints
 				db.Assignments.AddRange(c.New);
 				c.Ballot.Waitlist = c.Waitlist;
 				c.Ballot.NoReplacement = c.NoReplacement;
+				c.Ballot.GiveUp = c.GiveUp;
 				if (!c.SeatsChanged) continue;
 				var before = c.Old.Select(a => a.SessionId).ToHashSet();
 				var after = c.New.Select(a => a.SessionId).ToHashSet();
@@ -154,12 +157,17 @@ public static class SavePoints
 			var kept = then.Where(s => declined.Contains(activityOf[s])).ToList();
 			var seated = then.Except(kept).ToList();
 			var seatedActivities = seated.Select(s => activityOf[s]).ToHashSet();
+			// Ticks used up by moving up come back; ticks set since stay.
+			var waitlist = state.Waitlist.Concat(ballot.Waitlist).Distinct().Where(a => !seatedActivities.Contains(a) && !declined.Contains(a)).ToList();
+			// Their seat choices come back as well; a choice made since wins.
+			var choices = ballot.GiveUpMap();
+			foreach (var x in BallotEntity.ParseGiveUp(state.GiveUp)) choices.TryAdd(x.Key, x.Value);
 			var change = new Change(ballot, seats[ballot.Id].ToList(),
 				seated.Select(s => new AssignmentEntity { FairSlotId = slot.Id, BallotId = ballot.Id, SessionId = s, Locked = state.Locked.Contains(s) }).ToList(),
-				// Ticks used up by moving up come back; ticks set since stay.
-				state.Waitlist.Concat(ballot.Waitlist).Distinct().Where(a => !seatedActivities.Contains(a) && !declined.Contains(a)).ToList(),
+				waitlist,
 				declined.SetEquals(state.Declined) ? state.NoReplacement : ballot.NoReplacement,
-				kept);
+				kept,
+				choices.Where(x => waitlist.Contains(x.Key)).Select(x => $"{x.Key}>{x.Value}").ToList());
 			if (change.Changed || kept.Count > 0) changes.Add(change);
 		}
 		return (null, entry, changes);

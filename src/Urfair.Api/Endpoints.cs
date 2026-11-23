@@ -13,13 +13,18 @@ public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationD
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
-public record WaitlistRequest(string Name, List<string>? ActivityIds);
+/// <param name="GiveUp">Per ticked activity the activity whose seat goes for it; null keeps the earlier choices.</param>
+public record WaitlistRequest(string Name, List<string>? ActivityIds, Dictionary<string, string>? GiveUp = null);
 public record GiveBackRequest(string Name, string ActivityId, bool Replacement);
 public record TakeSeatRequest(string Name, string SessionId);
 /// <param name="Status">fixed, waitlist (full), free (seats left) or givenBack.</param>
 /// <param name="CanMoveUp">While visible: a tick can move the person up (more points than the seat they would give up, <paramref name="GivesUp"/>).</param>
+/// <param name="GiveUpOptions">While visible: the seats that could go for this activity (weakest first), to choose from if more than one.</param>
+/// <param name="GiveUpChoice">The activity whose seat the person chose to give up for it, if any.</param>
 public record MyActivityStatusDto(string ActivityId, string Title, string? GroupId, int Points, string Status, int? Position, bool Waitlisted,
-    DateTime? Start, DateTime? End, bool Flexible, string? Location, bool CanMoveUp = false, string? GivesUp = null, bool CanGiveBack = false);
+    DateTime? Start, DateTime? End, bool Flexible, string? Location, bool CanMoveUp = false, string? GivesUp = null, bool CanGiveBack = false,
+    IReadOnlyList<GiveUpOptionDto>? GiveUpOptions = null, string? GiveUpChoice = null);
+public record GiveUpOptionDto(string ActivityId, string Title, int Points);
 /// <summary>Seats a person lacks in a group (null without groups), with the free seats they may take.</summary>
 public record MissingDto(string? GroupId, int Count, IReadOnlyList<OpenSeatDto> Open);
 public record OpenSeatDto(string SessionId, string ActivityId, string Title, DateTime Start, DateTime? End, bool Flexible, string Location, int Points);
@@ -102,6 +107,17 @@ public static class Endpoints
             if (ballot is null) return Errors("notVoted");
             var pointed = ballot.Points.Where(p => p.Points > 0).Select(p => p.ActivityId).ToHashSet();
             ballot.Waitlist = (req.ActivityIds ?? []).Where(x => pointed.Contains(x) && !ballot.Declined.Contains(x)).Distinct().ToList();
+            if (req.GiveUp is not null && slot.Phase == Phase.Published)
+            {
+                // Only seats that could actually go for the activity (same group, fewer points, not fixed).
+                var (allocation, activities, _) = await AllocationEndpoints.CurrentAsync(db, slot);
+                var me = ballot.ToModel();
+                ballot.GiveUp = req.GiveUp
+                    .Where(x => ballot.Waitlist.Contains(x.Key) && activities.FirstOrDefault(a => a.Id == x.Key) is { } a &&
+                        allocation.GiveUpOptions(me, a, slot.PerParticipant).Any(s => s.ActivityId == x.Value))
+                    .Select(x => $"{x.Key}>{x.Value}").ToList();
+            }
+            else ballot.KeepGiveUpForTicks();
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
             return Results.Ok(await StatusAsync(db, slot, name));
@@ -129,6 +145,7 @@ public static class Endpoints
             var after = AllocationEndpoints.SeatText(activities, seats.Where(a => a != seat).Select(a => a.SessionId));
             ballot.Declined = [.. ballot.Declined.Append(req.ActivityId).Distinct()];
             ballot.Waitlist = ballot.Waitlist.Where(x => x != req.ActivityId).ToList();
+            ballot.KeepGiveUpForTicks();
             var group = Allocator.FromAssignments(activities, [], [], slot.ToRules().Groups).GroupKey(req.ActivityId);
             ballot.NoReplacement = req.Replacement
                 ? ballot.NoReplacement.Where(x => x != group).ToList()
@@ -217,6 +234,7 @@ public static class Endpoints
                 UnavailableSessions = unavailable.ToList(),
                 // Keep earlier waiting-list choices for activities that still have points.
                 Waitlist = existing.SelectMany(b => b.Waitlist).Where(points.ContainsKey).Distinct().ToList(),
+                GiveUp = existing.SelectMany(b => b.GiveUp).Where(x => points.ContainsKey(x.Split('>', 2)[0])).Distinct().ToList(),
             };
             db.Ballots.Add(entity);
             await db.SaveChangesAsync();
@@ -276,8 +294,12 @@ public static class Endpoints
                         allocation.Assignments[b.Id].All(y => y.Session.ActivityId != a.Id))
                     : null;
                 var (canMoveUp, givesUp) = visible ? allocation.MoveUpFor(me, a, slot.PerParticipant) : (false, null);
+                var options = visible
+                    ? allocation.GiveUpOptions(me, a, slot.PerParticipant).Select(s => new GiveUpOptionDto(s.ActivityId, titles[s.ActivityId], me.PointsFor(s.ActivityId))).ToList()
+                    : null;
                 return new MyActivityStatusDto(a.Id, a.Title, a.GroupId, me.PointsFor(a.Id), waiting ? "waitlist" : "free", position,
-                    mine.Waitlist.Contains(a.Id), null, null, false, null, canMoveUp, givesUp is null ? null : titles[givesUp.ActivityId]);
+                    mine.Waitlist.Contains(a.Id), null, null, false, null, canMoveUp, givesUp is null ? null : titles[givesUp.ActivityId],
+                    GiveUpOptions: options, GiveUpChoice: me.GiveUp?.GetValueOrDefault(a.Id));
             }).ToList();
         IReadOnlyList<MissingDto> missing = !visible ? [] : allocation.MissingSeats(me, slot.PerParticipant).Select(m => new MissingDto(m.Group?.Id, m.Count,
             allocation.OpenSeats(me, slot.PerParticipant)

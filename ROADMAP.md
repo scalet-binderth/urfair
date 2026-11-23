@@ -109,6 +109,12 @@ and English; keep both in sync.
   free seats by points) and one to overbook their best full wish. Every step is in the log; accepting is a save
   point. Demo: D cancels "Kochen mit Oma" in the closed "Ferienprogramm", C (who ticked it) gets the offer and gives
   up Fußballturnier, which is then free for D's suggestion
+- **Step 5, rest:** choosing the seat to give up. If more than one seat of the group could go for a ticked activity
+  (fewer points, not fixed, no clash), participants choose it next to the tick; the one with the fewest points is
+  pre-selected. The choice is binding: if that seat can no longer go, they do not move up there instead of losing
+  another one; a seat no longer held falls back to the weakest. It counts for moving up and for offers when closed,
+  goes with the tick and is part of the save points (new column `Ballots.GiveUp`). Demo: set the "Ferienprogramm"
+  to visible, C can give up Parkbad instead of Fußballturnier for "Kochen mit Oma"
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -117,7 +123,7 @@ and English; keep both in sync.
 | 2 ✓ | done, see above | |
 | 3 ✓ | done, see above | |
 | 4 ✓ | done, see above | |
-| 5 ✓ | done, see above (still open: choosing a different seat to give up when moving up; for now the weakest one goes) | |
+| 5 ✓ | done, see above | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 ✓ | done, see above | |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |

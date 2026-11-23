@@ -246,8 +246,20 @@ public sealed class Allocator
         : GroupOf(activityId)?.PerParticipant ?? Math.Max(0, perParticipant - _groupOf.Values.Distinct().Sum(g => g.PerParticipant));
 
     /// <summary>
+    /// Seats the person could give up to move into this activity (same group, fewer points, not fixed, no clash), the
+    /// pre-selected weakest first. Empty if they lack a seat in the group (nothing to give up) or cannot move there.
+    /// </summary>
+    public IReadOnlyList<Session> GiveUpOptions(Ballot b, Activity activity, int perParticipant)
+    {
+        var points = b.PointsFor(activity.Id);
+        var same = SameGroup(b, activity.Id);
+        if (points <= 0 || same.Count < Quota(activity.Id, perParticipant)) return [];
+        return Swappable(b, same, points, activity.Sessions).Select(x => x.Session).ToList();
+    }
+
+    /// <summary>
     /// Moving into a session: only with points, not given back and without a clash. With a full group a seat of it with
-    /// fewer points goes (the weakest, never a fixed one).
+    /// fewer points goes (the one the person chose, else the weakest; never a fixed one).
     /// </summary>
     private (bool Possible, Assignment? GiveUp) Exchange(Ballot b, Session s, int perParticipant)
     {
@@ -255,10 +267,21 @@ public sealed class Allocator
         if (points <= 0) return (false, null);
         var same = SameGroup(b, s.ActivityId);
         if (same.Count < Quota(s.ActivityId, perParticipant)) return (Fits(b, s), null);
-        var giveUp = same.Where(x => !x.Locked && x.Points < points && Fits(b, s, x))
-            .OrderBy(x => x.Points).ThenByDescending(x => x.Session.Start).FirstOrDefault();
+        var options = Swappable(b, same, points, [s]);
+        // A chosen seat still held is binding: if it cannot go for this session, the person does not move here.
+        if (b.GiveUp?.GetValueOrDefault(s.ActivityId) is { } chosen && same.Any(x => x.Session.ActivityId == chosen))
+        {
+            var pick = options.FirstOrDefault(x => x.Session.ActivityId == chosen);
+            return (pick is not null, pick);
+        }
+        var giveUp = options.FirstOrDefault();
         return (giveUp is not null, giveUp);
     }
+
+    /// <summary>Seats of the group that may go for one of the sessions, weakest first (ties: the later one).</summary>
+    private List<Assignment> Swappable(Ballot b, List<Assignment> same, int points, IEnumerable<Session> sessions) =>
+        same.Where(x => !x.Locked && x.Points < points && sessions.Any(s => Fits(b, s, x)))
+            .OrderBy(x => x.Points).ThenByDescending(x => x.Session.Start).ToList();
 
     // ---------- internals ----------
 

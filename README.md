@@ -44,7 +44,8 @@ system assigns the seats:
   Plätze"; restoring is logged and can itself be undone. Only states since the last freeze can be restored.
 - **Moving up** (phase Published): no recalculation any more. Participants tick activities to move up into, give back
   a seat or take a free one; free seats fill by themselves within the activity group, need before wish, more points
-  first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Every step is logged.
+  first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Whoever moves up gives up their weakest seat of the group unless
+  they chose another one next to the tick (`Ballots.GiveUp`, `Allocator.GiveUpOptions`). Every step is logged.
 - **Filling a seat** (phase Closed, `SeatOffers.cs`): nothing moves by itself. Participants can still cancel; for a free
   seat organisers start "Platz nachbesetzen", which offers it to one person at a time in the order of moving up (e-mail
   with the personal link, 48 hours, at most until a day before the date; not for dates less than two days ahead).

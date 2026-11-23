@@ -77,9 +77,18 @@ import { Toast } from './toast';
                 } @else if (x.status !== 'givenBack') {
                   @if (interim()) {
                     <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy() || !canWaitlist()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
-                  } @else if (published() && x.canMoveUp) {
+                  } @else if (published() && (x.canMoveUp || choosable(x))) {
                     <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{
-                      x.givesUp ? i18n.t('status.keepSwap', { title: x.givesUp }) : i18n.t('status.keepFinal') }}</label>
+                      choosable(x) ? i18n.t('status.keepFinal') : x.givesUp ? i18n.t('status.keepSwap', { title: x.givesUp }) : i18n.t('status.keepFinal') }}</label>
+                    @if (choosable(x)) {
+                      <label class="w small">{{ i18n.t('status.giveUpChoose') }}
+                        <select [disabled]="busy()" (change)="chooseGiveUp(x, $any($event.target).value)">
+                          @for (o of x.giveUpOptions!; track o.activityId) {
+                            <option [value]="o.activityId" [selected]="o.activityId === giveUpFor(x)">{{ o.title }} ({{ i18n.t('status.points', { n: o.points }) }})</option>
+                          }
+                        </select>
+                      </label>
+                    }
                   }
                 }
               </li>
@@ -317,7 +326,34 @@ export class VotePage implements OnInit {
   protected async toggleWaitlist(activityId: string): Promise<void> {
     const current = this.status()?.activities.filter(x => x.waitlisted).map(x => x.activityId) ?? [];
     const next = current.includes(activityId) ? current.filter(x => x !== activityId) : [...current, activityId];
-    await this.update(() => this.api.setWaitlist(this.slotId(), this.name(), next), 'status.saved');
+    await this.update(() => this.api.setWaitlist(this.slotId(), this.name(), next, this.giveUpChoices(next)), 'status.saved');
+  }
+
+  /** Seats chosen to give up that are not saved yet (the activity is not ticked). */
+  private giveUpDraft = signal<Record<string, string>>({});
+
+  /** More than one seat could go for this activity, so the person may choose (pre-selected: the weakest). */
+  protected choosable(x: MyActivityStatus): boolean { return (x.giveUpOptions?.length ?? 0) > 1; }
+
+  protected giveUpFor(x: MyActivityStatus): string {
+    return this.giveUpDraft()[x.activityId] ?? x.giveUpChoice ?? x.giveUpOptions?.find(o => o.title === x.givesUp)?.activityId ?? x.giveUpOptions?.[0]?.activityId ?? '';
+  }
+
+  /** Explicit choices for the ticked activities; without one the weakest seat goes. */
+  private giveUpChoices(ticked: string[]): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const x of this.status()?.activities ?? []) {
+      const chosen = this.giveUpDraft()[x.activityId] ?? x.giveUpChoice;
+      if (ticked.includes(x.activityId) && chosen) result[x.activityId] = chosen;
+    }
+    return result;
+  }
+
+  protected async chooseGiveUp(x: MyActivityStatus, activityId: string): Promise<void> {
+    this.giveUpDraft.update(d => ({ ...d, [x.activityId]: activityId }));
+    if (!x.waitlisted) return;
+    const ticked = this.status()!.activities.filter(y => y.waitlisted).map(y => y.activityId);
+    await this.update(() => this.api.setWaitlist(this.slotId(), this.name(), ticked, this.giveUpChoices(ticked)), 'status.saved');
   }
 
   protected async giveBack(activityId: string): Promise<void> {

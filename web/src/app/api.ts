@@ -54,7 +54,10 @@ export interface MyActivityStatus {
   start: string | null; end: string | null; flexible: boolean; location: string | null;
   /** While visible: a tick can move the person up, giving up the seat titled givesUp (null if a seat is missing). */
   canMoveUp: boolean; givesUp: string | null; canGiveBack: boolean;
+  /** While visible: seats that could go for this activity (weakest first) and the one the person chose, if any. */
+  giveUpOptions?: GiveUpOption[] | null; giveUpChoice?: string | null;
 }
+export interface GiveUpOption { activityId: string; title: string; points: number; }
 export interface OpenSeat { sessionId: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; points: number; }
 export interface Missing { groupId: string | null; count: number; open: OpenSeat[]; }
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; offer?: MyOffer | null; }
@@ -134,8 +137,9 @@ export class Api {
     return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }, this.me()));
   }
   myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name }, this.me())); }
-  setWaitlist(id: string, name: string, activityIds: string[]) {
-    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds }, this.me()));
+  /** giveUp: per ticked activity the activity whose seat goes for it; left out, earlier choices stay. */
+  setWaitlist(id: string, name: string, activityIds: string[], giveUp?: Record<string, string>) {
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds, giveUp }, this.me()));
   }
   giveBack(id: string, name: string, activityId: string, replacement: boolean) {
     return this.call(this.http.post<MyStatus>(`/api/slots/${id}/give-back`, { name, activityId, replacement }, this.me()));
