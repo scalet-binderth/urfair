@@ -40,6 +40,8 @@ export interface Participant {
   original: string[];
   /** Activity ids ticked on the waiting list and given back. */
   waitlist: string[]; declined: string[];
+  /** Gave back or cancelled a seat, wants a replacement and still lacks a seat. */
+  needsReplacement: boolean;
 }
 export interface MyActivityStatus {
   activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free' | 'givenBack'; position: number | null; waitlisted: boolean;
@@ -56,7 +58,7 @@ export interface ListPerson { name: string; parish: string | null; email: string
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
-export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'tookSeat'; person: string | null; before: string | null; after: string | null; }
+export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat'; person: string | null; before: string | null; after: string | null; }
 
 /** Thrown for 400/401 answers; carries the error codes for translation. */
 export class ApiFailure extends Error {

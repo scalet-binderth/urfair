@@ -103,13 +103,15 @@ public static class Database
     }
 
     /// <summary>
-    /// Five demo FairSlots for presentations, one per phase. Demo people: A sees nothing, B two in registration,
-    /// C two in registration and one with a visible allocation, D additionally one closed.
+    /// Five demo FairSlots for presentations, one per phase. Demo people: A sees nothing, B and C two in registration and one
+    /// with a visible allocation, D additionally one closed.
     /// B, C and D have already voted in their open FairSlots and can change their ballots.
     /// Dates are relative to the day of seeding, so deadlines and sessions fit the phases whenever the demo is reset.
     /// "Pfarrfest" shows the interim status during registration; in the visible "Ministrantenausflug" sample people are on
     /// waiting lists, so a seat given back moves up. There C did not get her first wish (Kletterwald, full) and can tick it,
     /// while D holds a seat there he can give back: then C moves up first, as no ticked sample person gave it as many points.
+    /// All its activities are full: B sits in his weakest wish and is warned that giving it back leaves him without a seat.
+    /// In the closed "Ferienprogramm" D can cancel a seat; the cancellation mail to the organiser is in the demo mailbox.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
@@ -118,10 +120,11 @@ public static class Database
         await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
             SampleData.FirmungRules, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
         await CreateSlotAsync(db, "Ministrantenausflug", Phase.Published, DeadlineIn(-7),
-            DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly,
-            choices: DemoData.ExcursionChoices, seats: DemoData.ExcursionSeats);
+            DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [b, c, d], withBallots: [b, c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly,
+            choices: DemoData.ExcursionChoices, seats: DemoData.ExcursionSeats, organiserEmail: "miriam.koller@example.org");
         await CreateSlotAsync(db, "Ferienprogramm", Phase.Closed, DeadlineIn(-21),
-            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber");
+            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber",
+            organiserEmail: "stefan.huber@example.org");
         await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
             DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
         await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
@@ -142,9 +145,10 @@ public static class Database
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
         IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false,
         string? parish = null, string? organiser = null, Visibility visibility = Visibility.JuniaShared, bool showInterim = false,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>>? choices = null, IReadOnlyList<(string Name, string Title)>? seats = null)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>>? choices = null, IReadOnlyList<(string Name, string Title)>? seats = null,
+        string? organiserEmail = null)
     {
-        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser, Visibility = visibility, ShowInterim = showInterim };
+        var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser, OrganiserEmail = organiserEmail, Visibility = visibility, ShowInterim = showInterim };
         slot.Apply(rules);
         var order = 0;
         foreach (var a in activities) slot.Activities.Add(ToEntity(a, slot.Id, order++));

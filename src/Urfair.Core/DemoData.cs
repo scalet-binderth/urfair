@@ -5,7 +5,7 @@ public static class DemoData
 {
     public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
 
-    /// <summary>A: no FairSlot, B: two in registration, C: two in registration + one published, D: additionally one closed.</summary>
+    /// <summary>A: no FairSlot, B: two in registration + one published, C: the same, D: additionally one closed.</summary>
     public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
     public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
     public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
@@ -42,28 +42,34 @@ public static class DemoData
             ("Musik und Ton am Abend", 8, [S("17:00", "21:00", "Bühne Pfarrgarten", 2)]));
     }
 
-    /// <summary>Two leaders with two activities each, to show the lists per leader. Few seats in the popular ones, to show moving up.</summary>
+    /// <summary>
+    /// Two leaders with two activities each, to show the lists per leader. Exactly as many seats as people (40 sample
+    /// people and B, C, D), so every activity is full and a seat given back leaves nothing else free.
+    /// </summary>
     public static IReadOnlyList<Activity> Excursion() => Build("mini",
         ("Tiergarten Walding", 9, ("2026-10-03T09:00", "2026-10-03T16:00", "Tiergarten Walding", 10)),
         ("Pöstlingbergbahn und Grottenbahn", 7, ("2026-10-03T09:00", "2026-10-03T13:00", "Hauptplatz Linz", 8)),
         ("Kletterwald Linz", 8, ("2026-10-03T10:00", "2026-10-03T15:00", "Kletterwald Pöstlingberg", 6)),
-        ("Ars Electronica Center", 5, ("2026-10-03T10:00", "2026-10-03T14:00", "Ars Electronica Center", 30)))
+        ("Ars Electronica Center", 5, ("2026-10-03T10:00", "2026-10-03T14:00", "Ars Electronica Center", 19)))
         .Select((a, i) => i % 2 == 0
             ? a with { Leader = "Miriam Koller", LeaderEmail = "miriam.koller@example.org" }
             : a with { Leader = "Florian Stadler", LeaderEmail = "florian.stadler@example.org" }).ToList();
 
     /// <summary>
-    /// Fixed points of C and D in the "Ministrantenausflug", so the waiting list can be tried: C did not get Kletterwald
-    /// (her maximum) and can tick it, D sits there and can give it back.
+    /// Fixed points of B, C and D in the "Ministrantenausflug", so the waiting list can be tried: C did not get Kletterwald
+    /// (her maximum) and can tick it, D sits there and can give it back. B sits in his weakest wish (Ars Electronica):
+    /// giving it back would leave him without a seat, so the app offers "just swap" (Tiergarten) instead.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> ExcursionChoices = new Dictionary<string, IReadOnlyDictionary<string, int>>
     {
+        [B.Name] = new Dictionary<string, int> { ["Tiergarten Walding"] = 50, ["Pöstlingbergbahn und Grottenbahn"] = 35, ["Ars Electronica Center"] = 15 },
         [C.Name] = new Dictionary<string, int> { ["Kletterwald Linz"] = 70, ["Tiergarten Walding"] = 30 },
         [D.Name] = new Dictionary<string, int> { ["Kletterwald Linz"] = 40, ["Pöstlingbergbahn und Grottenbahn"] = 35, ["Ars Electronica Center"] = 25 },
     };
 
-    /// <summary>Seats of C and D in the "Ministrantenausflug" after the allocation, whatever the lottery gave them.</summary>
-    public static readonly IReadOnlyList<(string Name, string Title)> ExcursionSeats = [(D.Name, "Kletterwald Linz"), (C.Name, "Tiergarten Walding")];
+    /// <summary>Seats of B, C and D in the "Ministrantenausflug" after the allocation, whatever the lottery gave them.</summary>
+    public static readonly IReadOnlyList<(string Name, string Title)> ExcursionSeats =
+        [(D.Name, "Kletterwald Linz"), (C.Name, "Tiergarten Walding"), (B.Name, "Ars Electronica Center")];
 
     public static IReadOnlyList<Activity> HolidayProgramme() => Build("ferien",
         ("Kochen mit Oma", 7, ("2026-07-14T09:00", "2026-07-14T13:00", "Pfarrheim St. Markus", 8)),
