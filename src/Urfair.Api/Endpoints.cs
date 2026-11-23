@@ -10,9 +10,12 @@ public record SessionDto(string Id, DateTime Start, DateTime? End, string Locati
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 /// <param name="DeleteOn">Ended: the day the vote is deleted with all its data (<see cref="Retention"/>).</param>
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount, DateOnly? DeleteOn = null);
+/// <summary>A mail as the participant would receive it (demo mailbox).</summary>
+public record MyMailDto(string Subject, string Body, DateTime CreatedAt);
 /// <param name="Excluded">Only for organisers: names a vote open to everyone leaves out.</param>
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
-    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null, IReadOnlyList<string>? Excluded = null);
+    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null, IReadOnlyList<string>? Excluded = null,
+    bool AutoFill = true);
 /// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
 /// <param name="Friends">"Together with friends": the group code; everyone in the group enters it themselves.</param>
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0, string? Friends = null);
@@ -112,6 +115,21 @@ public static class Endpoints
             return Results.Ok(new { voted = mine is not null, assignments = mine?.Assignments ?? [] });
         });
 
+        // Demo only: the mails of this vote addressed to the person, as they would arrive in their inbox.
+        api.MapPost("/slots/{id:guid}/my-mails", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http, IConfiguration cfg) =>
+        {
+            if (!Database.IsDemo(cfg)) return Results.NotFound();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (!await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
+            var email = await db.Participants.Where(p => p.FairSlotId == id && p.Name.ToLower() == name.ToLower() && p.Email != null)
+                .Select(p => p.Email).FirstOrDefaultAsync();
+            if (email is null) return Results.Ok(Array.Empty<MyMailDto>());
+            return Results.Ok((await db.Mails.AsNoTracking().Where(m => m.FairSlotId == id).ToListAsync())
+                .Where(m => m.To.Equals(email, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => new MyMailDto(m.Subject, m.Body, DateTime.SpecifyKind(m.CreatedAt, DateTimeKind.Utc))));
+        });
+
         // What the person would get if registration closed now (only if the organisers show it), later the published allocation.
         api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
@@ -124,14 +142,17 @@ public static class Endpoints
         });
 
         // Which not-yet-fixed activities the person wants to move up into. While visible, a tick may move them up at once.
+        // When closed ticks can only be removed (no longer asked when a seat there is offered), not added.
         api.MapPost("/slots/{id:guid}/waitlist", async (Guid id, WaitlistRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
-            if (!(slot.Phase == Phase.Published || slot.Phase == Phase.Open && slot.ShowInterim)) return Errors("waitlistClosed");
+            var closed = slot.Phase == Phase.Closed && slot.FrozenAt is not null;
+            if (!(closed || slot.Phase == Phase.Published || slot.Phase == Phase.Open && slot.ShowInterim)) return Errors("waitlistClosed");
             var ballot = await MyBallotAsync(db, id, name);
             if (ballot is null) return Errors("notVoted");
+            if (closed && (req.ActivityIds ?? []).Any(x => !ballot.Waitlist.Contains(x))) return Errors("waitlistClosed");
             var pointed = ballot.Points.Where(p => p.Points > 0).Select(p => p.ActivityId).ToHashSet();
             ballot.Waitlist = (req.ActivityIds ?? []).Where(x => pointed.Contains(x) && !ballot.Declined.Contains(x)).Distinct().ToList();
             if (req.GiveUp is not null && slot.Phase == Phase.Published)
@@ -152,7 +173,8 @@ public static class Endpoints
 
         // Gives back a seat the person no longer wants, for a date still ahead. It is never allocated to them again.
         // While visible the next person moves up, and with a replacement the person gets a free seat of the same group they
-        // gave points to, if there is one. When closed (cancelling, e.g. ill) nothing moves: the organisers are told and decide.
+        // gave points to, if there is one. When closed (cancelling, e.g. ill) the organisers are told, and the seat is offered
+        // to the next person at once if the vote says so (SeatOffers); otherwise they decide.
         api.MapPost("/slots/{id:guid}/give-back", async (Guid id, GiveBackRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
@@ -180,7 +202,14 @@ public static class Endpoints
             var closed = slot.Phase == Phase.Closed;
             var given = AllocationEndpoints.SeatText(activities, [seat.SessionId]);
             AllocationEndpoints.Log(db, id, name, closed ? "cancelled" : "givenBack", name, before, after);
-            if (closed) await OrganiserMailAsync(db, slot, name, given, after, req.Replacement, null, http);
+            if (closed)
+            {
+                await db.SaveChangesAsync();
+                var fill = slot.AutoFill && sessions[seat.SessionId].Capacity is not null
+                    ? await SeatOffers.StartAsync(db, slot, seat.SessionId, Phases.Clock, Mailing.BaseUrl(http.Request)) ?? "offered"
+                    : null;
+                await OrganiserMailAsync(db, slot, name, given, after, req.Replacement, null, http, fill);
+            }
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
             var status = await StatusAsync(db, slot, name);
@@ -290,7 +319,7 @@ public static class Endpoints
         if (s is null) return null;
         var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
         return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim,
-            DeleteOn: Retention.DeleteOn(s.EndedAt, Retention.Days(cfg)));
+            DeleteOn: Retention.DeleteOn(s.EndedAt, Retention.Days(cfg)), AutoFill: s.AutoFill);
     }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
@@ -362,13 +391,14 @@ public static class Endpoints
             .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
 
     /// <summary>
-    /// Tells the person responsible ("E-Mail für Antworten" of the vote) about a cancellation when closed, as nothing moves
-    /// on its own then, or, while visible, that a seat given back left the person short of seats (<paramref name="shortOf"/>).
+    /// Tells the person responsible ("E-Mail für Antworten" of the vote) about a cancellation when closed, with what happens to the
+    /// seat (<paramref name="fill"/>: "offered" or why not, null without automatic filling), or, while visible, that a seat given
+    /// back left the person short of seats (<paramref name="shortOf"/>).
     /// Replies go to the person, if they have an e-mail address on the list; the mail belongs to them, so admins of their
     /// Pfarrgemeinde see it as well.
     /// </summary>
     private static async Task OrganiserMailAsync(AppDbContext db, FairSlotEntity slot, string name, string seat, string left, bool replacement,
-        (int Count, string? Group)? shortOf, HttpContext http)
+        (int Count, string? Group)? shortOf, HttpContext http, string? fill = null)
     {
         if (string.IsNullOrWhiteSpace(slot.OrganiserEmail)) return;
         var person = await db.Participants.FirstOrDefaultAsync(p => p.FairSlotId == slot.Id && p.Name.ToLower() == name.ToLower());
@@ -382,11 +412,19 @@ public static class Endpoints
         else body.Append($"{name} hat bei „{slot.Name}“ abgesagt: {seat}.\n");
         body.Append($"Ersatzplatz gewünscht: {(replacement ? "ja" : "nein")}\n")
             .Append($"Plätze jetzt: {(left.Length > 0 ? left : "keine")}\n\n");
-        body.Append(shortOf is null
-            ? "Die Zuteilung ist abgeschlossen, daher rückt niemand von selbst nach. "
-            : replacement ? $"Wird bei einer Veranstaltung, der {name} Punkte gegeben hat, ein Platz frei, rückt {name} von selbst nach. " : "");
+        body.Append(shortOf is not null
+            ? replacement ? $"Wird bei einer Veranstaltung, der {name} Punkte gegeben hat, ein Platz frei, rückt {name} von selbst nach. " : ""
+            : fill switch
+            {
+                "offered" => "Der Platz wird jetzt automatisch der nächsten Person auf der Warteliste angeboten (siehe „Zuteilung“). " +
+                    "Nimmt ihn niemand, bekommst du eine Mail. ",
+                "nobodyLeft" => "Niemand wartet auf diesen Platz, daher wird er nicht angeboten. ",
+                "offerTooLate" => "Der Termin ist zu nah, um den Platz noch anzubieten. ",
+                null => "Die Zuteilung ist abgeschlossen, daher rückt niemand von selbst nach. ",
+                _ => "",
+            });
         body.Append($"Unter „Zuteilung“ kannst du {name} von Hand einteilen (auch überbuchen)")
-            .Append(shortOf is null ? " oder den Platz frei lassen." : ".")
+            .Append(shortOf is not null || fill == "offered" ? "." : " oder den Platz frei lassen.")
             .Append(person?.Email is { Length: > 0 } ? $" {name} bekommt dann eine Mail mit den neuen Plätzen." : "")
             .Append(replyTo is null ? "\n" : $"\nEine Antwort auf diese Mail geht direkt an {name}, z. B. um eine andere Veranstaltung vorzuschlagen.\n")
             .Append($"{Mailing.BaseUrl(http.Request)}/admin/s/{slot.Id}\n\nUrfair");

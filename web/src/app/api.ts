@@ -12,13 +12,13 @@ export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey']
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; maxExtra?: number; requiredStaffing?: boolean; friends?: number; }
 export interface PreviousBallot { points: Record<string, number>; unavailableSessions: string[]; extra?: number; friends?: string | null; friendNames?: string[]; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; deleteOn?: string | null; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; deleteOn?: string | null; excluded?: string[] | null; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; deleteOn?: string | null; excluded?: string[] | null; autoFill?: boolean; }
 /** missing: required staffing, people still missing on this date (participant view). */
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; missing?: number | null; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail: string | null; }
-export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; organiserEmail: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; excluded: string[]; }
+export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; organiserEmail: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; excluded: string[]; autoFill: boolean; }
 export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
 export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
@@ -29,6 +29,8 @@ export interface ListedParticipant extends ParticipantInput { id: string; token:
 /** manual: copied by hand; pending: waiting to be sent (also after an error); sent; failed: gave up. */
 export type MailStatus = 'manual' | 'pending' | 'sent' | 'failed';
 export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; status: MailStatus; sentAt: string | null; error: string | null; replyTo: string | null; }
+/** A mail as the participant would receive it (demo mailbox). */
+export interface MyMail { subject: string; body: string; createdAt: string; }
 /** check = confirmed date of birth, baptism = confirmed date of baptism ('' if none is asked). */
 export interface ParticipantLink { token: string; check: string; baptism?: string; }
 export interface LinkInfo { slotId: string; slotName: string; needsCheck: boolean; needsBaptism: boolean; }
@@ -52,6 +54,8 @@ export interface Participant {
 export interface Suggestion { sessionId: string; activityId: string; title: string; start: string; flexible: boolean; points: number; kind: 'otherDate' | 'pointed' | 'free' | 'overbook'; }
 /** A free seat offered to one person when closed. */
 export interface Offer { id: string; sessionId: string; person: string; status: 'open' | 'accepted' | 'declined' | 'expired' | 'withdrawn'; givesUp: string | null; expiresAt: string; createdAt: string; answeredAt: string | null; }
+/** Who would be asked next for a free seat of a date (Closed). */
+export interface OfferPreview { sessionId: string; next: { person: string; givesUp: string | null; need: boolean }[]; }
 export interface MyOffer { id: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; givesUp: string | null; expiresAt: string; }
 export interface MyActivityStatus {
   activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free' | 'givenBack'; position: number | null; waitlisted: boolean;
@@ -146,6 +150,7 @@ export class Api {
     return this.call(this.http.post<{ voted: boolean; assignments: Assignment[] }>(`/api/slots/${id}/my-result`, { name }, this.me()));
   }
   myStatus(id: string, name: string) { return this.call(this.http.post<MyStatus>(`/api/slots/${id}/my-status`, { name }, this.me())); }
+  myMails(id: string, name: string) { return this.call(this.http.post<MyMail[]>(`/api/slots/${id}/my-mails`, { name }, this.me())); }
   /** giveUp: per ticked activity the activity whose seat goes for it; left out, earlier choices stay. */
   setWaitlist(id: string, name: string, activityIds: string[], giveUp?: Record<string, string>) {
     return this.call(this.http.post<MyStatus>(`/api/slots/${id}/waitlist`, { name, activityIds, giveUp }, this.me()));
@@ -215,6 +220,7 @@ export class Api {
   restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {}, this.admin())); }
   undo(id: string, logId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/log/${logId}/undo`, {}, this.admin())); }
   offers(id: string) { return this.call(this.http.get<Offer[]>(`/api/admin/slots/${id}/offers`, this.admin())); }
+  offerPreview(id: string) { return this.call(this.http.get<OfferPreview[]>(`/api/admin/slots/${id}/offers/next`, this.admin())); }
   fillSeat(id: string, sessionId: string) { return this.call(this.http.post(`/api/admin/slots/${id}/offers`, { sessionId }, this.admin())); }
   leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
   leaderMails(id: string, body: { activityIds: string[]; withEmail: boolean; withBirthDate: boolean; withBaptismDate: boolean }) {

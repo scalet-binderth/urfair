@@ -23,6 +23,7 @@ public static class SlotCopy
 			OpenToAll = source.OpenToAll,
 			Excluded = source.Excluded.ToList(),
 			ShowInterim = source.ShowInterim,
+			AutoFill = source.AutoFill,
 			Parish = source.Parish,
 			Organiser = source.Organiser,
 			OrganiserEmail = source.OrganiserEmail,

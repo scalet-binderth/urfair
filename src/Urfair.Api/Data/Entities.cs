@@ -45,6 +45,8 @@ public class FairSlotEntity
     public List<string> Excluded { get; set; } = [];
     /// <summary>Participants see their interim status while registration is open. Off by default: it invites tactics.</summary>
     public bool ShowInterim { get; set; }
+    /// <summary>When closed, a cancelled seat is offered to the next person at once (<see cref="SeatOffers"/>), without "Platz nachbesetzen".</summary>
+    public bool AutoFill { get; set; } = true;
     /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>
     public string? Parish { get; set; }
     public string? Organiser { get; set; }

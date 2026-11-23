@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Urfair.Api.Data;
@@ -19,16 +20,27 @@ public class SeatOfferTests
 	static List<string> Seats(JsonElement person) =>
 		person.GetProperty("assignments").EnumerateArray().Select(a => a.GetProperty("title").GetString()!).ToList();
 
+	static async Task<string> SessionAsync(HttpClient organiser, Guid slot) =>
+		(await PersonAsync(organiser, slot, David)).GetProperty("assignments").EnumerateArray()
+			.Single(a => a.GetProperty("title").GetString() == Kochen).GetProperty("sessionId").GetString()!;
+
 	/// <summary>David cancels "Kochen mit Oma"; returns the slot, a participant client and the session of his seat.</summary>
-	static async Task<(Guid Slot, HttpClient Client, string Session)> DavidCancelsAsync(HttpClient organiser, DemoApp app)
+	static async Task<(Guid Slot, HttpClient Client, string Session)> DavidCancelsAsync(HttpClient organiser, DemoApp app, bool autoFill = true)
 	{
 		var slot = await DemoApp.SlotIdAsync(organiser, "Ferienprogramm");
-		var session = (await PersonAsync(organiser, slot, David)).GetProperty("assignments").EnumerateArray()
-			.Single(a => a.GetProperty("title").GetString() == Kochen).GetProperty("sessionId").GetString()!;
+		if (!autoFill) await AutoFillAsync(organiser, slot, false);
+		var session = await SessionAsync(organiser, slot);
 		var client = app.CreateClient();
 		var kochen = DemoApp.Activity(await DemoApp.StatusAsync(client, slot, David), Kochen).GetProperty("activityId").GetString()!;
 		(await DemoApp.GiveBackAsync(client, slot, David, kochen, replacement: true)).EnsureSuccessStatusCode();
 		return (slot, client, session);
+	}
+
+	static async Task AutoFillAsync(HttpClient organiser, Guid slot, bool on)
+	{
+		var body = JsonNode.Parse(await organiser.GetStringAsync($"/api/admin/slots/{slot}"))!;
+		body["autoFill"] = on;
+		Assert.Equal(HttpStatusCode.NoContent, (await organiser.PutAsJsonAsync($"/api/admin/slots/{slot}", body)).StatusCode);
 	}
 
 	static Task<HttpResponseMessage> FillAsync(HttpClient organiser, Guid slot, string session) =>
@@ -37,20 +49,30 @@ public class SeatOfferTests
 	static Task<HttpResponseMessage> AnswerAsync(HttpClient client, Guid slot, string offer, string answer) =>
 		client.PostAsJsonAsync($"/api/slots/{slot}/offers/{offer}/{answer}", new { name = Clara });
 
+	static async Task<string> MailBodyAsync(HttpClient organiser, Guid slot, string subjectStart) =>
+		(await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/mails")).EnumerateArray()
+			.First(m => m.GetProperty("subject").GetString()!.StartsWith(subjectStart)).GetProperty("body").GetString()!;
+
+	static async Task<List<string>> MyMailsAsync(HttpClient client, Guid slot, string name)
+	{
+		var response = await client.PostAsJsonAsync($"/api/slots/{slot}/my-mails", new { name });
+		response.EnsureSuccessStatusCode();
+		return (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().Select(m => m.GetProperty("subject").GetString()!).ToList();
+	}
+
 	[Fact]
-	public async Task The_seat_is_offered_to_Clara_who_ticked_it_and_after_she_accepts_David_gets_suggestions()
+	public async Task Davids_seat_is_offered_to_Clara_at_once_and_after_she_accepts_David_gets_suggestions()
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
 		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
 		Assert.Equal(["Parkbad-Nachmittag", "Fußballturnier"], Seats(await PersonAsync(organiser, slot, Clara)));
 
-		Assert.Equal(HttpStatusCode.NoContent, (await FillAsync(organiser, slot, session)).StatusCode);
-
 		var offer = (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer");
 		Assert.Equal(Kochen, offer.GetProperty("title").GetString());
 		Assert.Equal("Fußballturnier", offer.GetProperty("givesUp").GetString());
 		Assert.Contains(await DemoApp.MailSubjectsAsync(organiser, slot), s => s.StartsWith("Freier Platz für dich"));
+		Assert.Contains("automatisch der nächsten Person", await MailBodyAsync(organiser, slot, "Absage: David"));
 		Assert.Contains("noFreeSeat", await (await FillAsync(organiser, slot, session)).Content.ReadAsStringAsync()); // held for Clara
 
 		var accepted = await AnswerAsync(client, slot, offer.GetProperty("id").GetString()!, "accept");
@@ -71,12 +93,80 @@ public class SeatOfferTests
 	}
 
 	[Fact]
+	public async Task Without_automatic_filling_the_preview_shows_Clara_and_the_organisers_start_the_offer()
+	{
+		using var app = new DemoApp();
+		var organiser = await app.OrganiserAsync();
+		var (slot, client, session) = await DavidCancelsAsync(organiser, app, autoFill: false);
+		Assert.Equal(JsonValueKind.Null, (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").ValueKind);
+		Assert.Contains("rückt niemand von selbst nach", await MailBodyAsync(organiser, slot, "Absage: David"));
+
+		var preview = (await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/offers/next")).EnumerateArray()
+			.Single(p => p.GetProperty("sessionId").GetString() == session).GetProperty("next").EnumerateArray().ToList();
+		Assert.Equal(Clara, preview[0].GetProperty("person").GetString());
+		Assert.Equal("Fußballturnier", preview[0].GetProperty("givesUp").GetString());
+		Assert.DoesNotContain(preview, p => p.GetProperty("person").GetString() == David); // cancelled, never again
+
+		Assert.Equal(HttpStatusCode.NoContent, (await FillAsync(organiser, slot, session)).StatusCode);
+
+		Assert.Equal(Kochen, (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").GetProperty("title").GetString());
+		var after = await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/offers/next");
+		Assert.DoesNotContain(after.EnumerateArray(), p => p.GetProperty("sessionId").GetString() == session); // the free seat is held
+	}
+
+	[Fact]
+	public async Task When_closed_Clara_can_remove_her_tick_but_not_add_one_and_is_then_not_asked()
+	{
+		using var app = new DemoApp();
+		var organiser = await app.OrganiserAsync();
+		var slot = await DemoApp.SlotIdAsync(organiser, "Ferienprogramm");
+		var client = app.CreateClient();
+		var kochen = DemoApp.Activity(await DemoApp.StatusAsync(client, slot, Clara), Kochen);
+		Assert.True(kochen.GetProperty("waitlisted").GetBoolean());
+		var kochenId = kochen.GetProperty("activityId").GetString()!;
+
+		(await client.PostAsJsonAsync($"/api/slots/{slot}/waitlist", new { name = Clara, activityIds = Array.Empty<string>() })).EnsureSuccessStatusCode();
+		var again = await client.PostAsJsonAsync($"/api/slots/{slot}/waitlist", new { name = Clara, activityIds = new[] { kochenId } });
+
+		Assert.Contains("waitlistClosed", await again.Content.ReadAsStringAsync());
+		Assert.False(DemoApp.Activity(await DemoApp.StatusAsync(client, slot, Clara), Kochen).GetProperty("waitlisted").GetBoolean());
+		var david = DemoApp.Activity(await DemoApp.StatusAsync(client, slot, David), Kochen).GetProperty("activityId").GetString()!;
+		(await DemoApp.GiveBackAsync(client, slot, David, david, replacement: false)).EnsureSuccessStatusCode();
+		Assert.Equal(JsonValueKind.Null, (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").ValueKind);
+		Assert.Contains("Niemand wartet auf diesen Platz", await MailBodyAsync(organiser, slot, "Absage: David"));
+	}
+
+	[Fact]
+	public async Task In_the_demo_participants_see_only_their_own_mails()
+	{
+		using var app = new DemoApp();
+		var organiser = await app.OrganiserAsync();
+		var (slot, client, _) = await DavidCancelsAsync(organiser, app);
+
+		var clara = await MyMailsAsync(client, slot, Clara);
+		var david = await MyMailsAsync(client, slot, David);
+
+		Assert.Contains(clara, s => s.StartsWith("Freier Platz für dich"));
+		Assert.DoesNotContain(clara, s => s.StartsWith("Absage")); // to the organisers
+		Assert.DoesNotContain(david, s => s.StartsWith("Freier Platz für dich"));
+	}
+
+	[Theory]
+	[InlineData(10, 48)]
+	[InlineData(6, 24)]
+	[InlineData(2, 12)]
+	public void The_closer_the_date_the_shorter_the_time_to_answer(int daysAhead, int hours)
+	{
+		var now = new DateTime(2027, 7, 1, 12, 0, 0);
+		Assert.Equal(TimeSpan.FromHours(hours), SeatOffers.AnswerTimeFor(now.AddDays(daysAhead), now));
+	}
+
+	[Fact]
 	public async Task A_declined_offer_goes_to_the_next_person_and_seats_stay()
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
 		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
-		(await FillAsync(organiser, slot, session)).EnsureSuccessStatusCode();
 		var offer = (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").GetProperty("id").GetString()!;
 
 		(await AnswerAsync(client, slot, offer, "decline")).EnsureSuccessStatusCode();
@@ -90,12 +180,11 @@ public class SeatOfferTests
 	}
 
 	[Fact]
-	public async Task An_expired_offer_is_mailed_and_leaving_the_phase_withdraws_open_offers()
+	public async Task An_expired_offer_is_mailed_and_nobody_is_asked_twice()
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
 		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
-		(await FillAsync(organiser, slot, session)).EnsureSuccessStatusCode();
 		using (var scope = app.Services.CreateScope())
 		{
 			var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -117,10 +206,9 @@ public class SeatOfferTests
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
-		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
-		(await FillAsync(organiser, slot, session)).EnsureSuccessStatusCode();
+		var (slot, _, _) = await DavidCancelsAsync(organiser, app);
 
-		var body = System.Text.Json.Nodes.JsonNode.Parse(await organiser.GetStringAsync($"/api/admin/slots/{slot}"))!;
+		var body = JsonNode.Parse(await organiser.GetStringAsync($"/api/admin/slots/{slot}"))!;
 		body["phase"] = "Published";
 		Assert.Equal(HttpStatusCode.NoContent, (await organiser.PutAsJsonAsync($"/api/admin/slots/{slot}", body)).StatusCode);
 

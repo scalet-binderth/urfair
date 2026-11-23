@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Activity, Api, Group, MyActivityStatus, MyStatus, PreviousBallot, Slot } from './api';
+import { Activity, Api, Group, MyActivityStatus, MyMail, MyStatus, PreviousBallot, Slot } from './api';
 import { I18n } from './i18n';
+import { AppInfo } from './info';
 import { SessionService } from './session';
 import { Toast } from './toast';
 
@@ -90,6 +91,8 @@ import { Toast } from './toast';
                         </select>
                       </label>
                     }
+                  } @else if (closed() && x.waitlisted) {
+                    <label class="w small"><input type="checkbox" checked [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keepClosed') }}</label>
                   }
                 }
               </li>
@@ -110,10 +113,23 @@ import { Toast } from './toast';
               } @else { <p class="muted small">{{ i18n.t('status.nothingOpen') }}</p> }
             </div>
           }
-          <p class="muted small">{{ i18n.t(published() ? 'status.noteFinal' : closed() ? 'status.noteClosed' : 'status.note') }}</p>
+          <p class="muted small">{{ i18n.t(published() ? 'status.noteFinal' : closed() ? (c.autoFill === false ? 'status.noteClosed' : 'status.noteClosedAuto') : 'status.note') }}</p>
         </section>
       } @else if (status()?.voted && c.phase === 'Open') {
         <p class="card small">{{ i18n.t('status.hidden') }}</p>
+      }
+      @if (info.demo() && myMails().length) {
+        <details class="card mails">
+          <summary><b>{{ i18n.t('vote.mails', { n: myMails().length }) }}</b></summary>
+          <p class="muted small">{{ i18n.t('vote.mailsHint') }}</p>
+          @for (m of myMails(); track $index) {
+            <article>
+              <div class="muted small">{{ i18n.date(m.createdAt) }}</div>
+              <h3>{{ m.subject }}</h3>
+              <pre>{{ m.body }}</pre>
+            </article>
+          }
+        </details>
       }
       <div class="layout">
         <div class="list">
@@ -222,6 +238,11 @@ import { Toast } from './toast';
     @media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr) } }
     .list { display: grid; gap: 8px }
     .status { margin-bottom: 18px }
+    .mails { margin-bottom: 18px }
+    .mails summary { cursor: pointer }
+    .mails article { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 8px }
+    .mails h3 { margin: 2px 0; font-size: 15px }
+    .mails pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 4px 0 0; overflow-wrap: anywhere }
     .st { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; color: var(--ink); font-size: 15px }
     .st li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--line) }
     .st .w { grid-column: 1 / -1 }
@@ -279,10 +300,13 @@ export class VotePage implements OnInit {
   readonly slotId = input.required<string>();
 
   protected i18n = inject(I18n);
+  protected info = inject(AppInfo);
   private api = inject(Api);
   private toast = inject(Toast);
 
   protected slot = signal<Slot | null>(null);
+  /** Demo: the mails this person would have received. */
+  protected myMails = signal<MyMail[]>([]);
   protected activities = signal<Activity[]>([]);
   protected loadError = signal(false);
   protected points = signal<Record<string, number>>({});
@@ -355,6 +379,12 @@ export class VotePage implements OnInit {
 
   private async loadStatus(): Promise<void> {
     try { this.status.set(await this.api.myStatus(this.slotId(), this.name())); } catch { this.status.set(null); }
+    await this.loadMails();
+  }
+
+  private async loadMails(): Promise<void> {
+    if (!this.info.demo()) return;
+    try { this.myMails.set(await this.api.myMails(this.slotId(), this.name())); } catch { this.myMails.set([]); }
   }
 
   protected async toggleWaitlist(activityId: string): Promise<void> {
@@ -410,6 +440,7 @@ export class VotePage implements OnInit {
     try {
       this.status.set(await call());
       this.toast.show(this.i18n.t(done));
+      await this.loadMails();
     } catch (e) {
       this.errors.set(this.i18n.errors(e));
       await this.loadStatus();
