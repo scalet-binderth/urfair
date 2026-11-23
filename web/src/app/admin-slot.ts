@@ -102,6 +102,11 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                 </div>
               }
               <div><button class="btn ghost" type="button" (click)="addGroup()">{{ i18n.t('admin.addGroup') }}</button></div>
+              <h3>{{ i18n.t('admin.staffing') }}</h3>
+              <label class="check"><input type="checkbox" [(ngModel)]="form.rules.requiredStaffing" />{{ i18n.t('admin.requiredStaffing') }}</label>
+              <p class="muted small">{{ i18n.t('admin.requiredStaffingHint') }}</p>
+              <div class="field"><label for="r-extra">{{ i18n.t('admin.maxExtra') }}</label><input id="r-extra" type="number" min="0" max="10" step="1" [(ngModel)]="form.rules.maxExtra" /></div>
+              <p class="muted small">{{ i18n.t('admin.maxExtraHint') }}</p>
               <p class="muted small">{{ i18n.t('admin.rulesNote') }}</p>
               @if (canEdit()) { <div><button class="btn" type="button" [disabled]="busy()" (click)="saveSettings()">{{ i18n.t('common.save') }}</button></div> }
             </div>
@@ -195,7 +200,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
 
-        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" /> }
+        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" /> }
         @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" /> }
 
         @case ('demo') {
@@ -284,7 +289,7 @@ export class AdminSlotPage implements OnInit {
   protected confirmClear = signal(false);
   protected showImport = signal(false);
   protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; showInterim: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null } };
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null, maxExtra: 0, requiredStaffing: false } };
   protected formGroups: Group[] = [];
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
@@ -336,7 +341,8 @@ export class AdminSlotPage implements OnInit {
       await this.api.updateSlot(this.slotId(), {
         name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim,
         parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, organiserEmail: this.form.organiserEmail.trim() || null, visibility: this.form.visibility,
-        rules: { ...this.form.rules, perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
+        rules: { ...this.form.rules, maxExtra: Number(this.form.rules.maxExtra || 0), requiredStaffing: !!this.form.rules.requiredStaffing,
+          perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));
       await this.load();

@@ -88,6 +88,9 @@ interface Card {
                         <b
                           >{{ d.sessionLoad[s.id] ?? 0 }}{{ s.capacity ? ' / ' + s.capacity : '' }}</b
                         >
+                        @if (requiredStaffing() && s.capacity && (d.sessionLoad[s.id] ?? 0) < s.capacity) {
+                          <span class="need">{{ i18n.t('vote.missing', { n: s.capacity - (d.sessionLoad[s.id] ?? 0) }) }}</span>
+                        }
                         <span class="meter">
                           <i
                             [style.width.%]="
@@ -338,6 +341,10 @@ interface Card {
     .slot.over b {
       color: var(--warn);
     }
+    .need {
+      color: var(--warn);
+      font-weight: 600;
+    }
     .slot .meter {
       overflow: hidden;
     }
@@ -576,6 +583,8 @@ export class ResultsPage implements OnInit {
   /** Phase of the vote: from the allocation phase on the allocation is frozen. */
   readonly phase = input<Phase>('Allocation');
   readonly canEdit = input(true);
+  /** Every date must be filled: show how many people are still missing. */
+  readonly requiredStaffing = input(false);
   protected i18n = inject(I18n);
   protected api = inject(Api);
   private toast = inject(Toast);

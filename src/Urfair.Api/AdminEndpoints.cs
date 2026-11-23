@@ -104,6 +104,9 @@ public static class AdminEndpoints
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
             (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);
+            // Fewer extra seats allowed: offers above the new maximum are cut down.
+            foreach (var b in await db.Ballots.Where(b => b.FairSlotId == id && b.Extra > rules.MaxExtra).ToListAsync())
+                b.Extra = rules.MaxExtra;
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();
             foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())

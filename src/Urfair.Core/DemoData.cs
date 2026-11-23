@@ -18,7 +18,8 @@ public static class DemoData
     public static readonly Rules ExcursionRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 70, PerParticipant: 1);
     public static readonly Rules HolidayRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2);
     public static readonly Rules CampRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 60, PerParticipant: 1);
-    public static readonly Rules FestivalRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2);
+    /// <summary>Required staffing: every shift must be filled; helpers may offer up to two shifts more.</summary>
+    public static readonly Rules FestivalRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2, MaxExtra: 2, RequiredStaffing: true);
 
     /// <summary>
     /// Open vote without any ballots, to try voting live in a presentation. Shifts on the festival day:

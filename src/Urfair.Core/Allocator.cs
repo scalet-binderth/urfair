@@ -2,7 +2,8 @@ namespace Urfair.Core;
 
 /// <summary>
 /// Assigns participants to sessions.
-/// <see cref="PointBased"/>: round-based, higher points win, ties broken by lottery, followed by Pareto-improving swaps.
+/// <see cref="PointBased"/>: round-based, higher points win, ties broken by lottery, followed by Pareto-improving swaps;
+/// then extra seats for people who offered more than required.
 /// <see cref="FirstComeFirstServed"/>: baseline for comparison, random arrival order (simulates the rush at opening time).
 /// </summary>
 public sealed class Allocator
@@ -62,6 +63,7 @@ public sealed class Allocator
             foreach (var b in withoutBid.OrderBy(b => lottery[b.Id])) a.AssignFallback(b);
         }
         a.ImproveBySwapping();
+        a.AssignExtras(perParticipant, lottery, ranking);
         return a;
     }
 
@@ -298,7 +300,8 @@ public sealed class Allocator
 
     private double Free(Session s) => s.Capacity is { } c ? c - Load(s) : double.PositiveInfinity;
 
-    private bool Fits(Ballot b, Session s, Assignment? except = null)
+    /// <param name="extra">An extra seat ("more than required"): group quotas do not limit it.</param>
+    private bool Fits(Ballot b, Session s, Assignment? except = null, bool extra = false)
     {
         if (b.UnavailableSessions.Contains(s.Id) || b.HasDeclined(s.ActivityId)) return false;
         foreach (var x in _assignments[b.Id])
@@ -307,7 +310,7 @@ public sealed class Allocator
             if (x.Session.ActivityId == s.ActivityId || x.Session.Overlaps(s)) return false;
         }
         // Group quota: e.g. at most 2 green and 1 blue project per participant.
-        if (GroupOf(s.ActivityId) is { } g &&
+        if (!extra && GroupOf(s.ActivityId) is { } g &&
             _assignments[b.Id].Count(x => !ReferenceEquals(x, except) && GroupOf(x.Session.ActivityId) == g) >= g.PerParticipant)
             return false;
         return true;
@@ -315,8 +318,8 @@ public sealed class Allocator
 
     private ActivityGroup? GroupOf(string activityId) => _groupOf.GetValueOrDefault(activityId);
 
-    private IEnumerable<Session> Available(Ballot b, Activity act, Assignment? except = null) =>
-        act.Sessions.Where(s => Free(s) > 0 && Fits(b, s, except));
+    private IEnumerable<Session> Available(Ballot b, Activity act, Assignment? except = null, bool extra = false) =>
+        act.Sessions.Where(s => Free(s) > 0 && Fits(b, s, except, extra));
 
     private void Assign(Ballot b, Session s, bool locked = false)
     {
@@ -354,6 +357,34 @@ public sealed class Allocator
         if (s is null) return false;
         Assign(b, s);
         return true;
+    }
+
+    /// <summary>
+    /// "More than required": after the basic round people who offered more (<see cref="Ballot.Extra"/>) get one extra seat
+    /// per round in a free activity they gave points to, more points first, ties by lottery; group quotas do not limit them.
+    /// Nobody loses a seat for it, so in required staffing the dates still missing people fill up first from them.
+    /// </summary>
+    private void AssignExtras(int perParticipant, Dictionary<string, double> lottery, Dictionary<string, List<Activity>> ranking)
+    {
+        var rounds = _ballots.Select(b => b.Extra).DefaultIfEmpty(0).Max();
+        for (var round = 1; round <= rounds; round++)
+        {
+            var pending = _ballots.Where(b => b.Extra >= round && _assignments[b.Id].Count - perParticipant == round - 1).ToList();
+            while (pending.Count > 0)
+            {
+                var bids = new List<(Ballot Ballot, Activity Activity, int Points)>();
+                foreach (var b in pending)
+                    if (ranking[b.Id].FirstOrDefault(x => Available(b, x, extra: true).Any()) is { } act) bids.Add((b, act, b.PointsFor(act.Id)));
+                var next = new List<Ballot>();
+                foreach (var bid in bids.OrderByDescending(x => x.Points).ThenBy(x => lottery[x.Ballot.Id]))
+                {
+                    var s = Available(bid.Ballot, bid.Activity, extra: true).OrderByDescending(Free).ThenBy(x => x.Start).FirstOrDefault();
+                    if (s is null) next.Add(bid.Ballot);
+                    else Assign(bid.Ballot, s);
+                }
+                pending = next;
+            }
+        }
     }
 
     /// <summary>Applies improvements that leave nobody worse off.</summary>

@@ -33,6 +33,10 @@ system assigns the seats:
   visible to participants) → Closed (lists final) → Ended (read only). At the registration deadline an open vote
   switches to Allocation by itself; after the last date it becomes Ended (checked every minute, Vienna time).
   Participants see an interim status during registration only if the vote has "show interim status" switched on.
+- **Required staffing and more than required** (rules of a vote): with "all posts must be filled" every date with a
+  seat count shows participants how many people are still needed, even without the interim status. "More than
+  required" lets participants offer up to N extra seats (maximum set by the organisers, `Ballots.Extra`); extra seats
+  come after the basic round, only in activities they gave points to, and never cost anyone a seat.
 - **Frozen allocation**: during draft and registration the allocation is recalculated on every request (live preview).
   From Allocation on it is frozen; organisers move people by hand, lock seats and recalculate the rest. Going back to
   registration is possible only from the internal allocation and unfreezes it. Freezing

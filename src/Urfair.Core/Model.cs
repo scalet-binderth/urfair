@@ -37,7 +37,8 @@ public sealed record Activity(
 /// were given back and are never allocated again, <paramref name="Waitlist"/> activities are ticked to move up into, and
 /// <paramref name="NoReplacement"/> holds the groups (id, "" without a group) where a missing seat is not filled on its own.
 /// <paramref name="GiveUp"/> maps a ticked activity to the activity whose seat the person chose to give up for it
-/// (otherwise the weakest seat of the group goes).
+/// (otherwise the weakest seat of the group goes). <paramref name="Extra"/>: "more than required", the person would also
+/// take up to this many seats more (at most <see cref="Rules.MaxExtra"/>).
 /// </summary>
 public sealed record Ballot(
     string Id,
@@ -48,7 +49,8 @@ public sealed record Ballot(
     IReadOnlySet<string>? Declined = null,
     IReadOnlySet<string>? Waitlist = null,
     IReadOnlySet<string>? NoReplacement = null,
-    IReadOnlyDictionary<string, string>? GiveUp = null)
+    IReadOnlyDictionary<string, string>? GiveUp = null,
+    int Extra = 0)
 {
     public int PointsFor(string activityId) => Points.GetValueOrDefault(activityId);
     public bool HasDeclined(string activityId) => Declined?.Contains(activityId) == true;
@@ -63,14 +65,21 @@ public sealed record Ballot(
 /// </summary>
 public sealed record ActivityGroup(string Id, string Name, int PerParticipant, int MinActivities, string Color = "green");
 
-/// <summary>Rules of a FairSlot. With groups, <see cref="PerParticipant"/> must be the sum of the group quotas.</summary>
+/// <summary>
+/// Rules of a FairSlot. With groups, <see cref="PerParticipant"/> must be the sum of the group quotas.
+/// <see cref="MaxExtra"/>: "more than required", participants may offer up to this many seats more (0 = off).
+/// <see cref="RequiredStaffing"/>: every date with a seat count must be filled; participants see how many people are
+/// still missing while voting.
+/// </summary>
 public record Rules(
     int PointBudget = 100,
     int MinActivities = 5,
     int MaxPerActivity = 40,
     int PerParticipant = 3,
     int Step = 5,
-    IReadOnlyList<ActivityGroup>? Groups = null)
+    IReadOnlyList<ActivityGroup>? Groups = null,
+    int MaxExtra = 0,
+    bool RequiredStaffing = false)
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<ActivityGroup> GroupList => Groups ?? [];
@@ -79,11 +88,11 @@ public record Rules(
 
     // Compare groups by content so that "rules changed" detection works.
     public virtual bool Equals(Rules? other) =>
-        other is not null && (PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step) ==
-        (other.PointBudget, other.MinActivities, other.MaxPerActivity, other.PerParticipant, other.Step) &&
+        other is not null && (PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, MaxExtra, RequiredStaffing) ==
+        (other.PointBudget, other.MinActivities, other.MaxPerActivity, other.PerParticipant, other.Step, other.MaxExtra, other.RequiredStaffing) &&
         GroupList.SequenceEqual(other.GroupList);
 
-    public override int GetHashCode() => HashCode.Combine(PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, GroupList.Count);
+    public override int GetHashCode() => HashCode.Combine(PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, GroupList.Count, MaxExtra, RequiredStaffing);
 }
 
 public sealed class Assignment(string ballotId, Session session, int points)

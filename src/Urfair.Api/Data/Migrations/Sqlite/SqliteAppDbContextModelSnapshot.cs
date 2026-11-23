@@ -237,6 +237,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Extra")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("TEXT");
 
@@ -289,6 +292,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("MaxExtra")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("MaxPerActivity")
                         .HasColumnType("INTEGER");
 
@@ -328,6 +334,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
 
                     b.Property<DateTime?>("RegistrationDeadline")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("RequiredStaffing")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SampleCount")
                         .HasColumnType("INTEGER");
