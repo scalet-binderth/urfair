@@ -107,7 +107,8 @@ public static class Database
     /// with a visible allocation, D additionally one closed.
     /// B, C and D have already voted in their open FairSlots and can change their ballots.
     /// Dates are relative to the day of seeding, so deadlines and sessions fit the phases whenever the demo is reset.
-    /// "Pfarrfest" shows the interim status during registration; in the visible "Ministrantenausflug" sample people are on
+    /// "Pfarrfest" shows the interim status during registration and, as it needs every shift filled (required staffing), how
+    /// many people are still missing on each date; D offered one shift more than required. In the visible "Ministrantenausflug" sample people are on
     /// waiting lists, so a seat given back moves up. There C did not get her first wish (Kletterwald, full) and can tick it,
     /// while D holds a seat there he can give back: then C moves up first, as no ticked sample person gave it as many points.
     /// All its activities are full: B sits in his weakest wish and is warned that giving it back leaves him without a seat.
@@ -128,8 +129,11 @@ public static class Database
             organiserEmail: "stefan.huber@example.org", choices: DemoData.HolidayChoices, seats: DemoData.HolidaySeats, ticks: DemoData.HolidayTicks);
         await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
             DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
-        await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
+        var festival = await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
             DemoData.FestivalRules, DemoData.ParishFestival().MovedTo(today.AddDays(45)), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler", visibility: Visibility.ParishOnly, showInterim: true);
+        // D would also take one shift more than required.
+        (await db.Ballots.SingleAsync(x => x.FairSlotId == festival.Id && x.Name == d)).Extra = 1;
+        await db.SaveChangesAsync();
     }
 
     /// <summary>A registration deadline at the end of the day, relative to today.</summary>

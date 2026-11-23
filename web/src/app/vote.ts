@@ -18,6 +18,7 @@ import { Toast } from './toast';
         <h1>{{ i18n.t('vote.title') }}</h1>
         <p>{{ i18n.t('vote.lead', { budget: c.rules.pointBudget, min: c.rules.minActivities, max: c.rules.maxPerActivity, k: c.rules.perParticipant }) }}</p>
         @if (groups().length) { <p>{{ i18n.t('vote.leadGroups') }}</p> }
+        @if (c.rules.requiredStaffing) { <p>{{ i18n.t('vote.requiredLead') }}</p> }
       </div>
       @if (!canVote()) { <p class="card">{{ i18n.t('vote.closed') }}</p> }
       <div class="mini">
@@ -142,6 +143,9 @@ import { Toast } from './toast';
                           <span>{{ sessionText(s) }}</span>
                         </label>
                       } @else { {{ sessionText(s) }} }
+                      @if (s.missing != null) {
+                        <span class="need" [class.ok]="s.missing === 0">{{ s.missing ? i18n.t('vote.missing', { n: s.missing }) : i18n.t('vote.staffed') }}</span>
+                      }
                     </li>
                   }
                 </ul>
@@ -180,6 +184,16 @@ import { Toast } from './toast';
           <div class="card stack">
             <p class="small">{{ i18n.t('vote.as', { name: name() }) }}</p>
             @if (loadedPrevious()) { <p class="small muted">{{ i18n.t('vote.loaded') }}</p> }
+            @if (c.rules.maxExtra) {
+              <label class="extra small">{{ i18n.t('vote.extra') }}
+                <select [disabled]="!canVote()" (change)="extra.set(+$any($event.target).value)">
+                  @for (n of extraOptions(); track n) {
+                    <option [value]="n" [selected]="n === extra()">{{ n ? i18n.t('vote.extraN', { n }) : i18n.t('vote.extraNone') }}</option>
+                  }
+                </select>
+              </label>
+              <p class="muted small">{{ i18n.t('vote.extraHint') }}</p>
+            }
             @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
             <button class="btn" type="button" [disabled]="!canSubmit() || busy() || !canVote()" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
             @if (canVote()) { <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button> }
@@ -228,6 +242,9 @@ import { Toast } from './toast';
     label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer }
     label input { margin-top: 3px; accent-color: var(--accent) }
     label.off span { text-decoration: line-through }
+    .need { margin-left: 6px; font-weight: 600; color: var(--warn) }
+    .need.ok { color: var(--good) }
+    .extra { display: grid; gap: 4px }
     .stepper { display: flex; align-items: center; gap: 4px }
     .stepper button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 18px; line-height: 1 }
     .stepper button:hover:not(:disabled) { border-color: var(--accent) }
@@ -262,6 +279,9 @@ export class VotePage implements OnInit {
   private session = inject(SessionService);
   protected name = computed(() => this.session.participantName() ?? '');
   protected loadedPrevious = signal(false);
+  /** "More than required": seats the person would also take. */
+  protected extra = signal(0);
+  protected extraOptions = computed(() => Array.from({ length: (this.slot()?.rules.maxExtra ?? 0) + 1 }, (_, i) => i));
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
 
@@ -407,6 +427,7 @@ export class VotePage implements OnInit {
       if (previous) {
         this.points.set(previous.points);
         this.unavailable.set(new Set(previous.unavailableSessions));
+        this.extra.set(previous.extra ?? 0);
         this.loadedPrevious.set(true);
       }
       await this.loadStatus();
@@ -465,8 +486,10 @@ export class VotePage implements OnInit {
     this.busy.set(true);
     this.errors.set([]);
     try {
-      const res = await this.api.submitBallot(this.slotId(), { name: this.name().trim(), points: this.points(), unavailableSessions: [...this.unavailable()] });
+      const res = await this.api.submitBallot(this.slotId(), { name: this.name().trim(), points: this.points(), unavailableSessions: [...this.unavailable()], extra: this.extra() });
       this.toast.show(this.i18n.t(res.replaced ? 'vote.replaced' : 'vote.saved'));
+      // The people still missing per date change with every ballot.
+      if (this.rules().requiredStaffing) this.activities.set(await this.api.activities(this.slotId()));
       await this.loadStatus();
     } catch (e) {
       this.errors.set(this.i18n.errors(e));

@@ -115,6 +115,15 @@ and English; keep both in sync.
   another one; a seat no longer held falls back to the weakest. It counts for moving up and for offers when closed,
   goes with the tick and is part of the save points (new column `Ballots.GiveUp`). Demo: set the "Ferienprogramm"
   to visible, C can give up Parkbad instead of Fußballturnier for "Kochen mit Oma"
+- **Step 7: required staffing and more than required.** Two new rules per vote (blocked while the allocation is
+  frozen, like all rules). "Required staffing": every date with a seat count must be filled; participants see
+  "noch gesucht: X" per date while voting (even without the interim status) and organisers see it in the load view.
+  The allocation stays as it is: the basic round and the fallback already fill the emptiest dates. "More than
+  required": organisers allow up to N extra seats (0 = off, at most 10), participants choose "up to N" next to their
+  points. Extra seats come after the basic round and the swaps, only in activities the person gave points to, more
+  points first, group quotas do not limit them and nobody loses a seat for them. Lowering the maximum cuts offers
+  down (new columns `FairSlots.MaxExtra`, `FairSlots.RequiredStaffing`, `Ballots.Extra`). Demo: the "Pfarrfest"
+  shows the people still missing per shift; D offers one seat more and gets a third shift
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -126,7 +135,7 @@ and English; keep both in sync.
 | 5 ✓ | done, see above | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 ✓ | done, see above | |
-| 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |
+| 7 ✓ | done, see above | |
 | 8 ✓ | done, see above (later: activities, participant list and rules; points hang on them, the CSV export is the backup until then) | |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
@@ -177,12 +186,12 @@ original allocation so organisers can see and restore it; a log records every ch
 
 ## Requirement notes
 
-- **More than required:** without an explicit choice the algorithm limits to the required number. New: participants
-  state "I would also take up to N" (organiser sets the maximum); extra seats only after the basic round.
+- **More than required:** done in step 7 (participants offer "up to N" more, the organisers set the maximum; extra
+  seats only after the basic round).
 - **Interim status:** invites tactics; decided: off while registering, shown during allocation (see "Process model").
 - **Cancellations and moving up:** decided, see "Process model"; e-mails come in step 6.
-- **Required staffing:** first fill every date's minimum, preferring people who gave it points; show missing
-  people while voting.
+- **Required staffing:** done in step 7 as "every date with a seat count is a post to fill"; missing people are
+  shown while voting. A separate minimum below the seat count per date can follow if a real vote needs it.
 - **Together with friends (decided 22 November 2026):** switchable per vote (off / pairs / groups, default up to 3).
   A group forms by a code that every member enters (mutual consent, nobody can be added by others). It is only a
   wish: after the normal allocation, seats are swapped so that the group shares at least one activity, and only an

@@ -5,6 +5,7 @@ public static class Validation
 {
     public const int MaxDescription = 2000;
     public const int MaxShortText = 120;
+    public const int MaxExtraSeats = 10;
 
     private static ValidationError E(string code, params (string Key, object Value)[] args) =>
         new(code, args.Length == 0 ? null : args.ToDictionary(a => a.Key, a => a.Value));
@@ -26,6 +27,8 @@ public static class Validation
 
         var sum = ballot.Points.Values.Sum();
         if (sum != r.PointBudget) errors.Add(E("budgetNotSpent", ("budget", r.PointBudget), ("sum", sum)));
+
+        if (ballot.Extra < 0 || ballot.Extra > r.MaxExtra) errors.Add(E("extraInvalid", ("max", r.MaxExtra)));
 
         var count = ballot.Points.Count(p => p.Value > 0);
         if (count < r.MinActivities) errors.Add(E("tooFewActivities", ("min", r.MinActivities), ("count", count)));
@@ -71,6 +74,7 @@ public static class Validation
         if (r.MinActivities * r.Step > r.PointBudget) errors.Add(E("tooManyActivitiesForBudget", ("max", r.PointBudget / r.Step)));
         if (r.PerParticipant > r.MinActivities) errors.Add(E("perParticipantAboveMin"));
         if (r.PerParticipant < 1) errors.Add(E("perParticipantTooLow"));
+        if (r.MaxExtra is < 0 or > MaxExtraSeats) errors.Add(E("maxExtraInvalid", ("max", MaxExtraSeats)));
         if (r.GroupList.Count > 0)
         {
             if (r.GroupList.Any(g => string.IsNullOrWhiteSpace(g.Name))) errors.Add(E("groupNameRequired"));

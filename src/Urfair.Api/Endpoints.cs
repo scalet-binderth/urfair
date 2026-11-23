@@ -5,12 +5,14 @@ using Urfair.Core;
 
 namespace Urfair.Api;
 
-public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible);
+/// <param name="Missing">Required staffing: people still missing on this date by the current allocation (null without a seat count).</param>
+public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible, int? Missing = null);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
     Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null);
-public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions);
+/// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
+public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
 /// <param name="GiveUp">Per ticked activity the activity whose seat goes for it; null keeps the earlier choices.</param>
@@ -58,7 +60,7 @@ public static class Endpoints
                 .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
             return ballot is null
                 ? Results.NotFound()
-                : Results.Ok(new { points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions });
+                : Results.Ok(new { points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions, extra = ballot.Extra });
         });
 
         // FairSlots this person is listed in (drafts stay hidden). Identified by personal link, in demo mode also by name.
@@ -207,8 +209,17 @@ public static class Endpoints
         api.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg) =>
             await ToDto(db, id, cfg) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
+        // In required staffing every date also says how many people are still missing, even without the interim status.
         api.MapGet("/slots/{id:guid}/activities", async (Guid id, AppDbContext db) =>
-            (await Database.LoadActivitiesAsync(db, id)).Select(ToDto));
+        {
+            var slot = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+            if (slot is not { RequiredStaffing: true }) return (await Database.LoadActivitiesAsync(db, id)).Select(ToDto).ToList();
+            var (allocation, activities, _) = await AllocationEndpoints.CurrentAsync(db, slot);
+            return activities.Select(a => ToDto(a) with
+            {
+                Sessions = a.Sessions.Select(s => ToDto(s) with { Missing = s.Capacity is { } c ? Math.Max(0, c - allocation.Load(s)) : null }).ToList(),
+            }).ToList();
+        });
 
         api.MapPost("/slots/{id:guid}/ballots", async (Guid id, BallotRequest req, AppDbContext db, HttpContext http) =>
         {
@@ -221,7 +232,7 @@ public static class Endpoints
             var activities = await Database.LoadActivitiesAsync(db, id);
             var points = (req.Points ?? []).Where(p => p.Value != 0).ToDictionary();
             var unavailable = (req.UnavailableSessions ?? []).ToHashSet();
-            var errors = Validation.Check(new Ballot("new", name, points, unavailable), slot.ToRules(), activities);
+            var errors = Validation.Check(new Ballot("new", name, points, unavailable, Extra: req.Extra), slot.ToRules(), activities);
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             // A new ballot of the same person replaces the previous one.
@@ -232,6 +243,7 @@ public static class Endpoints
                 FairSlotId = id, Name = name,
                 Points = points.Select(p => new BallotPoints { ActivityId = p.Key, Points = p.Value }).ToList(),
                 UnavailableSessions = unavailable.ToList(),
+                Extra = req.Extra,
                 // Keep earlier waiting-list choices for activities that still have points.
                 Waitlist = existing.SelectMany(b => b.Waitlist).Where(points.ContainsKey).Distinct().ToList(),
                 GiveUp = existing.SelectMany(b => b.GiveUp).Where(x => points.ContainsKey(x.Split('>', 2)[0])).Distinct().ToList(),
@@ -251,7 +263,9 @@ public static class Endpoints
     }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,
-        a.Sessions.Select(s => new SessionDto(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible)).ToList(), a.GroupId, a.Description, a.Parish, a.Leader);
+        a.Sessions.Select(ToDto).ToList(), a.GroupId, a.Description, a.Parish, a.Leader);
+
+    private static SessionDto ToDto(Session s) => new(s.Id, s.Start, s.End, s.Location, s.Capacity, s.Flexible);
 
     /// <summary>With the leader's e-mail address, which participants do not see.</summary>
     public static ActivityDto ToAdminDto(Activity a) => ToDto(a) with { LeaderEmail = a.LeaderEmail };

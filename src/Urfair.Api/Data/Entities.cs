@@ -31,6 +31,10 @@ public class FairSlotEntity
     public int MinActivities { get; set; } = 5;
     public int MaxPerActivity { get; set; } = 40;
     public int PerParticipant { get; set; } = 3;
+    /// <summary>"More than required": participants may offer up to this many seats more (0 = off).</summary>
+    public int MaxExtra { get; set; }
+    /// <summary>Every date with a seat count must be filled; participants see how many people are still missing while voting.</summary>
+    public bool RequiredStaffing { get; set; }
     public int Seed { get; set; } = 2027;
     public int SampleCount { get; set; }
     /// <summary>Anyone who signs in may see and vote, without being on the participant list (demo playground, later self-registration).</summary>
@@ -52,11 +56,12 @@ public class FairSlotEntity
     public List<GroupEntity> Groups { get; set; } = [];
 
     public Rules ToRules() => new(PointBudget, MinActivities, MaxPerActivity, PerParticipant, 5,
-        Groups.OrderBy(g => g.SortOrder).Select(g => g.ToModel()).ToList());
+        Groups.OrderBy(g => g.SortOrder).Select(g => g.ToModel()).ToList(), MaxExtra, RequiredStaffing);
 
     public void Apply(Rules r)
     {
         (PointBudget, MinActivities, MaxPerActivity, PerParticipant) = (r.PointBudget, r.MinActivities, r.MaxPerActivity, r.PerParticipant);
+        (MaxExtra, RequiredStaffing) = (r.MaxExtra, r.RequiredStaffing);
         // Update groups in place (matched by id) so EF Core does not track two rows with the same key.
         var keep = r.GroupList.Select((g, i) =>
         {
@@ -120,6 +125,8 @@ public class BallotEntity
     public List<string> NoReplacement { get; set; } = [];
     /// <summary>Seat chosen to give up for a tick, as "tickedActivityId&gt;givenActivityId" (otherwise the weakest goes).</summary>
     public List<string> GiveUp { get; set; } = [];
+    /// <summary>"More than required": the person would also take up to this many seats more.</summary>
+    public int Extra { get; set; }
 
     public Dictionary<string, string> GiveUpMap() => ParseGiveUp(GiveUp);
 
@@ -131,7 +138,7 @@ public class BallotEntity
 
     public Ballot ToModel() => new(Id.ToString(), Name,
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
-        UnavailableSessions.ToHashSet(), Gender, Declined.ToHashSet(), Waitlist.ToHashSet(), NoReplacement.ToHashSet(), GiveUpMap());
+        UnavailableSessions.ToHashSet(), Gender, Declined.ToHashSet(), Waitlist.ToHashSet(), NoReplacement.ToHashSet(), GiveUpMap(), Extra);
 }
 /// <summary>
 /// A person allowed to vote in a FairSlot. Signs in with a personal link (token) and, if a date of birth is stored,

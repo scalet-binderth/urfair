@@ -7,10 +7,12 @@ export const PHASES: Phase[] = ['Draft', 'Open', 'Allocation', 'Published', 'Clo
 
 export interface Group { id: string; name: string; perParticipant: number; minActivities: number; color: string; }
 export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
-export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; }
+/** maxExtra: "more than required", participants may offer up to this many seats more (0 = off). requiredStaffing: every date must be filled. */
+export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; maxExtra?: number; requiredStaffing?: boolean; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
 export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; }
-export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
+/** missing: required staffing, people still missing on this date (participant view). */
+export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; missing?: number | null; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
 export interface SessionInput { id: string | null; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; }
 export interface ActivityInput { title: string; restrictedTo: string | null; sessions: SessionInput[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail: string | null; }
@@ -124,9 +126,9 @@ export class Api {
     return this.call(this.http.post<{ name: string; slotId: string }>(`/api/p/${token}/check`, { birthDate, baptismDate }));
   }
   /** Previously submitted ballot of this name, or null. */
-  async lookupBallot(id: string, name: string): Promise<{ points: Record<string, number>; unavailableSessions: string[] } | null> {
+  async lookupBallot(id: string, name: string): Promise<{ points: Record<string, number>; unavailableSessions: string[]; extra?: number } | null> {
     try {
-      return await firstValueFrom(this.http.post<{ points: Record<string, number>; unavailableSessions: string[] }>(`/api/slots/${id}/ballots/lookup`, { name }, this.me()));
+      return await firstValueFrom(this.http.post<{ points: Record<string, number>; unavailableSessions: string[]; extra?: number }>(`/api/slots/${id}/ballots/lookup`, { name }, this.me()));
     } catch (e) {
       if (e instanceof HttpErrorResponse && e.status === 404) return null;
       throw new ApiFailure([{ code: 'generic' }]);
@@ -152,7 +154,7 @@ export class Api {
   }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }
-  submitBallot(id: string, body: { name: string; points: Record<string, number>; unavailableSessions: string[] }) {
+  submitBallot(id: string, body: { name: string; points: Record<string, number>; unavailableSessions: string[]; extra?: number }) {
     return this.call(this.http.post<{ id: string; replaced: boolean }>(`/api/slots/${id}/ballots`, body, this.me()));
   }
 

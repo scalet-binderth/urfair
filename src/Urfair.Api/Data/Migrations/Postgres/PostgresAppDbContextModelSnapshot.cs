@@ -245,6 +245,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .IsRequired()
                         .HasColumnType("text[]");
 
+                    b.Property<int>("Extra")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("uuid");
 
@@ -297,6 +300,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<int>("MaxExtra")
+                        .HasColumnType("integer");
+
                     b.Property<int>("MaxPerActivity")
                         .HasColumnType("integer");
 
@@ -336,6 +342,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
 
                     b.Property<DateTime?>("RegistrationDeadline")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<bool>("RequiredStaffing")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("SampleCount")
                         .HasColumnType("integer");
