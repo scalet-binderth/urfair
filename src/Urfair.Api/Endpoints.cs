@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Urfair.Api.Data;
 using Urfair.Core;
@@ -102,20 +103,22 @@ public static class Endpoints
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
-        // Gives back a seat the person no longer wants (only while visible). It is never allocated to them again; the next
-        // person moves up. With a replacement the person gets a free seat of the same group they gave points to, if there is one.
+        // Gives back a seat the person no longer wants, for a date still ahead. It is never allocated to them again.
+        // While visible the next person moves up, and with a replacement the person gets a free seat of the same group they
+        // gave points to, if there is one. When closed (cancelling, e.g. ill) nothing moves: the organisers are told and decide.
         api.MapPost("/slots/{id:guid}/give-back", async (Guid id, GiveBackRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
-            if (slot.Phase != Phase.Published || slot.FrozenAt is null) return Errors("giveBackClosed");
+            if (slot.Phase is not (Phase.Published or Phase.Closed) || slot.FrozenAt is null) return Errors("giveBackClosed");
             var ballot = await MyBallotAsync(db, id, name);
             if (ballot is null) return Errors("notVoted");
             var activities = await Database.LoadActivitiesAsync(db, id);
-            var sessions = activities.FirstOrDefault(a => a.Id == req.ActivityId)?.Sessions.Select(s => s.Id).ToHashSet() ?? [];
+            var sessions = activities.FirstOrDefault(a => a.Id == req.ActivityId)?.Sessions.ToDictionary(s => s.Id) ?? [];
             var seats = await db.Assignments.Where(a => a.BallotId == ballot.Id).ToListAsync();
-            if (seats.FirstOrDefault(a => sessions.Contains(a.SessionId)) is not { } seat) return Errors("noSeat");
+            if (seats.FirstOrDefault(a => sessions.ContainsKey(a.SessionId)) is not { } seat) return Errors("noSeat");
+            if (sessions[seat.SessionId].Start <= Phases.Now()) return Errors("tooLate");
 
             var before = AllocationEndpoints.SeatText(activities, seats.Select(a => a.SessionId));
             db.Assignments.Remove(seat);
@@ -126,10 +129,23 @@ public static class Endpoints
             ballot.NoReplacement = req.Replacement
                 ? ballot.NoReplacement.Where(x => x != group).ToList()
                 : [.. ballot.NoReplacement.Append(group).Distinct()];
-            AllocationEndpoints.Log(db, id, name, "givenBack", name, before, after);
+            var closed = slot.Phase == Phase.Closed;
+            var given = AllocationEndpoints.SeatText(activities, [seat.SessionId]);
+            AllocationEndpoints.Log(db, id, name, closed ? "cancelled" : "givenBack", name, before, after);
+            if (closed) await OrganiserMailAsync(db, slot, name, given, after, req.Replacement, null, http);
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
-            return Results.Ok(await StatusAsync(db, slot, name));
+            var status = await StatusAsync(db, slot, name);
+            // While visible the organisers only hear about it if the person is now short of seats in that group.
+            if (!closed && status.Missing?.FirstOrDefault(m => (m.GroupId ?? "") == group) is { } shortOf)
+            {
+                var now = await db.Assignments.Where(a => a.BallotId == ballot.Id).Select(a => a.SessionId).ToListAsync();
+                var groupName = slot.ToRules().Groups.FirstOrDefault(g => g.Id == shortOf.GroupId)?.Name;
+                await OrganiserMailAsync(db, slot, name, given, AllocationEndpoints.SeatText(activities, now), req.Replacement,
+                    (shortOf.Count, groupName), http);
+                await db.SaveChangesAsync();
+            }
+            return Results.Ok(status);
         });
 
         // Takes a free seat in a group where the person lacks one (also an activity without points, e.g. as a replacement).
@@ -222,6 +238,8 @@ public static class Endpoints
         if (mine is null) return new MyStatusDto(false, [], full);
 
         var visible = slot.Phase == Phase.Published;
+        var canCancel = visible || slot.Phase == Phase.Closed;
+        var now = Phases.Now();
         var me = ballots.Single(b => b.Id == mine.Id.ToString());
         var assigned = allocation.Assignments[me.Id].ToDictionary(x => x.Session.ActivityId);
         var titles = activities.ToDictionary(a => a.Id, a => a.Title);
@@ -231,7 +249,7 @@ public static class Endpoints
             {
                 if (assigned.TryGetValue(a.Id, out var x))
                     return new MyActivityStatusDto(a.Id, a.Title, a.GroupId, me.PointsFor(a.Id), "fixed", null, false,
-                        x.Session.Start, x.Session.End, x.Session.Flexible, x.Session.Location, CanGiveBack: visible);
+                        x.Session.Start, x.Session.End, x.Session.Flexible, x.Session.Location, CanGiveBack: canCancel && x.Session.Start > now);
                 if (me.HasDeclined(a.Id))
                     return new MyActivityStatusDto(a.Id, a.Title, a.GroupId, me.PointsFor(a.Id), "givenBack", null, false, null, null, false, null);
                 var waiting = full.Contains(a.Id);
@@ -257,6 +275,41 @@ public static class Endpoints
         db.Ballots.Include(b => b.Points)
             .Where(b => b.FairSlotId == slotId && !b.IsSample && b.Name.ToLower() == name.ToLower())
             .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
+
+    /// <summary>
+    /// Tells the person responsible ("E-Mail für Antworten" of the vote) about a cancellation when closed, as nothing moves
+    /// on its own then, or, while visible, that a seat given back left the person short of seats (<paramref name="shortOf"/>).
+    /// Replies go to the person, if they have an e-mail address on the list; the mail belongs to them, so admins of their
+    /// Pfarrgemeinde see it as well.
+    /// </summary>
+    private static async Task OrganiserMailAsync(AppDbContext db, FairSlotEntity slot, string name, string seat, string left, bool replacement,
+        (int Count, string? Group)? shortOf, HttpContext http)
+    {
+        if (string.IsNullOrWhiteSpace(slot.OrganiserEmail)) return;
+        var person = await db.Participants.FirstOrDefaultAsync(p => p.FairSlotId == slot.Id && p.Name.ToLower() == name.ToLower());
+        var replyTo = person?.Email is { Length: > 0 } email ? email : null;
+        var body = new StringBuilder("Hallo,\n\n");
+        if (shortOf is { } s)
+        {
+            body.Append($"{name} hat bei „{slot.Name}“ einen Platz zurückgegeben: {seat}.\n")
+                .Append($"Es {(s.Count == 1 ? "fehlt" : "fehlen")} jetzt {s.Count} {(s.Count == 1 ? "Platz" : "Plätze")}{(s.Group is null ? "" : $" in „{s.Group}“")}.\n");
+        }
+        else body.Append($"{name} hat bei „{slot.Name}“ abgesagt: {seat}.\n");
+        body.Append($"Ersatzplatz gewünscht: {(replacement ? "ja" : "nein")}\n")
+            .Append($"Plätze jetzt: {(left.Length > 0 ? left : "keine")}\n\n");
+        body.Append(shortOf is null
+            ? "Die Zuteilung ist abgeschlossen, daher rückt niemand von selbst nach. "
+            : replacement ? $"Wird bei einer Veranstaltung, der {name} Punkte gegeben hat, ein Platz frei, rückt {name} von selbst nach. " : "");
+        body.Append($"Unter „Zuteilung“ kannst du {name} von Hand einteilen (auch überbuchen)")
+            .Append(shortOf is null ? " oder den Platz frei lassen." : ".")
+            .Append(person?.Email is { Length: > 0 } ? $" {name} bekommt dann eine Mail mit den neuen Plätzen." : "")
+            .Append(replyTo is null ? "\n" : $"\nEine Antwort auf diese Mail geht direkt an {name}, z. B. um eine andere Veranstaltung vorzuschlagen.\n")
+            .Append($"{Mailing.BaseUrl(http.Request)}/admin/s/{slot.Id}\n\nUrfair");
+        var subject = shortOf is null ? $"Absage: {name} – {slot.Name}" : $"Platz fehlt: {name} – {slot.Name}";
+        var mail = new MailEntity { ParticipantId = person?.Id, To = slot.OrganiserEmail, Subject = subject, Body = body.ToString() };
+        Mailing.Add(db, slot, mail);
+        if (replyTo is not null) mail.ReplyTo = replyTo;
+    }
 
     /// <summary>Interim status during registration only if the organisers switched it on; the allocation once published.</summary>
     private static bool ShowsStatus(FairSlotEntity slot) => slot.Phase == Phase.Open && slot.ShowInterim || Phases.ShowsResult(slot.Phase);

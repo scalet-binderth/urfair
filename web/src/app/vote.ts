@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Activity, Api, Group, MyStatus, Slot } from './api';
+import { Activity, Api, Group, MyActivityStatus, MyStatus, Slot } from './api';
 import { I18n } from './i18n';
 import { SessionService } from './session';
 import { Toast } from './toast';
@@ -27,33 +27,45 @@ import { Toast } from './toast';
       @if (status()?.activities?.length) {
         <section class="card stack status">
           <h2>{{ i18n.t(interim() ? 'status.title' : 'status.titleFinal') }}</h2>
-          <p class="muted small">{{ i18n.t(interim() ? 'status.lead' : 'status.leadFinal') }}</p>
+          <p class="muted small">{{ i18n.t(interim() ? 'status.lead' : closed() ? 'status.leadClosed' : 'status.leadFinal') }}</p>
           <ul class="st">
             @for (x of status()!.activities; track x.activityId) {
               <li>
                 <span class="t">@if (groupFor(x.groupId); as g) { <span class="grp" [attr.data-color]="g.color"></span> }{{ x.title }}
                   <span class="muted small">· {{ i18n.t('status.points', { n: x.points }) }}</span></span>
-                <span class="chip" [attr.data-status]="x.status">{{ i18n.t(x.status === 'fixed' && !interim() ? 'status.fixedFinal' : 'status.' + x.status, { n: x.position ?? 0 }) }}</span>
+                <span class="chip" [attr.data-status]="x.status">{{ i18n.t(x.status === 'fixed' && !interim() ? 'status.fixedFinal' : x.status === 'givenBack' && closed() ? 'status.cancelled' : 'status.' + x.status, { n: x.position ?? 0 }) }}</span>
                 @if (x.status === 'fixed') {
                   <span class="muted small w">{{ i18n.when({ start: x.start!, end: x.end, flexible: x.flexible }) }}@if (x.location) { · {{ x.location }} }</span>
                   @if (x.canGiveBack) {
                     @if (givingBack() === x.activityId) {
                       <div class="w back">
-                        <p class="small">{{ i18n.t('status.giveBackConfirm', { title: x.title }) }}</p>
-                        <label class="small"><input type="checkbox" [checked]="replacement()" (change)="replacement.set(!replacement())" />{{ i18n.t('status.replacement') }}</label>
+                        <p class="small">{{ i18n.t(closed() ? 'status.cancelConfirm' : 'status.giveBackConfirm', { title: x.title }) }}</p>
+                        @if (published() && leavesShort(x)) {
+                          <p class="small short">{{ i18n.t('status.giveBackShort') }}</p>
+                          @for (y of swapsFor(x); track y.activityId) {
+                            @if (y.waitlisted) {
+                              <p class="small">{{ i18n.t('status.swapSet', { title: y.title, mine: x.title }) }}</p>
+                            } @else {
+                              <p class="small">{{ i18n.t('status.swapOffer', { title: y.title, mine: x.title }) }}@if (y.position) { {{ i18n.t('status.swapPosition', { n: y.position }) }} }</p>
+                              <div class="row"><button class="btn small" type="button" [disabled]="busy()" (click)="swapOnly(y.activityId)">{{ i18n.t('status.swapOnly', { title: y.title }) }}</button></div>
+                            }
+                          }
+                        }
+                        <label class="small"><input type="checkbox" [checked]="replacement()" (change)="replacement.set(!replacement())" />{{ i18n.t(closed() ? 'status.replacementClosed' : 'status.replacement') }}</label>
                         <div class="row">
-                          <button class="btn small" type="button" [disabled]="busy()" (click)="giveBack(x.activityId)">{{ i18n.t('status.giveBack') }}</button>
+                          <button class="btn small" type="button" [class.ghost]="published() && swapsFor(x).length > 0" [disabled]="busy()" (click)="giveBack(x.activityId)">{{
+                            i18n.t(closed() ? 'status.cancel' : published() && leavesShort(x) ? 'status.giveBackAnyway' : 'status.giveBack') }}</button>
                           <button class="btn ghost small" type="button" (click)="givingBack.set(null)">{{ i18n.t('common.cancel') }}</button>
                         </div>
                       </div>
                     } @else {
-                      <div class="w"><button class="btn ghost small" type="button" [disabled]="busy()" (click)="givingBack.set(x.activityId); replacement.set(true)">{{ i18n.t('status.giveBack') }}</button></div>
+                      <div class="w"><button class="btn ghost small" type="button" [disabled]="busy()" (click)="givingBack.set(x.activityId); replacement.set(true)">{{ i18n.t(closed() ? 'status.cancel' : 'status.giveBack') }}</button></div>
                     }
                   }
                 } @else if (x.status !== 'givenBack') {
-                  @if (!published()) {
+                  @if (interim()) {
                     <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy() || !canWaitlist()" (change)="toggleWaitlist(x.activityId)" />{{ i18n.t('status.keep') }}</label>
-                  } @else if (x.canMoveUp) {
+                  } @else if (published() && x.canMoveUp) {
                     <label class="w small"><input type="checkbox" [checked]="x.waitlisted" [disabled]="busy()" (change)="toggleWaitlist(x.activityId)" />{{
                       x.givesUp ? i18n.t('status.keepSwap', { title: x.givesUp }) : i18n.t('status.keepFinal') }}</label>
                   }
@@ -76,7 +88,7 @@ import { Toast } from './toast';
               } @else { <p class="muted small">{{ i18n.t('status.nothingOpen') }}</p> }
             </div>
           }
-          <p class="muted small">{{ i18n.t(published() ? 'status.noteFinal' : 'status.note') }}</p>
+          <p class="muted small">{{ i18n.t(published() ? 'status.noteFinal' : closed() ? 'status.noteClosed' : 'status.note') }}</p>
         </section>
       } @else if (status()?.voted && c.phase === 'Open') {
         <p class="card small">{{ i18n.t('status.hidden') }}</p>
@@ -175,6 +187,7 @@ import { Toast } from './toast';
     .chip[data-status="givenBack"] { text-decoration: line-through }
     .back { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px }
     .back p { margin: 0 }
+    .back .short { color: var(--warn) }
     .btn.small { padding: 5px 10px; font-size: 13px }
     .missing { gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--warn-soft) }
     .missing p { margin: 0 }
@@ -251,10 +264,37 @@ export class VotePage implements OnInit {
   protected canWaitlist = computed(() => this.slot()?.phase === 'Published' || (this.interim() && !!this.slot()?.showInterim));
   /** Visible allocation: seats can be given back, ticks move up at once and free seats can be taken. */
   protected published = computed(() => this.slot()?.phase === 'Published');
+  /** Lists are final: participants can only cancel a seat; the organisers decide what happens with it. */
+  protected closed = computed(() => this.slot()?.phase === 'Closed');
   protected givingBack = signal<string | null>(null);
   protected replacement = signal(true);
   protected groups = computed(() => this.slot()?.rules.groups ?? []);
   protected groupFor(id: string | null): Group | undefined { return this.groups().find(g => g.id === id); }
+
+  /** Seats required in the group of an activity (without groups: all seats; ungrouped ones: the rest). */
+  private required(groupId: string | null): number {
+    const rules = this.slot()!.rules;
+    const group = this.groupFor(groupId);
+    if (group) return group.perParticipant;
+    const groups = this.groups();
+    return groups.length ? Math.max(0, rules.perParticipant - groups.reduce((n, g) => n + g.perParticipant, 0)) : rules.perParticipant;
+  }
+
+  /** Giving back this seat leaves the person with fewer seats in its group than required. */
+  protected leavesShort(x: MyActivityStatus): boolean {
+    const sameGroup = (this.status()?.activities ?? []).filter(y => y.status === 'fixed' && (this.groupFor(y.groupId) ?? null) === (this.groupFor(x.groupId) ?? null));
+    return sameGroup.length - 1 < this.required(x.groupId);
+  }
+
+  /** Ticks that would swap exactly this seat: moving up there gives it up, so the person is never left without one. */
+  protected swapsFor(x: MyActivityStatus): MyActivityStatus[] {
+    return (this.status()?.activities ?? []).filter(y => y.canMoveUp && y.givesUp === x.title);
+  }
+
+  protected async swapOnly(activityId: string): Promise<void> {
+    await this.toggleWaitlist(activityId);
+    this.givingBack.set(null);
+  }
 
   private async loadStatus(): Promise<void> {
     try { this.status.set(await this.api.myStatus(this.slotId(), this.name())); } catch { this.status.set(null); }
@@ -267,7 +307,7 @@ export class VotePage implements OnInit {
   }
 
   protected async giveBack(activityId: string): Promise<void> {
-    await this.update(() => this.api.giveBack(this.slotId(), this.name(), activityId, this.replacement()), 'status.givenBackSaved');
+    await this.update(() => this.api.giveBack(this.slotId(), this.name(), activityId, this.replacement()), this.closed() ? 'status.cancelledSaved' : 'status.givenBackSaved');
     this.givingBack.set(null);
   }
 

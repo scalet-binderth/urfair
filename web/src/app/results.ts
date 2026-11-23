@@ -36,6 +36,8 @@ interface Card {
               <div><button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button></div>
             } @else if (phase() === 'Published') {
               <p class="muted small">{{ i18n.t('results.movingUpHint') }}</p>
+            } @else if (phase() === 'Closed') {
+              <p class="muted small">{{ i18n.t('results.closedHint') }}</p>
             }
           } @else {
             <p><b>{{ i18n.t('results.live') }}</b></p>
@@ -130,6 +132,9 @@ interface Card {
           @if (csv()) {
             <textarea class="csv" readonly [value]="csv()" aria-label="CSV"></textarea>
           }
+          @if (needReplacement()) {
+            <p class="need small">{{ i18n.t('results.needReplacementHint', { n: needReplacement() }) }}</p>
+          }
           <div class="tbl-wrap">
             <table>
               <thead>
@@ -147,6 +152,9 @@ interface Card {
                       {{ p.name }}
                       @if (!p.isSample) {
                         <span class="tag">{{ i18n.t('results.real') }}</span>
+                      }
+                      @if (p.needsReplacement) {
+                        <span class="tag need">{{ i18n.t('results.needsReplacement') }}</span>
                       }
                     </td>
                     <td>
@@ -301,6 +309,16 @@ interface Card {
     .lock {
       margin-right: 4px;
       font-size: 11px;
+    }
+    .tag.need {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+    p.need {
+      margin: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--warn-soft);
     }
     .sr {
       position: absolute;
@@ -537,13 +555,15 @@ export class ResultsPage implements OnInit {
     const q = this.query().trim().toLowerCase();
     const list = this.data()?.participants ?? [];
     if (q) return list.filter((p) => p.name.toLowerCase().includes(q));
-    // Real ballots first, then the least satisfied.
+    // Whoever needs a replacement first, then real ballots, then the least satisfied.
     return [...list].sort(
       (a, b) =>
+        Number(b.needsReplacement) - Number(a.needsReplacement) ||
         Number(a.isSample) - Number(b.isSample) ||
         a.satisfaction - b.satisfaction,
     );
   });
+  protected needReplacement = computed(() => (this.data()?.participants ?? []).filter((p) => p.needsReplacement).length);
   protected visible = computed(() =>
     this.showAll() || this.query() ? this.filtered() : this.filtered().slice(0, 40),
   );

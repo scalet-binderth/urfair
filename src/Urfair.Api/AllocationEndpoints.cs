@@ -7,8 +7,10 @@ namespace Urfair.Api;
 
 public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points,
 	bool IsFallback, bool Locked);
+/// <param name="NeedsReplacement">A real person who gave back or cancelled a seat, wants a replacement and still lacks a seat.</param>
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments,
-	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original, IReadOnlyList<string> Waitlist, IReadOnlyList<string> Declined);
+	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original, IReadOnlyList<string> Waitlist, IReadOnlyList<string> Declined,
+	bool NeedsReplacement = false);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
 	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt);
 public record SeatRequest(string SessionId, bool Locked);
@@ -71,6 +73,8 @@ public static class AllocationEndpoints
 				seats.Select(s => new FixedAssignment(ballot.Id.ToString(), s.SessionId)), slot.ToRules().Groups);
 			ballot.NoReplacement = model.MissingSeats(ballot.ToModel(), slot.PerParticipant).Select(m => m.Group?.Id ?? "").ToList();
 			if (before != after) Log(db, http, id, "seats", ballot.Name, before, after);
+			if (before != after && slot.Phase is (Phase.Published or Phase.Closed))
+				await SeatsChangedMailAsync(db, slot, ballot, activities, old.Select(a => a.SessionId).ToHashSet(), seats.Select(s => s.SessionId).ToHashSet(), http);
 			await db.SaveChangesAsync();
 			await MovingUp.FillAsync(db, slot);
 			return Results.Ok(await AllocateAsync(db, slot));
@@ -170,6 +174,24 @@ public static class AllocationEndpoints
 	public static void Log(AppDbContext db, Guid slotId, string actor, string kind, string? person = null, string? before = null, string? after = null) =>
 		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after });
 
+	/// <summary>Once participants see the allocation, a change by hand is mailed to the person (if on the list with an e-mail address).</summary>
+	static async Task SeatsChangedMailAsync(AppDbContext db, FairSlotEntity slot, BallotEntity ballot, List<Activity> activities,
+		HashSet<string> before, HashSet<string> after, HttpContext http)
+	{
+		if (ballot.IsSample) return;
+		var p = await db.Participants.FirstOrDefaultAsync(x => x.FairSlotId == slot.Id && x.Email != null && x.Name.ToLower() == ballot.Name.ToLower());
+		if (p is null) return;
+		var gained = SeatText(activities, after.Except(before));
+		var lost = SeatText(activities, before.Except(after));
+		var body = new StringBuilder($"Hallo {p.Name},\n\nbei „{slot.Name}“ hat das Organisationsteam deine Plätze geändert.\n");
+		if (gained.Length > 0) body.Append($"Neu: {gained}\n");
+		if (lost.Length > 0) body.Append($"Nicht mehr: {lost}\n");
+		body.Append($"\nDeine Plätze jetzt: {(after.Count > 0 ? SeatText(activities, after) : "keine")}\n\n")
+			.Append($"Alle Termine siehst du unter deinem persönlichen Link:\n{Mailing.BaseUrl(http.Request)}/p/{p.Token}\n\nBitte gib den Link nicht weiter.\n\n")
+			.Append(slot.Organiser ?? "Dein Organisationsteam");
+		Mailing.Add(db, slot, new MailEntity { ParticipantId = p.Id, To = p.Email!, Subject = $"Deine Plätze: {slot.Name}", Body = body.ToString() });
+	}
+
 	/// <summary>Seats as readable text for the log: activity titles in date order, with the date where an activity has several.</summary>
 	public static string SeatText(List<Activity> activities, IEnumerable<string> sessionIds)
 	{
@@ -241,7 +263,8 @@ public static class AllocationEndpoints
 			allocation.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
 				x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
 				x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback, x.Locked)).ToList(),
-			b.Points, original.GetValueOrDefault(b.Id, []), entity[b.Id].Waitlist, entity[b.Id].Declined)).ToList();
+			b.Points, original.GetValueOrDefault(b.Id, []), entity[b.Id].Waitlist, entity[b.Id].Declined,
+			!isSample[b.Id] && entity[b.Id].Declined.Count > 0 && allocation.MissingSeats(b, k).Any(m => b.WantsReplacement(m.Group?.Id ?? "")))).ToList();
 
 		var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, allocation.Load);
 		// Stored as UTC; the database returns it without a kind.

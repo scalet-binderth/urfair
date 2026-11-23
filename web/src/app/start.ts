@@ -34,7 +34,14 @@ import { SessionService } from './session';
             <button type="button" class="person" (click)="name = p.name; joinAsParticipant()">
               <b>{{ p.key }}</b> {{ p.name }}<span class="muted small">{{ i18n.t('start.demo.' + p.key) }}</span>
             </button>
+            <details class="try small">
+              <summary>{{ i18n.t('start.tryTitle') }}</summary>
+              <ul>
+                @for (i of p.tries; track i) { <li>{{ i18n.t('start.try.' + p.key + i) }}</li> }
+              </ul>
+            </details>
           }
+          <p class="small muted">{{ i18n.t('start.tryMail') }}</p>
         </div>
         }
       </form>
@@ -98,6 +105,10 @@ import { SessionService } from './session';
     .linkish { justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline }
     .recover { border-top: 1px solid var(--line); padding-top: 12px }
     .person b { grid-row: span 2; color: var(--accent) }
+    .try { margin: -2px 0 4px 30px }
+    .try summary { cursor: pointer; color: var(--accent) }
+    .try ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px }
+    .demo-people > p { margin: 0 }
   `,
 })
 export class StartPage {
@@ -108,10 +119,10 @@ export class StartPage {
   private router = inject(Router);
 
   protected name = this.session.participantName() ?? '';
-  /** Demo people, matching the seeded participant lists on the server (DemoData.cs). */
+  /** Demo people, matching the seeded participant lists on the server (DemoData.cs); tries = numbered texts start.try.{key}{n}. */
   protected readonly people = [
-    { key: 'A', name: 'Anna Ammer' }, { key: 'B', name: 'Ben Berger' },
-    { key: 'C', name: 'Clara Czerny' }, { key: 'D', name: 'David Doppler' },
+    { key: 'A', name: 'Anna Ammer', tries: [1, 2] }, { key: 'B', name: 'Ben Berger', tries: [1, 2, 3, 4] },
+    { key: 'C', name: 'Clara Czerny', tries: [1, 2, 3, 4] }, { key: 'D', name: 'David Doppler', tries: [1, 2, 3, 4] },
   ];
   protected key = '';
   protected email = '';

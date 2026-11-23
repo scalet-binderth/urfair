@@ -72,6 +72,17 @@ and English; keep both in sync.
   error and "send again"). Replies go to the optional "E-Mail für Antworten" of the vote. While the allocation is
   visible, "send the allocation" mails everyone who voted their seats and personal link; whoever moves up gets an
   e-mail with the new seats. Without a mail server everything stays to copy; the demo always shows the mailbox
+- **Step 6, part 2:** cancelling when closed. Participants can cancel a seat until its date starts ("do you need a
+  replacement?"); nothing moves automatically, the log says "cancelled" and the organisers get an e-mail (to the
+  "E-Mail für Antworten", reply goes to the participant) with the seats left and a link to the allocation. The
+  allocation marks and lists first everyone who still needs a replacement; organisers seat them by hand (also
+  overbooked) or leave the seat free. Demo: D can cancel in the closed "Ferienprogramm"
+- **Giving back with care:** if giving back leaves a person short of seats, the app warns and offers "just swap"
+  instead (the waiting-list tick that gives up exactly this seat only when moving up). If they are still short after
+  moving up, the organisers get an e-mail ("Platz fehlt", replies go to the person, e.g. to suggest another activity).
+  Once participants see the allocation, every change by hand is mailed to the person with their new seats.
+  Demo: B sits in his weakest wish in the full "Ministrantenausflug"; the start page explains per demo person what
+  can be tried
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -82,7 +93,7 @@ and English; keep both in sync.
 | 4 ✓ | done, see above | |
 | 5 ✓ | done, see above (still open: choosing a different seat to give up when moving up; for now the weakest one goes) | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
-| 6 | ~~E-mails from the app (always with a direct link, reply-to the person responsible)~~ done (part 1); message to the organisers; cancellations when closed: "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
+| 6 | ~~E-mails from the app (always with a direct link, reply-to the person responsible)~~ done (part 1); ~~message to the organisers, cancelling when closed~~ done (part 2); "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
