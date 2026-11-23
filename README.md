@@ -69,7 +69,14 @@ system assigns the seats:
 - **Open to everyone with exceptions** (settings, "Für alle offen"): everyone who signs in sees the vote and can
   vote, except the names on its exclusion list (case-insensitive; the participants of another vote can be added in one
   go, e.g. last year's confirmands). People on the participant list always take part; a vote already cast stays.
-  Without self-registration this only reaches people with a personal link from some vote (in the demo: any name). (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
+  Without self-registration this only reaches people with a personal link from some vote (in the demo: any name).
+- **Together with friends** (settings, "Gemeinsam mit Freund:innen": off, pairs, groups up to 3/4/5): participants
+  enter a shared code in their ballot ("Neuen Code erzeugen" makes one to pass on), so nobody can be added by others.
+  Only a wish: after the calculated allocation each group is moved into a shared date of an activity every member
+  gave points to, by free seats or swaps; members may lose points, nobody else does. Moving up may separate a group
+  again; lowering the group size dissolves groups that are now too large. Demo: in the "Firmvorbereitung" B and C
+  share the code `FIRM42`.
+- **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
   prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).

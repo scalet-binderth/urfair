@@ -6,6 +6,13 @@ public static class Validation
     public const int MaxDescription = 2000;
     public const int MaxShortText = 120;
     public const int MaxExtraSeats = 10;
+    public const int MaxFriends = 5;
+
+    /// <summary>A friend code: 4 to 20 letters or digits, compared without case.</summary>
+    public static string? FriendCode(string? code) =>
+        string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
+
+    private static bool ValidFriendCode(string code) => code.Length is >= 4 and <= 20 && code.All(char.IsAsciiLetterOrDigit);
 
     private static ValidationError E(string code, params (string Key, object Value)[] args) =>
         new(code, args.Length == 0 ? null : args.ToDictionary(a => a.Key, a => a.Value));
@@ -29,6 +36,11 @@ public static class Validation
         if (sum != r.PointBudget) errors.Add(E("budgetNotSpent", ("budget", r.PointBudget), ("sum", sum)));
 
         if (ballot.Extra < 0 || ballot.Extra > r.MaxExtra) errors.Add(E("extraInvalid", ("max", r.MaxExtra)));
+        if (FriendCode(ballot.Friends) is { } code)
+        {
+            if (r.Friends < 2) errors.Add(E("friendsOff"));
+            else if (!ValidFriendCode(code)) errors.Add(E("friendCodeInvalid"));
+        }
 
         var count = ballot.Points.Count(p => p.Value > 0);
         if (count < r.MinActivities) errors.Add(E("tooFewActivities", ("min", r.MinActivities), ("count", count)));
@@ -75,6 +87,7 @@ public static class Validation
         if (r.PerParticipant > r.MinActivities) errors.Add(E("perParticipantAboveMin"));
         if (r.PerParticipant < 1) errors.Add(E("perParticipantTooLow"));
         if (r.MaxExtra is < 0 or > MaxExtraSeats) errors.Add(E("maxExtraInvalid", ("max", MaxExtraSeats)));
+        if (r.Friends is < 0 or 1 or > MaxFriends) errors.Add(E("friendsInvalid", ("max", MaxFriends)));
         if (r.GroupList.Count > 0)
         {
             if (r.GroupList.Any(g => string.IsNullOrWhiteSpace(g.Name))) errors.Add(E("groupNameRequired"));

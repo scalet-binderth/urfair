@@ -15,6 +15,9 @@ public static class DemoData
     /// <summary>Demo person A stays without any vote, even for votes open to all (shows the "nothing assigned" case).</summary>
     public static readonly string NobodyName = A.Name.ToLowerInvariant();
 
+    /// <summary>"Together with friends": B and C entered this code in the "Firmvorbereitung".</summary>
+    public const string FriendCode = "FIRM42";
+
     public static readonly Rules ExcursionRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 70, PerParticipant: 1);
     public static readonly Rules HolidayRules = new(PointBudget: 100, MinActivities: 3, MaxPerActivity: 50, PerParticipant: 2);
     public static readonly Rules CampRules = new(PointBudget: 100, MinActivities: 2, MaxPerActivity: 60, PerParticipant: 1);

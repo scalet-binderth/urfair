@@ -147,6 +147,13 @@ and English; keep both in sync.
   vote already cast stays. The list is copied with a template (new column `FairSlots.Excluded`). Limit: there is no
   self-registration yet, so on a real instance "open to everyone" only reaches people with a personal link.
   Demo: exclude "David Doppler" in the "Pfarrfest", then he no longer sees it
+- **Together with friends.** Settings: off / pairs / groups up to 3, 4 or 5 (new columns `FairSlots.Friends`,
+  `Ballots.Friends`). Each member enters the same code in the ballot ("Neuen Code erzeugen" makes a random one) and
+  sees who else entered it; a full group takes nobody more. After the calculated allocation (before extra seats)
+  each group, in lottery order, is moved into a shared date of an activity all members gave points to: by a free
+  seat or by swapping with an outsider who does not lose points; members may give up a weaker seat. Limits: only in
+  the calculated allocation; moving up may separate a group again; lowering the group size dissolves groups that are
+  too large. Demo: "Firmvorbereitung" allows groups up to 3, B and C share the code `FIRM42`
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -202,7 +209,7 @@ original allocation so organisers can see and restore it; a log records every ch
 
 ## Later
 
-- "Together with friends" (concept decided, see requirement notes)
+- Undo also for activities, the participant list and rules (step 8 covers the allocation only)
 
 ## Requirement notes
 
@@ -212,7 +219,7 @@ original allocation so organisers can see and restore it; a log records every ch
 - **Cancellations and moving up:** decided, see "Process model"; e-mails come in step 6.
 - **Required staffing:** done in step 7 as "every date with a seat count is a post to fill"; missing people are
   shown while voting. A separate minimum below the seat count per date can follow if a real vote needs it.
-- **Together with friends (decided 22 November 2026):** switchable per vote (off / pairs / groups, default up to 3).
+- **Together with friends (decided 22 November 2026, done):** switchable per vote (off / pairs / groups up to 5).
   A group forms by a code that every member enters (mutual consent, nobody can be added by others). It is only a
   wish: after the normal allocation, seats are swapped so that the group shares at least one activity, and only an
   activity every member gave points to; a swap is only made if nobody outside the group loses. Groups are never

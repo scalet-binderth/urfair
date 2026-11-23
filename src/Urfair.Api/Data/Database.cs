@@ -119,8 +119,10 @@ public static class Database
     {
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         var today = DateOnly.FromDateTime(Phases.Now());
-        await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
-            SampleData.FirmungRules, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
+        var firmung = await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
+            SampleData.FirmungRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
+        // B and C entered the same friend code: they wish to share an activity.
+        foreach (var x in await db.Ballots.Where(x => x.FairSlotId == firmung.Id && (x.Name == b || x.Name == c)).ToListAsync()) x.Friends = DemoData.FriendCode;
         await CreateSlotAsync(db, "Ministrantenausflug", Phase.Published, DeadlineIn(-7),
             DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [b, c, d], withBallots: [b, c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly,
             choices: DemoData.ExcursionChoices, seats: DemoData.ExcursionSeats, organiserEmail: "miriam.koller@example.org");

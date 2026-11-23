@@ -251,6 +251,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Friends")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Gender")
                         .HasColumnType("text");
 
@@ -303,6 +307,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.PrimitiveCollection<List<string>>("Excluded")
                         .IsRequired()
                         .HasColumnType("text[]");
+
+                    b.Property<int>("Friends")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("timestamp without time zone");

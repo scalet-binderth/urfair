@@ -243,6 +243,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<Guid>("FairSlotId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Friends")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Gender")
                         .HasColumnType("TEXT");
 
@@ -295,6 +299,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.PrimitiveCollection<string>("Excluded")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Friends")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("TEXT");
