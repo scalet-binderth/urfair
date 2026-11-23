@@ -43,7 +43,11 @@ import { SessionService } from './session';
                 <p class="muted small">{{ i18n.t('home.closed') }}</p>
               } @else {
                 <p class="muted small">{{ i18n.t(s.phase === 'Ended' ? 'home.ended' : 'home.published') }}</p>
-                <a class="btn ghost" [routerLink]="['/s', s.id, 'result']">{{ i18n.t('home.seeResult') }}</a>
+                @if (s.phase === 'Published') {
+                  <a class="btn ghost" [routerLink]="['/s', s.id]">{{ i18n.t('home.seeStatus') }}</a>
+                } @else {
+                  <a class="btn ghost" [routerLink]="['/s', s.id, 'result']">{{ i18n.t('home.seeResult') }}</a>
+                }
               }
             </div>
           }
