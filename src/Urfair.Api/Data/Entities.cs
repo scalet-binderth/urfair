@@ -239,6 +239,8 @@ public class AllocationLogEntity
     public string? Person { get; set; }
     public string? Before { get; set; }
     public string? After { get; set; }
+    /// <summary>JSON: how the activities, participants or rules this change touched were before (see <see cref="Urfair.Api.Undo"/>); null once undone or not undoable.</summary>
+    public string? Undo { get; set; }
 }
 
 /// <summary>

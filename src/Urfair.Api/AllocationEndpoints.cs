@@ -18,7 +18,7 @@ public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Me
 	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt, bool WasVisible = false);
 public record SeatRequest(string SessionId, bool Locked);
 public record SeatsRequest(List<SeatRequest>? Seats);
-public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After, Guid Id = default, bool CanRestore = false);
+public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After, Guid Id = default, bool CanRestore = false, bool CanUndo = false);
 public record ListPersonDto(string Name, string? Parish, string? Email, DateOnly? BirthDate, DateOnly? BaptismDate);
 public record ListSessionDto(string Id, DateTime Start, DateTime? End, bool Flexible, string Location, int? Capacity, IReadOnlyList<ListPersonDto> People);
 public record ListActivityDto(string Id, string Title, string? Leader, string? LeaderEmail, string? GroupId, IReadOnlyList<ListSessionDto> Sessions);
@@ -84,16 +84,19 @@ public static class AllocationEndpoints
 			return Results.Ok(await AllocateAsync(db, slot));
 		});
 
-		// Changes to the frozen allocation, newest first. Entries with a save point can be gone back to (SavePoints).
+		// Changes to the frozen allocation, newest first. Entries with a save point can be gone back to (SavePoints),
+		// changes to activities, participants and rules can be undone (Undo).
 		admin.MapGet("/slots/{id:guid}/allocation/log", async (Guid id, AppDbContext db) =>
 		{
 			if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
 			var restorable = await SavePoints.RestorableAsync(db, slot);
-			return Results.Ok((await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id).ToListAsync())
+			return Results.Ok((await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id)
+					.Select(l => new { l.Id, l.At, l.Actor, l.Kind, l.Person, l.Before, l.After, CanUndo = l.Undo != null }).ToListAsync())
 				.OrderByDescending(l => l.At).Take(300)
-				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After, l.Id, restorable.Contains(l.Id))));
+				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After, l.Id, restorable.Contains(l.Id), l.CanUndo)));
 		});
 		admin.MapSavePoints();
+		admin.MapUndo();
 		admin.MapSeatOfferAdmin();
 
 		// Who goes where, per activity and date, for the activity leaders.
@@ -177,14 +180,16 @@ public static class AllocationEndpoints
 		: $"{s.Start:dd.MM.yyyy, HH:mm} Uhr bis {end:dd.MM.yyyy, HH:mm} Uhr";
 
 	/// <summary>Adds a log entry; it is saved with the next SaveChanges.</summary>
-	public static void Log(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null) =>
-		Log(db, slotId, Access.Account(http).Name, kind, person, before, after);
+	/// <param name="undo">How the things the change touched were before (<see cref="Undo"/>), so it can be undone.</param>
+	public static void Log(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null, string? undo = null) =>
+		Log(db, slotId, Access.Account(http).Name, kind, person, before, after, undo);
 
-	/// <summary>Logs a change to activities, participants or settings once the FairSlot is no longer a draft.</summary>
-	public static async Task LogChangeAsync(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null)
+	/// <summary>Logs a change to activities, participants or settings once the FairSlot is no longer a draft (only then it can be undone).</summary>
+	public static async Task LogChangeAsync(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null,
+		string? undo = null)
 	{
 		if (await db.FairSlots.AsNoTracking().Where(s => s.Id == slotId).Select(s => (Phase?)s.Phase).SingleOrDefaultAsync() is { } phase && phase != Phase.Draft)
-			Log(db, http, slotId, kind, person, before, after);
+			Log(db, http, slotId, kind, person, before, after, undo);
 	}
 
 	/// <summary>Seats of an activity for the log ("∞" if a date has no limit).</summary>
@@ -192,8 +197,8 @@ public static class AllocationEndpoints
 		sessions.Any(s => s.Capacity is null) ? "∞" : sessions.Sum(s => s.Capacity ?? 0).ToString();
 
 	/// <summary>Adds a log entry with a given actor (a participant, or Urfair for automatic changes).</summary>
-	public static void Log(AppDbContext db, Guid slotId, string actor, string kind, string? person = null, string? before = null, string? after = null) =>
-		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after });
+	public static void Log(AppDbContext db, Guid slotId, string actor, string kind, string? person = null, string? before = null, string? after = null, string? undo = null) =>
+		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after, Undo = undo });
 
 	/// <summary>Once participants see the allocation, a change by hand is mailed to the person (if on the list with an e-mail address).</summary>
 	public static async Task SeatsChangedMailAsync(AppDbContext db, FairSlotEntity slot, BallotEntity ballot, List<Activity> activities,

@@ -131,6 +131,7 @@ public static class AdminEndpoints
             var before = slot.Phase;
             var settingsChanged = rulesChanged || slot.RegistrationDeadline != req.RegistrationDeadline || slot.OpenToAll != req.OpenToAll
                 || !slot.Excluded.SequenceEqual(excluded);
+            var undo = settingsChanged && before != Phase.Draft ? Undo.Json(new(Settings: await Undo.SettingsAsync(db, slot))) : null;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
             slot.Excluded = excluded;
             slot.EndedAt = slot.Phase == Phase.Ended ? slot.EndedAt ?? Phases.Now() : null;
@@ -148,7 +149,7 @@ public static class AdminEndpoints
             foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())
                 if (!ids.Contains(a.GroupId!)) a.GroupId = null;
             if (before != slot.Phase) AllocationEndpoints.Log(db, http, id, "phase", null, before.ToString(), slot.Phase.ToString());
-            if (settingsChanged && before != Phase.Draft) AllocationEndpoints.Log(db, http, id, "settings");
+            if (settingsChanged && before != Phase.Draft) AllocationEndpoints.Log(db, http, id, "settings", undo: undo);
             await db.SaveChangesAsync();
             if (reopen)
             {
@@ -187,7 +188,8 @@ public static class AdminEndpoints
             var entity = new ActivityEntity { FairSlotId = id, SortOrder = await db.Activities.CountAsync(a => a.FairSlotId == id) };
             if (Apply(entity, req) is { } error) return error;
             db.Activities.Add(entity);
-            await AllocationEndpoints.LogChangeAsync(db, http, id, "activityAdded", entity.Title, null, AllocationEndpoints.SeatsText(entity.Sessions));
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "activityAdded", entity.Title, null, AllocationEndpoints.SeatsText(entity.Sessions),
+                Undo.Json(new(ActivityIds: [entity.Id])));
             await db.SaveChangesAsync();
             return Results.Ok(new { entity.Id });
         });
@@ -197,8 +199,9 @@ public static class AdminEndpoints
             var entity = await db.Activities.Include(a => a.Sessions).SingleOrDefaultAsync(a => a.Id == activityId);
             if (entity is null) return Results.NotFound();
             var seats = AllocationEndpoints.SeatsText(entity.Sessions);
+            var undo = Undo.Json(new(await Undo.ActivitiesAsync(db, entity.FairSlotId, [activityId]), [activityId]));
             if (Apply(entity, req) is { } error) return error;
-            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activity", entity.Title, seats, AllocationEndpoints.SeatsText(entity.Sessions));
+            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activity", entity.Title, seats, AllocationEndpoints.SeatsText(entity.Sessions), undo);
             await db.SaveChangesAsync();
             // More seats while visible: they fill from the waiting list.
             if (await db.FairSlots.FindAsync(entity.FairSlotId) is { } slot) await MovingUp.FillAsync(db, slot);
@@ -209,7 +212,8 @@ public static class AdminEndpoints
         {
             var entity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId);
             if (entity is null) return Results.NotFound();
-            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activityRemoved", entity.Title);
+            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activityRemoved", entity.Title, null, null,
+                Undo.Json(new(await Undo.ActivitiesAsync(db, entity.FairSlotId, [activityId]), [])));
             // Remove the points ballots gave to this activity.
             foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == entity.FairSlotId).ToListAsync())
                 b.Points.RemoveAll(p => p.ActivityId == activityId);
@@ -242,6 +246,7 @@ public static class AdminEndpoints
             if (req.Replace && slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
 
             var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
+            var replaced = req.Replace ? await Undo.ActivitiesAsync(db, id) : [];
             if (req.Replace)
             {
                 // Replacing removes the old activities and the points ballots gave to them.
@@ -249,8 +254,10 @@ public static class AdminEndpoints
                 foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == id).ToListAsync()) b.Points.Clear();
                 order = 0;
             }
-            foreach (var a in result.Activities) db.Activities.Add(Database.ToEntity(a, id, order++));
-            await AllocationEndpoints.LogChangeAsync(db, http, id, req.Replace ? "activitiesReplaced" : "activitiesImported", null, null, result.Activities.Count.ToString());
+            var added = result.Activities.Select(a => Database.ToEntity(a, id, order++)).ToList();
+            db.Activities.AddRange(added);
+            await AllocationEndpoints.LogChangeAsync(db, http, id, req.Replace ? "activitiesReplaced" : "activitiesImported", null, null, result.Activities.Count.ToString(),
+                Undo.Json(new(replaced, added.Select(a => a.Id).ToList())));
             await db.SaveChangesAsync();
             if (req.Replace) await Database.ResetSamplesAsync(db, id); // sample ballots must refer to the new activities
             return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), [], true));

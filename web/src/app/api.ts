@@ -75,9 +75,12 @@ export interface LogEntry {
   id: string; at: string; actor: string; person: string | null; before: string | null; after: string | null;
   /** A save point exists: the allocation can go back to the state after this entry. */
   canRestore: boolean;
+  /** A change to activities, participants or rules that can be undone (overwrites later changes to the same things). */
+  canUndo: boolean;
   kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
     | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
-    | 'participantsImported' | 'participantsCopied' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone';
+    | 'participantsImported' | 'participantsCopied' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone'
+    | 'undone';
 }
 export interface RestoreChange { name: string; isSample: boolean; before: string; after: string; keptGivenBack: string | null; }
 export interface RestorePreview { at: string; changes: RestoreChange[]; mails: number; movesUp: boolean; }
@@ -210,6 +213,7 @@ export class Api {
     return this.call(this.http.get<RestorePreview>(`/api/admin/slots/${id}/allocation/restore/${logId}`, this.admin()));
   }
   restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {}, this.admin())); }
+  undo(id: string, logId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/log/${logId}/undo`, {}, this.admin())); }
   offers(id: string) { return this.call(this.http.get<Offer[]>(`/api/admin/slots/${id}/offers`, this.admin())); }
   fillSeat(id: string, sessionId: string) { return this.call(this.http.post(`/api/admin/slots/${id}/offers`, { sessionId }, this.admin())); }
   leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }

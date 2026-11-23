@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
+import { Component, computed, inject, input, output, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
 import { I18n } from './i18n';
@@ -307,6 +307,19 @@ interface Card {
                       <div><button class="btn ghost small" type="button" [disabled]="busy()" (click)="previewRestore(l)">{{ i18n.t('restore.button') }}</button></div>
                     }
                   }
+                  @if (l.canUndo && canEdit()) {
+                    @if (undoing() === l.id) {
+                      <div class="restore stack">
+                        <p class="muted small">{{ i18n.t('undo.hint') }}</p>
+                        <div class="row">
+                          <button class="btn small" type="button" [disabled]="busy()" (click)="confirmUndo(l)">{{ i18n.t('undo.confirm') }}</button>
+                          <button class="btn ghost small" type="button" (click)="undoing.set(null)">{{ i18n.t('common.cancel') }}</button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div><button class="btn ghost small" type="button" [disabled]="busy()" (click)="undoing.set(l.id)">{{ i18n.t('undo.button') }}</button></div>
+                    }
+                  }
                 </li>
               }
             </ul>
@@ -585,6 +598,8 @@ export class ResultsPage implements OnInit {
   readonly canEdit = input(true);
   /** Every date must be filled: show how many people are still missing. */
   readonly requiredStaffing = input(false);
+  /** Activities, participants or rules were changed by an undo from the log. */
+  readonly undone = output<void>();
   protected i18n = inject(I18n);
   protected api = inject(Api);
   private toast = inject(Toast);
@@ -603,6 +618,8 @@ export class ResultsPage implements OnInit {
   protected log = signal<LogEntry[]>([]);
   /** The log entry whose state is being previewed for going back to it. */
   protected restoring = signal<{ id: string; preview: RestorePreview | null } | null>(null);
+  /** The log entry whose change is about to be undone. */
+  protected undoing = signal<string | null>(null);
   /** Seats offered one by one when the lists are final (Closed). */
   protected offers = signal<Offer[]>([]);
 
@@ -727,11 +744,36 @@ export class ResultsPage implements OnInit {
     return this.act(() => this.api.recalculateAllocation(this.slotId()), 'results.recalculated');
   }
 
-  /** Phase changes name the phases in the current language; a restore names the time it went back to. */
+  /** Phase changes name the phases in the current language; a restore names the time it went back to, an undo what it undid. */
   protected logText(l: LogEntry): string {
+    if (l.kind === 'undone') {
+      const what = this.i18n.t('undo.what.' + (l.before ?? ''));
+      const when = l.after ? this.i18n.date(l.after) : '–';
+      return this.i18n.t(l.person ? 'log.undonePerson' : 'log.undone', { what, person: l.person ?? '', when });
+    }
     const name = (x: string | null | undefined) => (l.kind === 'phase' && x ? this.i18n.t('phase.' + x) : l.kind === 'restored' && x ? this.i18n.date(x) : x || '–');
     const key = l.kind === 'offered' && l.before ? 'offeredSwap' : l.kind;
     return this.i18n.t('log.' + key, { person: l.person ?? '', before: name(l.before), after: name(l.after) });
+  }
+
+  /** Sets the activities, participants or rules the entry changed back; the page around reloads them. */
+  protected async confirmUndo(l: LogEntry): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.api.undo(this.slotId(), l.id);
+      this.undoing.set(null);
+      this.toast.show(this.i18n.t('undo.done'));
+      const [data, activities] = await Promise.all([this.api.allocation(this.slotId()), this.api.adminActivities(this.slotId())]);
+      this.data.set(data);
+      this.activities.set(activities);
+      this.undone.emit();
+    } catch (e) {
+      this.error.set(this.i18n.errors(e).join(' '));
+    } finally {
+      await this.loadLog();
+      this.busy.set(false);
+    }
   }
 
   /** Offers the free seat of this date to the next person. */

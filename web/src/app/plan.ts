@@ -58,6 +58,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Teilnehmende aus einer anderen Wahl übernehmen (z. B. vom Vorjahr): erst sehen, wie viele neu sind, dann mit neuen persönlichen Links übernehmen',
       'Wahlen „für alle offen“ mit Ausnahmeliste: z. B. alle außer den Teilnehmenden vom Vorjahr; wer auf der Teilnehmerliste steht, ist immer dabei',
       'Gemeinsam mit Freund:innen: pro Wahl aus, Paare oder Gruppen bis 3–5; alle tragen denselben Code ein; nur ein Wunsch: die Gruppe kommt möglichst in denselben Termin einer Veranstaltung, die alle bepunktet haben, und niemand außerhalb der Gruppe verliert dabei. In der „Firmvorbereitung“ teilen B und C den Code FIRM42',
+      'Rückgängig auch für Veranstaltungen, Teilnehmerliste und Regeln: im Protokoll „Rückgängig machen“; eine gelöschte Veranstaltung kommt mit Terminen, Punkten und Plätzen zurück, eine entfernte Person mit demselben persönlichen Link. Niemand verliert dabei einen Platz',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
@@ -68,7 +69,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Schritt 4 · erledigt', kind: 'done', title: 'Zuteilung im Griff', items: ['Zuteilung festschreiben und anpassen', 'Namen pro Termin in der Auslastung', 'Original merken und Protokoll', 'Listen für Leiter:innen', '„Noch nicht abgestimmt“ mit Erinnerungen'] },
       { label: 'Schritt 5 · erledigt', kind: 'done', title: 'Neuer Ablauf', items: ['Phasen: Entwurf → Anmeldung → Zuteilung (erst intern, dann sichtbar) → Abgeschlossen → Beendet', 'Anmeldeschluss automatisch: Zuteilung wird gerechnet und festgeschrieben', 'Während der Anmeldung kein Zwischenstand (pro Wahl einschaltbar)', 'In der Zuteilung: Punkte gesperrt, Warteliste nur noch, wenn sichtbar', 'Wartelisten-Häkchen, „Platz zurückgeben“ und freie Plätze nehmen', 'Freie Plätze rücken automatisch nach, innerhalb der Gruppe, Bedarf vor Wunsch', 'Beendet nach dem letzten Termin oder von Hand (nur noch lesen)'] },
       { label: 'Schritt 6 und 7', title: 'Nachrichten und Sonderfälle', items: ['zuerst: Probelauf mit 20 bis 30 Firmlingen', '✓ E-Mails aus der App, immer mit direktem Link', '✓ Nachricht an die Organisation', '✓ Absagen nach Abschluss, „braucht Ersatz“ in der Zuteilung', '✓ Warnung beim Zurückgeben mit „Nur tauschen“, Mail an die Organisation, wenn ein Platz fehlt, Mail an die Person bei Änderungen von Hand', '✓ Absagen kurz vor dem Termin: „Platz nachbesetzen“ mit Angeboten und Frist, Mail auch bei Ablauf', '✓ Ersatz vorschlagen (ein Klick), gezielt überbuchen', '✓ Beim Nachrücken selbst wählen, welcher Platz abgegeben wird', '✓ Pflichtbesetzung', '✓ „Mehr als gefordert“'] },
-      { label: 'Schritt 8 · erledigt', kind: 'done', title: 'Rückgängig mit Speicherpunkten', items: ['Jede Änderung an der Zuteilung legt einen Speicherpunkt an (von Hand, Nachrücken, Zurückgeben, Absagen, Neu rechnen)', 'Im Protokoll „Zu diesem Stand zurück“, vorher eine Vorschau: wer welchen Platz bekommt oder verliert', 'Zurücksetzen löscht nichts und lässt sich selbst wieder rückgängig machen', 'Ist die Zuteilung sichtbar oder abgeschlossen, bekommen alle Betroffenen die Mail „Deine Plätze“', 'Was Teilnehmende selbst zurückgegeben haben, bleibt zurückgegeben', 'Später auch Veranstaltungen, Teilnehmerliste und Regeln'] },
+      { label: 'Schritt 8 · erledigt', kind: 'done', title: 'Rückgängig mit Speicherpunkten', items: ['Jede Änderung an der Zuteilung legt einen Speicherpunkt an (von Hand, Nachrücken, Zurückgeben, Absagen, Neu rechnen)', 'Im Protokoll „Zu diesem Stand zurück“, vorher eine Vorschau: wer welchen Platz bekommt oder verliert', 'Zurücksetzen löscht nichts und lässt sich selbst wieder rückgängig machen', 'Ist die Zuteilung sichtbar oder abgeschlossen, bekommen alle Betroffenen die Mail „Deine Plätze“', 'Was Teilnehmende selbst zurückgegeben haben, bleibt zurückgegeben', 'Auch Änderungen an Veranstaltungen, Teilnehmerliste und Regeln lassen sich rückgängig machen'] },
       { label: 'Parallel', kind: 'parallel', title: 'Mit der Diözese', items: ['Hosting: Diözesanserver oder EU-Anbieter', 'Datenschutz mit dem Datenschutzbeauftragten', 'Texte für Impressum und Datenschutzerklärung', '✓ Seiten dafür und automatisches Löschen'] },
     ],
     mustTitle: 'Muss vor echten Anmeldungen passieren',
@@ -106,7 +107,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     shouldTitle: 'Sollte für den echten Einsatz dabei sein',
     should: ['✓ Teilnehmerlisten für Leiter:innen zum Exportieren oder Drucken', '✓ Anmeldeschluss automatisch (Schritt 5)', '✓ Überblick „noch nicht abgestimmt“ für Erinnerungen'],
     laterTitle: 'Später, wenn es sich bewährt',
-    later: ['Rückgängig machen auch für Veranstaltungen, Teilnehmerliste und Regeln (bisher nur für die Zuteilung)'],
+    later: [],
     questionsTitle: 'Offene Fragen',
     questions: ['Wer ist Ansprechperson für Hosting und Datenschutz in Pfarre und Diözese?', 'Dürfen Pfarrgemeinde-Admins bei „Junia, nur lesen“ die Teilnehmenden ihrer Pfarrgemeinde pflegen? (Vorschlag: ja, nur die eigenen Zeilen)', 'Probelauf mit 20 bis 30 Firmlingen oder gleich dem ganzen Jahrgang?'],
     back: '← Zur Startseite',
@@ -150,6 +151,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Take over participants from another vote (e.g. last year’s): first see how many are new, then take them over with new personal links',
       'Votes “open to everyone” with an exclusion list: e.g. everyone except last year’s participants; people on the participant list always take part',
       'Together with friends: per vote off, pairs or groups up to 3–5; everyone enters the same code; only a wish: the group is placed in the same date of an activity all of them gave points to where possible, and nobody outside the group loses. In the “Firmvorbereitung” B and C share the code FIRM42',
+      'Undo also for activities, the participant list and rules: “Undo” in the log; a deleted activity comes back with its dates, points and seats, a removed person with the same personal link. Nobody loses a seat by it',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
@@ -160,7 +162,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       { label: 'Step 4 · done', kind: 'done', title: 'Allocation under control', items: ['Freeze and adjust the allocation', 'Names per date in the utilisation', 'Keep the original and log', 'Lists for activity leaders', '“Not voted yet” with reminders'] },
       { label: 'Step 5 · done', kind: 'done', title: 'New flow', items: ['Phases: draft → registration → allocation (internal first, then visible) → closed → ended', 'Automatic registration deadline: the allocation is calculated and frozen', 'No interim status during registration (switchable per vote)', 'During allocation: points locked, waiting list only once visible', 'Waiting-list ticks, “give back a seat” and taking free seats', 'Free seats move up automatically, within the group, need before wish', 'Ended after the last date or by hand (read only)'] },
       { label: 'Steps 6 and 7', title: 'Messages and special cases', items: ['first: pilot with 20 to 30 confirmands', '✓ E-mails from the app, always with a direct link', '✓ Message to the organisers', '✓ Cancelling when closed, “needs a replacement” in the allocation', '✓ Warning when giving back with “just swap”, e-mail to the organisers when a seat is missing, e-mail to the person about changes by hand', '✓ Cancellations shortly before the date: “fill seat” with offers and a deadline, e-mail also when it expires', '✓ Suggesting a replacement (one click), targeted overbooking', '✓ Choosing which seat to give up when moving up', '✓ Required staffing', '✓ “More than required”'] },
-      { label: 'Step 8 · done', kind: 'done', title: 'Undo with save points', items: ['Every change to the allocation stores a save point (by hand, moving up, giving back, cancelling, recalculating)', '“Back to this state” in the log, with a preview first: who gains or loses which seat', 'Restoring deletes nothing and can itself be undone', 'While visible or closed, everyone affected gets the e-mail “Deine Plätze”', 'Seats participants gave back themselves stay given back', 'Later also activities, participant list and rules'] },
+      { label: 'Step 8 · done', kind: 'done', title: 'Undo with save points', items: ['Every change to the allocation stores a save point (by hand, moving up, giving back, cancelling, recalculating)', '“Back to this state” in the log, with a preview first: who gains or loses which seat', 'Restoring deletes nothing and can itself be undone', 'While visible or closed, everyone affected gets the e-mail “Deine Plätze”', 'Seats participants gave back themselves stay given back', 'Changes to activities, the participant list and rules can be undone too'] },
       { label: 'In parallel', kind: 'parallel', title: 'With the diocese', items: ['Hosting: diocese server or EU provider', 'Data protection with the data protection officer', 'Texts of the legal notice and privacy policy', '✓ Pages for them and automatic deletion'] },
     ],
     mustTitle: 'Needed before real registrations',
@@ -198,7 +200,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     shouldTitle: 'Should be there for real use',
     should: ['✓ Participant lists for leaders to export or print', '✓ Automatic registration deadline (step 5)', '✓ Overview “not voted yet” for reminders'],
     laterTitle: 'Later, once it has proven itself',
-    later: ['Undo also for activities, the participant list and rules (so far only for the allocation)'],
+    later: [],
     questionsTitle: 'Open questions',
     questions: ['Who is the contact for hosting and data protection in the parish and diocese?', 'May parish community admins maintain their own participants in “Junia, read only” votes? (proposal: yes, only their own rows)', 'Pilot with 20 to 30 confirmands or the whole year group?'],
     back: '← Back to the start page',
@@ -263,7 +265,9 @@ const PLAN: Record<'de' | 'en', PlanText> = {
 
     <div class="two">
       <section class="card stack"><h2>{{ p.shouldTitle }}</h2><ul>@for (s of p.should; track s) { <li>{{ s }}</li> }</ul></section>
+      @if (p.later.length) {
       <section class="card stack"><h2>{{ p.laterTitle }}</h2><ul>@for (s of p.later; track s) { <li>{{ s }}</li> }</ul></section>
+      }
     </div>
 
     <section class="card stack">
