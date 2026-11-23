@@ -23,7 +23,9 @@ public record MyActivityStatusDto(string ActivityId, string Title, string? Group
 /// <summary>Seats a person lacks in a group (null without groups), with the free seats they may take.</summary>
 public record MissingDto(string? GroupId, int Count, IReadOnlyList<OpenSeatDto> Open);
 public record OpenSeatDto(string SessionId, string ActivityId, string Title, DateTime Start, DateTime? End, bool Flexible, string Location, int Points);
-public record MyStatusDto(bool Voted, IReadOnlyList<MyActivityStatusDto> Activities, IReadOnlyList<string> Full, IReadOnlyList<MissingDto>? Missing = null);
+/// <param name="Offer">When closed: a free seat offered to the person, to accept or decline (<see cref="SeatOffers"/>).</param>
+public record MyStatusDto(bool Voted, IReadOnlyList<MyActivityStatusDto> Activities, IReadOnlyList<string> Full, IReadOnlyList<MissingDto>? Missing = null,
+    MyOfferDto? Offer = null);
 
 /// <summary>Endpoints for participants.</summary>
 public static class Endpoints
@@ -171,6 +173,20 @@ public static class Endpoints
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
+        // A free seat offered when closed: take it (giving up the seat named in the offer) or leave it to the next person.
+        api.MapPost("/slots/{id:guid}/offers/{offerId:guid}/{answer:regex(^(accept|decline)$)}", async (Guid id, Guid offerId, string answer,
+            OfferAnswerRequest req, AppDbContext db, HttpContext http) =>
+        {
+            var slot = await db.FairSlots.FindAsync(id);
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
+            var url = Mailing.BaseUrl(http.Request);
+            var error = answer == "accept"
+                ? await SeatOffers.AcceptAsync(db, slot, offerId, name, url)
+                : await SeatOffers.DeclineAsync(db, slot, offerId, name, url);
+            return error is null ? Results.Ok(await StatusAsync(db, slot, name)) : Errors(error);
+        });
+
         api.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg) =>
             await ToDto(db, id, cfg) is { } dto ? Results.Ok(dto) : Results.NotFound());
 
@@ -269,7 +285,7 @@ public static class Endpoints
                 .OrderByDescending(s => me.PointsFor(s.ActivityId)).ThenBy(s => s.Start)
                 .Select(s => new OpenSeatDto(s.Id, s.ActivityId, titles[s.ActivityId], s.Start, s.End, s.Flexible, s.Location, me.PointsFor(s.ActivityId)))
                 .ToList())).ToList();
-        return new MyStatusDto(true, list, full, missing);
+        return new MyStatusDto(true, list, full, missing, await SeatOffers.MineAsync(db, slot, mine.Id, activities));
     }
 
     /// <summary>The person's latest own ballot (tracked, with points).</summary>

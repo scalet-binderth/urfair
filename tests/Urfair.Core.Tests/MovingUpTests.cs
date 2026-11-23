@@ -157,4 +157,37 @@ public class MovingUpTests
 		// c clashes with a.
 		Assert.Equal(["b1"], alloc.OpenSeats(x, 2).Select(s => s.Id));
 	}
+
+	[Fact]
+	public void The_next_for_an_offered_seat_follows_moving_up_and_skips_who_was_asked()
+	{
+		// a is full; x ticked it with more points than y, z gave it no points.
+		Activity[] acts = [Act("a", 1, hour: 9), Act("b", 5, hour: 12)];
+		var x = Ballot("x", new() { ["a"] = 70, ["b"] = 30 }, waitlist: ["a"]);
+		var y = Ballot("y", new() { ["a"] = 60, ["b"] = 40 }, waitlist: ["a"]);
+		var z = Ballot("z", new() { ["b"] = 100 });
+		var alloc = Frozen(acts, [x, y, z], ("x", "b", false), ("y", "b", false), ("z", "a", false));
+
+		var first = alloc.NextFor(acts[0].Sessions[0], 1, 1, _ => false);
+		var second = alloc.NextFor(acts[0].Sessions[0], 1, 1, b => b.Id == "x");
+
+		Assert.Equal("x", first?.BallotId);
+		Assert.Equal("b1", first?.GaveUp?.Id);
+		Assert.Equal("y", second?.BallotId);
+		Assert.Null(alloc.NextFor(acts[0].Sessions[0], 1, 1, b => b.Id != "z"));
+		Assert.Equal("b1", alloc.ExchangeFor(x, acts[0].Sessions[0], 1).GivesUp?.Id);
+	}
+
+	[Fact]
+	public void Organisers_may_add_any_session_without_a_clash_in_a_group_with_a_missing_seat()
+	{
+		Activity[] acts = [Act("a", 1, hour: 9), Act("b", 0, hour: 12), Act("c", 1, hour: 9)];
+		var x = Ballot("x", new() { ["a"] = 50 }, declined: ["b"]);
+		var alloc = Frozen(acts, [x], ("x", "a", false));
+
+		Assert.True(alloc.CanAdd(x, acts[1].Sessions[0], 2)); // full and given back: organisers decide
+		Assert.False(alloc.CanAdd(x, acts[2].Sessions[0], 2)); // clashes with a
+		Assert.False(alloc.CanAdd(x, acts[0].Sessions[0], 2)); // already held
+		Assert.False(alloc.CanAdd(x, acts[1].Sessions[0], 1)); // no seat missing
+	}
 }

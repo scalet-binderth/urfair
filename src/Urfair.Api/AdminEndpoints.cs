@@ -123,6 +123,7 @@ public static class AdminEndpoints
                 AllocationEndpoints.Log(db, http, id, "frozen");
                 await AllocationEndpoints.FreezeAsync(db, slot);
             }
+            if (before == Phase.Closed && slot.Phase != Phase.Closed) await SeatOffers.WithdrawAllAsync(db, slot, account.Name);
             await MovingUp.FillAsync(db, slot);
             return Results.NoContent();
         });

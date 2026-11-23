@@ -98,6 +98,17 @@ and English; keep both in sync.
   moving up come back; while visible or closed everyone affected gets "Deine Plätze"; while visible, seats that are
   free afterwards move up at once (switch to internal first to avoid that). Only states since the last freeze. Demo:
   every vote with an allocation starts with a save point "frozen"
+- **Step 6, part 3:** filling a seat when closed. The allocation lists free seats per date with "fill seat": the
+  seat is offered to one real person at a time in the order of moving up (missing a seat, then ticks, more points,
+  lottery), each person once per date and only one open offer per person (new table `SeatOffers`). The person gets
+  an e-mail with their personal link and sees the offer in their allocation (accept/decline, naming the seat they
+  would give up); they have 48 hours, at most until a day before the date, and dates less than two days ahead are
+  not offered. Declined or expired (e-mail to the person): the next one is asked; accepted: the seat given up is
+  offered next (chain); nobody left: the organisers get an e-mail "Platz frei". Leaving "closed" withdraws open
+  offers. People who need a replacement get up to three one-click suggestions (another date of what they gave back,
+  free seats by points) and one to overbook their best full wish. Every step is in the log; accepting is a save
+  point. Demo: D cancels "Kochen mit Oma" in the closed "Ferienprogramm", C (who ticked it) gets the offer and gives
+  up Fußballturnier, which is then free for D's suggestion
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -108,7 +119,7 @@ and English; keep both in sync.
 | 4 ✓ | done, see above | |
 | 5 ✓ | done, see above (still open: choosing a different seat to give up when moving up; for now the weakest one goes) | |
 | → | **Pilot with 20–30 confirmands** on a real instance | |
-| 6 | ~~E-mails from the app (always with a direct link, reply-to the person responsible)~~ done (part 1); ~~message to the organisers, cancelling when closed~~ done (part 2); "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
+| 6 ✓ | done, see above | |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |
 | 8 ✓ | done, see above (later: activities, participant list and rules; points hang on them, the CSV export is the backup until then) | |
 

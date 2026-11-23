@@ -111,7 +111,8 @@ public static class Database
     /// waiting lists, so a seat given back moves up. There C did not get her first wish (Kletterwald, full) and can tick it,
     /// while D holds a seat there he can give back: then C moves up first, as no ticked sample person gave it as many points.
     /// All its activities are full: B sits in his weakest wish and is warned that giving it back leaves him without a seat.
-    /// In the closed "Ferienprogramm" D can cancel a seat; the cancellation mail to the organiser is in the demo mailbox.
+    /// In the closed "Ferienprogramm" D can cancel a seat; the cancellation mail to the organiser is in the demo mailbox. When the
+    /// organisers fill his seat in "Kochen mit Oma", C is offered it (she ticked it) and accepts or declines under her link.
     /// </summary>
     private static async Task SeedDemoAsync(AppDbContext db)
     {
@@ -123,8 +124,8 @@ public static class Database
             DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [b, c, d], withBallots: [b, c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly,
             choices: DemoData.ExcursionChoices, seats: DemoData.ExcursionSeats, organiserEmail: "miriam.koller@example.org");
         await CreateSlotAsync(db, "Ferienprogramm", Phase.Closed, DeadlineIn(-21),
-            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [d], withBallots: [d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber",
-            organiserEmail: "stefan.huber@example.org");
+            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber",
+            organiserEmail: "stefan.huber@example.org", choices: DemoData.HolidayChoices, seats: DemoData.HolidaySeats, ticks: DemoData.HolidayTicks);
         await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
             DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
         await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
@@ -141,12 +142,13 @@ public static class Database
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     /// <param name="choices">Fixed points (activity title → points) for some of <paramref name="withBallots"/>; the others get generated ones.</param>
-    /// <param name="seats">After freezing: the activity (title) a person sits in, swapped with a sample person (see <see cref="SeatAsync"/>).</param>
+    /// <param name="seats">After freezing: the activities (titles) a person sits in, swapped with sample people (see <see cref="SeatAsync"/>).</param>
+    /// <param name="ticks">Waiting-list ticks (person, activity title), as if set while the allocation was visible.</param>
     private static async Task<FairSlotEntity> CreateSlotAsync(AppDbContext db, string name, Phase phase, DateTime deadline, Rules rules,
         IReadOnlyList<Activity> activities, int sampleCount, string[] participants, string[]? withBallots = null, bool openToAll = false,
         string? parish = null, string? organiser = null, Visibility visibility = Visibility.JuniaShared, bool showInterim = false,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>>? choices = null, IReadOnlyList<(string Name, string Title)>? seats = null,
-        string? organiserEmail = null)
+        string? organiserEmail = null, IReadOnlyList<(string Name, string Title)>? ticks = null)
     {
         var slot = new FairSlotEntity { Name = name, Phase = phase, SampleCount = sampleCount, RegistrationDeadline = deadline, OpenToAll = openToAll, Parish = parish, Organiser = organiser, OrganiserEmail = organiserEmail, Visibility = visibility, ShowInterim = showInterim };
         slot.Apply(rules);
@@ -179,8 +181,15 @@ public static class Database
             await db.SaveChangesAsync();
         }
         if (Phases.HasAllocation(phase)) await AllocationEndpoints.FreezeAsync(db, slot);
-        foreach (var (person, title) in seats ?? []) await SeatAsync(db, slot, person, title);
+        foreach (var person in (seats ?? []).GroupBy(s => s.Name)) await SeatAsync(db, slot, person.Key, person.Select(s => s.Title).ToList());
         if (phase == Phase.Published) await TickWaitlistsAsync(db, slot);
+        if (ticks is { Count: > 0 })
+        {
+            var ids = slot.Activities.ToDictionary(a => a.Title, a => a.Id);
+            foreach (var b in await db.Ballots.Where(b => b.FairSlotId == slot.Id && !b.IsSample).ToListAsync())
+                b.Waitlist = ticks.Where(t => t.Name == b.Name).Select(t => ids[t.Title]).ToList();
+            await db.SaveChangesAsync();
+        }
         if (Phases.HasAllocation(phase))
         {
             // The first save point: the demo can be undone back to here.
@@ -191,29 +200,43 @@ public static class Database
     }
 
     /// <summary>
-    /// Demo: puts a person into an activity of the frozen allocation by swapping seats with a sample person sitting there
-    /// (preferring one who gave the person's old activity points and has time for it). The original allocation is changed
-    /// the same way, so the demo starts without differences from the original.
+    /// Demo: puts a person into activities of the frozen allocation (one date each). For each one they lack, a seat of theirs
+    /// they should not keep is swapped with a sample person sitting there (preferring one without the old activity, with time
+    /// for it and who gave it points); without such a seat the sample person's seat is taken. The original allocation is set
+    /// to the result, so the demo starts without differences from the original.
     /// </summary>
-    private static async Task SeatAsync(AppDbContext db, FairSlotEntity slot, string person, string title)
+    private static async Task SeatAsync(AppDbContext db, FairSlotEntity slot, string person, IReadOnlyList<string> titles)
     {
-        var target = (await db.Activities.Include(a => a.Sessions).SingleAsync(a => a.FairSlotId == slot.Id && a.Title == title)).Sessions.Single().Id;
+        var activities = await db.Activities.Include(a => a.Sessions).Where(a => a.FairSlotId == slot.Id).ToListAsync();
+        var activityOf = activities.SelectMany(a => a.Sessions).ToDictionary(s => s.Id, s => s.ActivityId);
+        var wanted = titles.Select(t => activities.Single(a => a.Title == t).Sessions.Single().Id).ToList();
         var ballots = await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == slot.Id).ToListAsync();
         var me = ballots.Single(b => b.Name == person);
         var seats = await db.Assignments.Where(a => a.FairSlotId == slot.Id).ToListAsync();
-        var originals = await db.OriginalAssignments.Where(a => a.FairSlotId == slot.Id).ToListAsync();
-        if (seats.FirstOrDefault(a => a.BallotId == me.Id) is not { } mine || mine.SessionId == target) return;
-        var old = mine.SessionId;
-        var oldActivity = (await db.Sessions.SingleAsync(s => s.Id == old)).ActivityId;
-        var sample = ballots.Where(b => b.IsSample && seats.Any(a => a.BallotId == b.Id && a.SessionId == target))
-            .OrderBy(b => b.UnavailableSessions.Contains(old))
-            .ThenByDescending(b => b.Points.FirstOrDefault(p => p.ActivityId == oldActivity)?.Points ?? 0).FirstOrDefault();
-        string Swap(Guid ballotId, string sessionId) =>
-            ballotId == me.Id && sessionId == old ? target
-            : ballotId == sample?.Id && sessionId == target ? old
-            : sessionId;
-        foreach (var a in seats) a.SessionId = Swap(a.BallotId, a.SessionId);
-        foreach (var a in originals) a.SessionId = Swap(a.BallotId, a.SessionId);
+        bool Holds(BallotEntity b, string activityId) => seats.Any(a => a.BallotId == b.Id && activityOf[a.SessionId] == activityId);
+        foreach (var target in wanted)
+        {
+            var mine = seats.Where(a => a.BallotId == me.Id).ToList();
+            if (mine.Any(a => a.SessionId == target)) continue;
+            var spare = mine.FirstOrDefault(a => !wanted.Contains(a.SessionId));
+            var old = spare?.SessionId;
+            var sample = ballots.Where(b => b.IsSample && seats.Any(a => a.BallotId == b.Id && a.SessionId == target))
+                .OrderBy(b => old is not null && Holds(b, activityOf[old]))
+                .ThenBy(b => old is not null && b.UnavailableSessions.Contains(old))
+                .ThenByDescending(b => old is null ? 0 : b.Points.FirstOrDefault(p => p.ActivityId == activityOf[old])?.Points ?? 0).FirstOrDefault();
+            var theirs = sample is null ? null : seats.First(a => a.BallotId == sample.Id && a.SessionId == target);
+            if (spare is not null) spare.SessionId = target;
+            if (theirs is not null && old is not null) theirs.SessionId = old;
+            else if (theirs is not null) theirs.BallotId = me.Id;
+            if (spare is null && theirs is null)
+            {
+                var seat = new AssignmentEntity { FairSlotId = slot.Id, BallotId = me.Id, SessionId = target };
+                seats.Add(seat);
+                db.Assignments.Add(seat);
+            }
+        }
+        db.OriginalAssignments.RemoveRange(await db.OriginalAssignments.Where(a => a.FairSlotId == slot.Id).ToListAsync());
+        db.OriginalAssignments.AddRange(seats.Select(a => new OriginalAssignmentEntity { FairSlotId = slot.Id, BallotId = a.BallotId, SessionId = a.SessionId }));
         await db.SaveChangesAsync();
     }
 
