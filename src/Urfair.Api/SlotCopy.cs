@@ -21,6 +21,7 @@ public static class SlotCopy
 			RegistrationDeadline = source.RegistrationDeadline + shift,
 			Seed = source.Seed,
 			OpenToAll = source.OpenToAll,
+			Excluded = source.Excluded.ToList(),
 			ShowInterim = source.ShowInterim,
 			Parish = source.Parish,
 			Organiser = source.Organiser,

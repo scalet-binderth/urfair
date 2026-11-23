@@ -8,7 +8,7 @@ public record CreateSlotRequest(string Name, bool WithSampleData, Guid? CopyFrom
 public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
     string? Parish, Visibility Visibility, bool CanEdit);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
-    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false, string? OrganiserEmail = null);
+    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false, string? OrganiserEmail = null, List<string>? Excluded = null);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -19,6 +19,9 @@ public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyL
 /// <summary>Endpoints for organisers (signed-in accounts; permissions in Access.cs).</summary>
 public static class AdminEndpoints
 {
+    /// <summary>Names a vote open to everyone may leave out (a few years of confirmands with room to spare).</summary>
+    public const int MaxExcluded = 2000;
+
     public static void MapAdminApi(this WebApplication app)
     {
         // Every request needs a signed-in account; the filter also checks access to the FairSlot (Access.cs).
@@ -70,7 +73,12 @@ public static class AdminEndpoints
 
         admin.MapGet("/slots/{id:guid}", async (Guid id, AppDbContext db, IConfiguration cfg, HttpContext http) =>
             await Endpoints.ToDto(db, id, cfg) is { } dto
-                ? Results.Ok(dto with { CanEdit = Access.Slot(http).CanEdit, OrganiserEmail = await db.FairSlots.Where(s => s.Id == id).Select(s => s.OrganiserEmail).SingleAsync() })
+                ? Results.Ok(dto with
+                {
+                    CanEdit = Access.Slot(http).CanEdit,
+                    OrganiserEmail = await db.FairSlots.Where(s => s.Id == id).Select(s => s.OrganiserEmail).SingleAsync(),
+                    Excluded = await db.FairSlots.Where(s => s.Id == id).Select(s => s.Excluded).SingleAsync(),
+                })
                 : Results.NotFound());
 
         admin.MapPut("/slots/{id:guid}", async (Guid id, UpdateSlotRequest req, AppDbContext db, HttpContext http) =>
@@ -98,6 +106,13 @@ public static class AdminEndpoints
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
             if (Clean(req.OrganiserEmail) is { } organiserEmail && !ParticipantCsv.IsEmail(organiserEmail))
                 errors.Add(new ValidationError("emailInvalid"));
+            // Without a list (older clients) the exclusions stay as they are.
+            var excluded = req.Excluded is null ? slot.Excluded
+                : req.Excluded.Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList();
+            if (excluded.Any(x => x.Length > Validation.MaxShortText))
+                errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
+            if (excluded.Count > MaxExcluded)
+                errors.Add(new ValidationError("tooManyExcluded", new Dictionary<string, object> { ["max"] = MaxExcluded }));
             // A frozen allocation must stay valid: no other rules. Back to registration only from the internal allocation
             // (it is unfrozen then); once participants have seen it, it stays.
             var rulesChanged = slot.ToRules() != rules;
@@ -114,8 +129,10 @@ public static class AdminEndpoints
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             var before = slot.Phase;
-            var settingsChanged = rulesChanged || slot.RegistrationDeadline != req.RegistrationDeadline;
+            var settingsChanged = rulesChanged || slot.RegistrationDeadline != req.RegistrationDeadline || slot.OpenToAll != req.OpenToAll
+                || !slot.Excluded.SequenceEqual(excluded);
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
+            slot.Excluded = excluded;
             slot.EndedAt = slot.Phase == Phase.Ended ? slot.EndedAt ?? Phases.Now() : null;
             (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);

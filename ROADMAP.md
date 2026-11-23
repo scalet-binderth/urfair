@@ -141,6 +141,12 @@ and English; keep both in sync.
   e-mail, dates of birth and baptism and Pfarrgemeinde. New personal links, not invited yet; names already listed
   stay unchanged; logged after the draft. Pfarrgemeinde admins take over only people of their own Pfarrgemeinden.
   Demo: take over the people of the "Ferienprogramm" into the "Jungschar-Sommerlager"
+- **"Open to everyone" with an exclusion list.** Settings: below "Für alle offen" a list of names (one per line,
+  case-insensitive) who do not see the vote and cannot vote; "exclude the participants of another vote" adds the names
+  of e.g. last year's vote (only people the account may see). People on the participant list always take part; a
+  vote already cast stays. The list is copied with a template (new column `FairSlots.Excluded`). Limit: there is no
+  self-registration yet, so on a real instance "open to everyone" only reaches people with a personal link.
+  Demo: exclude "David Doppler" in the "Pfarrfest", then he no longer sees it
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -197,7 +203,6 @@ original allocation so organisers can see and restore it; a log records every ch
 ## Later
 
 - "Together with friends" (concept decided, see requirement notes)
-- "Open to everyone" with an exclusion list (e.g. last year's participants)
 
 ## Requirement notes
 

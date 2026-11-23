@@ -77,8 +77,16 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                   @for (v of visibilities(); track v) { <option [value]="v">{{ i18n.t('visibility.' + v) }}</option> }
                 </select></div>
               <p class="muted small">{{ i18n.t('visibility.hint.' + form.visibility) }}</p>
-              <label class="check"><input type="checkbox" [(ngModel)]="form.openToAll" />{{ i18n.t('admin.openToAll') }}</label>
+              <label class="check"><input type="checkbox" [(ngModel)]="form.openToAll" (ngModelChange)="$event && loadOtherSlots()" />{{ i18n.t('admin.openToAll') }}</label>
               <p class="muted small">{{ i18n.t('admin.openToAllHint') }}</p>
+              @if (form.openToAll) {
+                <div class="field"><label for="s-excluded">{{ i18n.t('admin.excluded') }}</label><textarea id="s-excluded" rows="4" [(ngModel)]="form.excluded"></textarea></div>
+                <select [(ngModel)]="excludeSource" (ngModelChange)="excludeFrom($event)" [attr.aria-label]="i18n.t('admin.excludeFrom')">
+                  <option [ngValue]="null">{{ i18n.t('admin.excludeFrom') }}</option>
+                  @for (o of otherSlots(); track o.id) { <option [ngValue]="o.id">{{ o.name }}</option> }
+                </select>
+                <p class="muted small">{{ i18n.t('admin.excludedHint') }}</p>
+              }
               <h2>{{ i18n.t('admin.rules') }}</h2>
               <div class="rules">
                 <div class="field"><label for="r-budget">{{ i18n.t('admin.budget') }}</label><input id="r-budget" type="number" step="5" [(ngModel)]="form.rules.pointBudget" /></div>
@@ -288,9 +296,12 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; showInterim: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null, maxExtra: 0, requiredStaffing: false } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; excluded: string; showInterim: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, excluded: '', showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null, maxExtra: 0, requiredStaffing: false } };
   protected formGroups: Group[] = [];
+  /** Votes whose participants can be excluded (loaded when "open to everyone" is on). */
+  protected otherSlots = signal<{ id: string; name: string }[]>([]);
+  protected excludeSource: string | null = null;
   protected readonly colors = GROUP_COLORS;
   protected sampleCount = 0;
   protected removeReal = false;
@@ -303,10 +314,11 @@ export class AdminSlotPage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, showInterim: slot.showInterim,
+      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, excluded: (slot.excluded ?? []).join('\n'), showInterim: slot.showInterim,
         parish: slot.parish ?? '', organiser: slot.organiser ?? '', organiserEmail: slot.organiserEmail ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
+      if (slot.openToAll) await this.loadOtherSlots();
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
     } catch (e) {
       this.handle(e);
@@ -336,10 +348,29 @@ export class AdminSlotPage implements OnInit {
 
   protected ratioWidth(d: Demand): number { return Math.min(100, (d.interested / (d.seats ?? 1) / 3) * 100); }
 
+  protected async loadOtherSlots(): Promise<void> {
+    if (this.otherSlots().length) return;
+    try { this.otherSlots.set((await this.api.adminSlots()).filter(s => s.id !== this.slotId())); } catch (e) { this.handle(e); }
+  }
+
+  /** Adds the names of another vote's participants (e.g. last year's) to the exclusion list; saving applies it. */
+  protected async excludeFrom(id: string | null): Promise<void> {
+    if (!id) return;
+    try {
+      const names = this.form.excluded.split('\n').map(n => n.trim()).filter(n => n);
+      const known = new Set(names.map(n => n.toLowerCase()));
+      const added = (await this.api.participants(id)).map(p => p.name).filter(n => !known.has(n.toLowerCase()) && known.add(n.toLowerCase()));
+      this.form.excluded = [...names, ...added].join('\n');
+      this.toast.show(this.i18n.t('admin.excludeAdded', { n: added.length }));
+    } catch (e) { this.handle(e); }
+    finally { this.excludeSource = null; }
+  }
+
   protected saveSettings(): Promise<void> {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
         name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim,
+        excluded: this.form.excluded.split('\n').map(n => n.trim()).filter(n => n),
         parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, organiserEmail: this.form.organiserEmail.trim() || null, visibility: this.form.visibility,
         rules: { ...this.form.rules, maxExtra: Number(this.form.rules.maxExtra || 0), requiredStaffing: !!this.form.rules.requiredStaffing,
           perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },

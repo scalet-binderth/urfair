@@ -292,6 +292,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("Excluded")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("TEXT");
 
