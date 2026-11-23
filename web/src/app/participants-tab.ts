@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Api, ListedParticipant, ParticipantInput } from './api';
+import { Api, ListedParticipant, ParticipantInput, SlotSummary } from './api';
 import { I18n } from './i18n';
 import { AppInfo } from './info';
 import { Toast } from './toast';
@@ -45,6 +45,7 @@ import { Toast } from './toast';
                 @for (p of parishesInList(); track p) { <option [value]="p">{{ p }}</option> }
               </select>
             }
+            <button class="btn ghost small" type="button" (click)="toggleCopy()">{{ i18n.t('participants.copyOpen') }}</button>
             <button class="btn ghost small" type="button" (click)="showImport.set(!showImport())">{{ i18n.t('import.open') }}</button>
           </div>
         </div>
@@ -52,6 +53,26 @@ import { Toast } from './toast';
           <label class="check"><input type="checkbox" [ngModel]="notVotedOnly()" (ngModelChange)="notVotedOnly.set($event)" />{{ i18n.t('participants.notVotedOnly', { n: notVotedCount() }) }}</label>
           <button class="btn ghost small" type="button" (click)="copyMails()">{{ i18n.t('participants.copyMails') }}</button>
         </div>
+
+        @if (showCopy()) {
+          <div class="import stack">
+            <p class="muted small">{{ i18n.t('participants.copyLead') }}</p>
+            <select [(ngModel)]="copyFrom" (ngModelChange)="sendCopy(false)" [attr.aria-label]="i18n.t('participants.copyOpen')">
+              <option [ngValue]="null">{{ i18n.t('participants.copyChoose') }}</option>
+              @for (s of otherSlots(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+            </select>
+            @if (copyErrors().length) { <ul class="errors">@for (e of copyErrors(); track $index) { <li>{{ e }}</li> }</ul> }
+            @if (copyCounts(); as c) {
+              <p class="small">{{ i18n.t('participants.copyFound', { n: c.new, k: c.known }) }}</p>
+              @if (c.new) {
+                <div class="row">
+                  <button class="btn" type="button" [disabled]="busy()" (click)="sendCopy(true)">{{ i18n.t('participants.commit') }}</button>
+                  <button class="btn ghost" type="button" (click)="closeCopy()">{{ i18n.t('common.cancel') }}</button>
+                </div>
+              }
+            }
+          </div>
+        }
 
         @if (showImport()) {
           <div class="import stack">
@@ -151,6 +172,11 @@ export class ParticipantsTab implements OnInit {
   protected preview = signal<{ new: number; updated: number } | null>(null);
   protected importErrors = signal<string[]>([]);
   private csv = '';
+  protected showCopy = signal(false);
+  protected otherSlots = signal<SlotSummary[]>([]);
+  protected copyFrom: string | null = null;
+  protected copyCounts = signal<{ new: number; known: number } | null>(null);
+  protected copyErrors = signal<string[]>([]);
 
   ngOnInit(): void { this.load(); }
 
@@ -247,6 +273,40 @@ export class ParticipantsTab implements OnInit {
       }
     } catch (e) {
       this.importErrors.set(this.i18n.errors(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Other votes as the source, e.g. last year's (loaded when the panel opens). */
+  protected async toggleCopy(): Promise<void> {
+    if (this.showCopy()) { this.closeCopy(); return; }
+    this.showCopy.set(true);
+    try { this.otherSlots.set((await this.api.adminSlots()).filter(s => s.id !== this.slotId())); }
+    catch (e) { this.copyErrors.set(this.i18n.errors(e)); }
+  }
+
+  protected closeCopy(): void {
+    this.showCopy.set(false);
+    this.copyFrom = null;
+    this.copyCounts.set(null);
+    this.copyErrors.set([]);
+  }
+
+  protected async sendCopy(commit: boolean): Promise<void> {
+    this.copyCounts.set(null);
+    this.copyErrors.set([]);
+    if (!this.copyFrom) return;
+    this.busy.set(true);
+    try {
+      const res = await this.api.copyParticipants(this.slotId(), { from: this.copyFrom, commit });
+      if (res.saved) {
+        this.closeCopy();
+        this.toast.show(this.i18n.t('participants.copied', { n: res.new }));
+        await this.load();
+      } else this.copyCounts.set({ new: res.new, known: res.known });
+    } catch (e) {
+      this.copyErrors.set(this.i18n.errors(e));
     } finally {
       this.busy.set(false);
     }

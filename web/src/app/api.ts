@@ -75,7 +75,7 @@ export interface LogEntry {
   canRestore: boolean;
   kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
     | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
-    | 'participantsImported' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone';
+    | 'participantsImported' | 'participantsCopied' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone';
 }
 export interface RestoreChange { name: string; isSample: boolean; before: string; after: string; keptGivenBack: string | null; }
 export interface RestorePreview { at: string; changes: RestoreChange[]; mails: number; movesUp: boolean; }
@@ -185,6 +185,10 @@ export class Api {
   exportParticipants(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/participants.csv`, { ...this.admin(), responseType: 'blob' })); }
   importParticipants(id: string, body: { csv: string; commit: boolean }) {
     return this.call(this.http.post<{ people: ParticipantInput[]; errors: ApiError[]; new: number; updated: number; saved: boolean }>(`/api/admin/slots/${id}/participants/import`, body, this.admin()));
+  }
+  /** People of another vote: preview (commit false) or add them; names already listed are skipped. */
+  copyParticipants(id: string, body: { from: string; commit: boolean }) {
+    return this.call(this.http.post<{ new: number; known: number; saved: boolean }>(`/api/admin/slots/${id}/participants/copy`, body, this.admin()));
   }
   createInvitations(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/invitations`, {}, this.admin())); }
   mails(id: string) { return this.call(this.http.get<Mail[]>(`/api/admin/slots/${id}/mails`, this.admin())); }

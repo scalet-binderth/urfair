@@ -136,6 +136,11 @@ and English; keep both in sync.
   the same weekday a year later, at most 104). Participants, points, seats, mails and the log are not copied; the
   copy starts as a draft. Pfarrgemeinde admins copy into their own Pfarrgemeinde, never read-only for themselves.
   Demo: create "Ferienprogramm 2028" from the "Ferienprogramm"
+- **Take over participants from another vote.** Tab "Teilnehmende", "Aus anderer Wahl übernehmen": choose a vote
+  the account sees (also an ended one), see how many are new and how many already listed, then take them over with
+  e-mail, dates of birth and baptism and Pfarrgemeinde. New personal links, not invited yet; names already listed
+  stay unchanged; logged after the draft. Pfarrgemeinde admins take over only people of their own Pfarrgemeinden.
+  Demo: take over the people of the "Ferienprogramm" into the "Jungschar-Sommerlager"
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -192,7 +197,6 @@ original allocation so organisers can see and restore it; a log records every ch
 ## Later
 
 - "Together with friends" (concept decided, see requirement notes)
-- Take over participants from another vote
 - "Open to everyone" with an exclusion list (e.g. last year's participants)
 
 ## Requirement notes

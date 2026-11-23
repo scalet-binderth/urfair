@@ -11,6 +11,9 @@ public record ParticipantListDto(Guid Id, string Name, string? Email, DateOnly? 
 public record ParticipantRequest(string? Name, string? Email, DateOnly? BirthDate, string? Parish, DateOnly? BaptismDate = null);
 public record ParticipantImportRequest(string? Csv, bool Commit);
 public record ParticipantImportDto(IReadOnlyList<ParticipantCsv.Person> People, IReadOnlyList<ValidationError> Errors, int New, int Updated, bool Saved);
+public record ParticipantCopyRequest(Guid From, bool Commit);
+/// <param name="Known">Already on the list; skipped.</param>
+public record ParticipantCopyDto(int New, int Known, bool Saved);
 public record MailDto(Guid Id, string To, string Subject, string Body, DateTime CreatedAt, string Status, DateTime? SentAt, string? Error, string? ReplyTo);
 /// <param name="NeedsCheck">The date of birth is asked.</param>
 /// <param name="NeedsBaptism">The date of baptism is asked.</param>
@@ -116,6 +119,30 @@ public static class ParticipantEndpoints
                 else db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
             }
             await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsImported", null, updated.ToString(), (result.People.Count - updated).ToString());
+            await db.SaveChangesAsync();
+            return Results.Ok(preview with { Saved = true });
+        });
+
+        // Takes over the people of another vote the account sees (e.g. last year's, also ended): preview (commit=false) or
+        // add (commit=true). New personal links, not invited yet; names already listed are skipped. Pfarrgemeinde admins
+        // take over only people of their own Pfarrgemeinden.
+        admin.MapPost("/slots/{id:guid}/participants/copy", async (Guid id, ParticipantCopyRequest req, AppDbContext db, HttpContext http) =>
+        {
+            var account = Access.Account(http);
+            var source = await db.FairSlots.AsNoTracking().FirstOrDefaultAsync(s => s.Id == req.From);
+            if (source is null || source.Id == id || !Access.CanSee(account, source)) return Results.NotFound();
+            var (from, to) = (Access.For(account, source), Access.Slot(http));
+            var listed = (await db.Participants.Where(p => p.FairSlotId == id).Select(p => p.Name).ToListAsync())
+                .Select(n => n.ToLowerInvariant()).ToHashSet();
+            var people = (await db.Participants.AsNoTracking().Where(p => p.FairSlotId == source.Id).OrderBy(p => p.Name).ToListAsync())
+                .Where(p => from.InScope(p.Parish) && to.InScope(p.Parish)).ToList();
+            var fresh = people.Where(p => listed.Add(p.Name.ToLowerInvariant())).ToList();
+            var preview = new ParticipantCopyDto(fresh.Count, people.Count - fresh.Count, false);
+            if (!req.Commit || fresh.Count == 0) return Results.Ok(preview);
+
+            foreach (var p in fresh)
+                db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = p.Name, Email = p.Email, BirthDate = p.BirthDate, BaptismDate = p.BaptismDate, Parish = p.Parish });
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsCopied", null, source.Name, fresh.Count.ToString());
             await db.SaveChangesAsync();
             return Results.Ok(preview with { Saved = true });
         });
