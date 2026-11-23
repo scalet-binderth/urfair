@@ -128,10 +128,25 @@ See [ROADMAP.md](ROADMAP.md) for the plan and [CLAUDE.md](CLAUDE.md) for the wor
 The `Dockerfile` builds one container (UI + API, port 8080). GitHub Actions runs the tests and builds
 the image on every push and pull request.
 
+## Finding errors in operation
+
+- **Version:** the footer, `/api/info` and the first log line (`Urfair version … starting`) name the running commit
+  (`RENDER_GIT_COMMIT`, set by Render; `dev` locally). Render can roll back to an earlier deploy.
+- **Error number:** an unexpected server error shows "Fehlernummer abc12345" to the user; the server log has the
+  same number with the stack trace, path and version (search the Render log for `Error abc12345`).
+- **Browser errors** are written to the server log as `Browser error at …` (message and page only, at most 20 per
+  address and 10 minutes). Personal links appear as `/p/…`; no names or bodies are logged.
+- **Log per vote** (tab "Zuteilung"): from "Anmeldung" on, every change with account and time: phases, rules,
+  activities, participant list, seats, giving back, moving up, cancelling. E-mails with their status are in the mailbox.
+- **Fixing a bug:** issue with error number and steps → a test that reproduces it (`tests/Urfair.Core.Tests` for the
+  allocation, `tests/Urfair.Api.Tests` for whole workflows on a fresh demo database) → fix → CI green → merge;
+  Render deploys `main`.
+
 ## Dependencies and licences
 
 Only permissively licensed, free components: .NET / ASP.NET Core / EF Core and the dotnet-ef tool (MIT), Npgsql (PostgreSQL licence),
-SQLite (public domain), Angular (MIT). No external fonts, CDNs or trackers.
+SQLite (public domain), Angular (MIT). Tests only: xUnit (Apache 2.0), coverlet (MIT), Microsoft.AspNetCore.Mvc.Testing (MIT).
+No external fonts, CDNs or trackers.
 
 ## Licence
 

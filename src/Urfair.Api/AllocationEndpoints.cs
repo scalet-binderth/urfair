@@ -12,7 +12,7 @@ public record ParticipantDto(string BallotId, string Name, bool IsSample, double
 	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original, IReadOnlyList<string> Waitlist, IReadOnlyList<string> Declined,
 	bool NeedsReplacement = false);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
-	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt);
+	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt, bool WasVisible = false);
 public record SeatRequest(string SessionId, bool Locked);
 public record SeatsRequest(List<SeatRequest>? Seats);
 public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After);
@@ -44,6 +44,7 @@ public static class AllocationEndpoints
 			if (slot is null) return Results.NotFound();
 			if (slot.FrozenAt is null) return Endpoints.Errors("notFrozen");
 			if (slot.Phase != Phase.Allocation) return Endpoints.Errors("recalculateInternal");
+			if (await WasVisibleAsync(db, id)) return Endpoints.Errors("wasVisible");
 			var locked = await db.Assignments.Where(a => a.FairSlotId == id && a.Locked).ToListAsync();
 			Log(db, http, id, "recalculated");
 			await FreezeAsync(db, slot, locked.Select(a => a.ToModel()).ToList());
@@ -170,6 +171,17 @@ public static class AllocationEndpoints
 	public static void Log(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null) =>
 		Log(db, slotId, Access.Account(http).Name, kind, person, before, after);
 
+	/// <summary>Logs a change to activities, participants or settings once the FairSlot is no longer a draft.</summary>
+	public static async Task LogChangeAsync(AppDbContext db, HttpContext http, Guid slotId, string kind, string? person = null, string? before = null, string? after = null)
+	{
+		if (await db.FairSlots.AsNoTracking().Where(s => s.Id == slotId).Select(s => (Phase?)s.Phase).SingleOrDefaultAsync() is { } phase && phase != Phase.Draft)
+			Log(db, http, slotId, kind, person, before, after);
+	}
+
+	/// <summary>Seats of an activity for the log ("∞" if a date has no limit).</summary>
+	public static string SeatsText(IEnumerable<SessionEntity> sessions) =>
+		sessions.Any(s => s.Capacity is null) ? "∞" : sessions.Sum(s => s.Capacity ?? 0).ToString();
+
 	/// <summary>Adds a log entry with a given actor (a participant, or Urfair for automatic changes).</summary>
 	public static void Log(AppDbContext db, Guid slotId, string actor, string kind, string? person = null, string? before = null, string? after = null) =>
 		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after });
@@ -269,6 +281,18 @@ public static class AllocationEndpoints
 		var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, allocation.Load);
 		// Stored as UTC; the database returns it without a kind.
 		DateTime? frozen = slot.FrozenAt is { } f ? DateTime.SpecifyKind(f, DateTimeKind.Utc) : null;
-		return new AllocationDto(slot.Seed, k, allocation.Evaluate(k), fcfs.Evaluate(k), load, participants, frozen);
+		return new AllocationDto(slot.Seed, k, allocation.Evaluate(k), fcfs.Evaluate(k), load, participants, frozen, await WasVisibleAsync(db, slot.Id));
+	}
+
+	/// <summary>
+	/// Participants have seen the allocation once (the log shows a visible phase or their own changes). Then it is not
+	/// recalculated and the vote does not go back to registration: seats people know about stay.
+	/// </summary>
+	public static async Task<bool> WasVisibleAsync(AppDbContext db, Guid slotId)
+	{
+		string[] visible = [nameof(Phase.Published), nameof(Phase.Closed), nameof(Phase.Ended)];
+		string[] byParticipants = ["movedUp", "givenBack", "cancelled", "tookSeat"];
+		return await db.AllocationLog.AnyAsync(l => l.FairSlotId == slotId &&
+			((l.Kind == "phase" && (visible.Contains(l.Before!) || visible.Contains(l.After!))) || byParticipants.Contains(l.Kind)));
 	}
 }

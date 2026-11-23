@@ -200,7 +200,7 @@ public class OriginalAssignmentEntity
     public string SessionId { get; set; } = "";
 }
 
-/// <summary>One change to a frozen allocation (who, when, what). Deleted with its FairSlot.</summary>
+/// <summary>One change to a FairSlot after the draft (who, when, what): allocation, phases, activities, participant list. Deleted with its FairSlot.</summary>
 public class AllocationLogEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -208,7 +208,7 @@ public class AllocationLogEntity
     public DateTime At { get; set; } = DateTime.UtcNow;
     /// <summary>Name of the organiser account.</summary>
     public string Actor { get; set; } = "";
-    /// <summary>frozen, recalculated, unfrozen or seats.</summary>
+    /// <summary>frozen, recalculated, unfrozen, seats, phase, movedUp, givenBack, cancelled, tookSeat, settings, activity…, listed, unlisted, … (texts: log.* in i18n.ts).</summary>
     public string Kind { get; set; } = "";
     /// <summary>For <c>seats</c>: the participant and their seats before and after (activity titles, with date if needed).</summary>
     public string? Person { get; set; }

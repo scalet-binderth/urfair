@@ -36,8 +36,10 @@ public static class Endpoints
         api.MapGet("/info", (IConfiguration cfg, HttpRequest http) =>
         {
             Mailing.BaseUrl(http); // remembered for links in mails made without a request
-            return new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), mailSending = Mailing.Enabled, parishes = Parishes.All };
+            return new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), mailSending = Mailing.Enabled, parishes = Parishes.All,
+                version = Operations.Version };
         });
+        api.MapOperations();
 
         // Reloads the own previously submitted ballot so it can be changed.
         api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
@@ -140,7 +142,7 @@ public static class Endpoints
             if (!closed && status.Missing?.FirstOrDefault(m => (m.GroupId ?? "") == group) is { } shortOf)
             {
                 var now = await db.Assignments.Where(a => a.BallotId == ballot.Id).Select(a => a.SessionId).ToListAsync();
-                var groupName = slot.ToRules().Groups.FirstOrDefault(g => g.Id == shortOf.GroupId)?.Name;
+                var groupName = slot.ToRules().GroupList.FirstOrDefault(g => g.Id == shortOf.GroupId)?.Name;
                 await OrganiserMailAsync(db, slot, name, given, AllocationEndpoints.SeatText(activities, now), req.Replacement,
                     (shortOf.Count, groupName), http);
                 await db.SaveChangesAsync();

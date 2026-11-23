@@ -41,7 +41,7 @@ import { Toast } from './toast';
     </header>
     @if (info.demo()) { <div class="wrap demo small">{{ i18n.t('app.demo') }}</div> }
     <main class="wrap"><router-outlet /></main>
-    <footer class="wrap small">{{ i18n.t('app.madeFor') }}</footer>
+    <footer class="wrap small">{{ i18n.t('app.madeFor') }}@if (info.version(); as v) { · {{ i18n.t('app.version', { v }) }} }</footer>
     @if (toast.message(); as m) {
       <div class="toast" role="status">{{ m }}</div>
     }

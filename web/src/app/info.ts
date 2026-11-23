@@ -12,8 +12,13 @@ export class AppInfo {
   readonly mailSending = signal(false);
   /** Official names of the Pfarre and its Pfarrgemeinden, for selections. */
   readonly parishes = signal<string[]>([]);
+  /** Short commit of the running server, shown in the footer so error reports name the version. */
+  readonly version = signal('');
 
   constructor() {
-    this.api.info().then(i => { this.demo.set(i.demo); this.adminProtected.set(i.adminProtected); this.mailSending.set(i.mailSending); this.parishes.set(i.parishes ?? []); }, () => { /* keep defaults */ });
+    this.api.info().then(i => {
+      this.demo.set(i.demo); this.adminProtected.set(i.adminProtected); this.mailSending.set(i.mailSending); this.parishes.set(i.parishes ?? []);
+      this.version.set(i.version ?? '');
+    }, () => { /* keep defaults */ });
   }
 }

@@ -52,15 +52,20 @@ export interface MyActivityStatus {
 export interface OpenSeat { sessionId: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; points: number; }
 export interface Missing { groupId: string | null; count: number; open: OpenSeat[]; }
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; }
-export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; }
+export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; wasVisible?: boolean; }
 export interface Seat { sessionId: string; locked: boolean; }
 export interface ListPerson { name: string; parish: string | null; email: string | null; birthDate: string | null; baptismDate: string | null; }
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
-export interface LogEntry { at: string; actor: string; kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat'; person: string | null; before: string | null; after: string | null; }
+export interface LogEntry {
+  at: string; actor: string; person: string | null; before: string | null; after: string | null;
+  kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
+    | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
+    | 'participantsImported';
+}
 
-/** Thrown for 400/401 answers; carries the error codes for translation. */
+/** Thrown for 400/401 answers and server errors (with error number); carries the error codes for translation. */
 export class ApiFailure extends Error {
   constructor(readonly errors: ApiError[]) { super(errors.map(e => e.code).join(', ')); }
 }
@@ -85,7 +90,7 @@ export class Api {
   deleteAccount(id: string) { return this.call(this.http.delete(`/api/admin/accounts/${id}`)); }
 
   // ---------- general ----------
-  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[] }>('/api/info')); }
+  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[]; version?: string }>('/api/info')); }
 
   // ---------- participants ----------
   /** Personal link of the signed-in participant (token and confirmed dates of birth and baptism), sent with participant requests. */
@@ -191,7 +196,7 @@ export class Api {
       if (e instanceof HttpErrorResponse) {
         if (e.status === 401) throw new ApiFailure([{ code: 'unauthorized' }]);
         if (e.status === 403) throw new ApiFailure([{ code: 'forbidden' }]);
-        if (e.status === 400 && e.error?.errors) throw new ApiFailure(e.error.errors);
+        if ((e.status === 400 || e.status === 500) && e.error?.errors) throw new ApiFailure(e.error.errors);
       }
       throw new ApiFailure([{ code: 'generic' }]);
     }

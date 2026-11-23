@@ -13,7 +13,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Test allocation logic
+      - name: Test allocation logic and API workflows
         run: dotnet test Urfair.slnx
 
       - uses: actions/setup-node@v4

@@ -83,6 +83,13 @@ and English; keep both in sync.
   Once participants see the allocation, every change by hand is mailed to the person with their new seats.
   Demo: B sits in his weakest wish in the full "Ministrantenausflug"; the start page explains per demo person what
   can be tried
+- **Operations and troubleshooting:** the running version (commit) in the footer, `/api/info` and the log; unexpected
+  server errors show an error number that is also in the log; browser errors go to the server log (without personal
+  links); the log per vote also records rules, activities and participant list changes with the account; API tests
+  (`tests/Urfair.Api.Tests`) run the demo workflows on a fresh database in CI. Bug-fix routine in the README
+- **Seen stays seen:** once participants have seen an allocation (visible phase or their own changes in the log), it
+  can still go back to "internal" for quiet corrections by hand, but it is no longer recalculated and does not go back
+  to registration
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -95,6 +102,7 @@ and English; keep both in sync.
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 | ~~E-mails from the app (always with a direct link, reply-to the person responsible)~~ done (part 1); ~~message to the organisers, cancelling when closed~~ done (part 2); "fill seat" with offers and a deadline (e-mail also when it expires), replacement for the cancelling person, targeted overbooking | messages in the demo mailbox |
 | 7 | Required staffing mode ("all posts must be filled", hint "X people still missing"); "more than required" with an upper limit | Pfarrfest with missing people shown |
+| 8 | **Undo with save points** for the allocation: every change (by hand, moving up, giving back, cancelling, recalculating) stores a save point (seats with "locked", ticks, seats given back; new table, migration for both providers). In the log each entry gets "back to this state" with a preview (who gains or loses which seat) and a confirmation. Restoring deletes nothing: it is a new log entry and can itself be undone. While visible or closed, everyone affected gets "Deine Plätze"; seats a participant gave back themselves stay given back (with a hint); while visible, freed seats move up at once (switch to internal first to avoid that). Later: activities, participant list and rules (points hang on them; CSV export is the backup until then) | undo a moving-up chain in the "Ministrantenausflug" |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
 officer, legal notice and privacy policy, automatic deletion after an event.
