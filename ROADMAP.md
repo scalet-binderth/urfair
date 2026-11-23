@@ -173,6 +173,15 @@ and English; keep both in sync.
   would give up). Participants can remove waiting-list ticks when closed (not add any), so they are no longer asked.
   Demo: participants see the e-mails of the vote addressed to them ("Deine Mails (Demo)" on their page); D cancels
   "Kochen mit Oma" in the "Ferienprogramm" and C finds the offer there at once
+- **Leaders hear about changes, demo mail traffic.** Once a leader got their lists by mail, the list they got is kept
+  per date (column `Sessions.LeaderList`) and every change against it is mailed to them ("Änderung Teilnahmeliste":
+  who is new, who is no longer there, the whole list), only while the allocation is visible or closed (`LeaderNotices.cs`).
+  Changes by participants (cancelling, giving back, moving up, accepting an offer) go out at once, others (e.g. by hand)
+  once the vote has been quiet for 10 minutes, so a series of edits makes one mail. Accepting an offered seat is
+  confirmed by mail ("Platz bestätigt"). Demo: the mails sent so far are seeded with earlier dates (invitations,
+  results, lists for the leaders); the "Ferienprogramm" has two leaders with e-mail addresses and B ticked "Kochen mit
+  Oma" after C, so a declined offer goes on to him. The "Einladungen" tab shows the whole mail traffic or one mailbox
+  (organisers, leaders, participants) with inbox and sent, and who each mail is from
 
 ## Next steps (each ends with a demo that can be shown)
 

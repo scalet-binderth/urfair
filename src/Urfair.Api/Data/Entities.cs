@@ -113,6 +113,11 @@ public class SessionEntity
     public string Location { get; set; } = "";
     public int? Capacity { get; set; }
     public bool Flexible { get; set; }
+    /// <summary>
+    /// Names on the list the leader last got by e-mail, one per line; null if they got none. Later changes against it are
+    /// mailed to the leader (<see cref="Urfair.Api.LeaderNotices"/>).
+    /// </summary>
+    public string? LeaderList { get; set; }
 }
 
 public class BallotEntity

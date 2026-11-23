@@ -5,7 +5,7 @@ public static class DemoData
 {
     public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
 
-    /// <summary>A: no FairSlot, B: two in registration + one published, C: the same, D: additionally one closed.</summary>
+    /// <summary>A: no FairSlot, B: two in registration, one published and one closed, C and D: the same.</summary>
     public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
     public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
     public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
@@ -76,29 +76,36 @@ public static class DemoData
         [(D.Name, "Kletterwald Linz"), (C.Name, "Tiergarten Walding"), (B.Name, "Ars Electronica Center")];
 
     /// <summary>
-    /// Fixed points of C and D in the closed "Ferienprogramm", so filling a seat can be tried: D sits in "Kochen mit Oma" and can
-    /// cancel it; C ticked it while the allocation was visible, so she is offered the seat and would give up her weakest seat
-    /// (Fußballturnier), which nobody else wants. D is then left one seat short and the organisers get suggestions for him.
+    /// Fixed points of B, C and D in the closed "Ferienprogramm", so filling a seat can be tried: D sits in "Kochen mit Oma" and can
+    /// cancel it; C and B ticked it while the allocation was visible. C gave it more points, so she is offered the seat first and
+    /// would give up her weakest seat (Fußballturnier), which nobody else wants; if she declines, B is asked and would give up
+    /// "Waldtag mit dem Förster". D is then left one seat short and the organisers get suggestions for him.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> HolidayChoices = new Dictionary<string, IReadOnlyDictionary<string, int>>
     {
+        [B.Name] = new Dictionary<string, int> { ["Kochen mit Oma"] = 45, ["Kreativwerkstatt"] = 30, ["Waldtag mit dem Förster"] = 25 },
         [C.Name] = new Dictionary<string, int> { ["Kochen mit Oma"] = 50, ["Parkbad-Nachmittag"] = 30, ["Fußballturnier"] = 20 },
         [D.Name] = new Dictionary<string, int> { ["Kochen mit Oma"] = 40, ["Waldtag mit dem Förster"] = 35, ["Kreativwerkstatt"] = 25 },
     };
 
-    /// <summary>Seats of C and D in the "Ferienprogramm" after the allocation.</summary>
+    /// <summary>Seats of B, C and D in the "Ferienprogramm" after the allocation.</summary>
     public static readonly IReadOnlyList<(string Name, string Title)> HolidaySeats =
-        [(D.Name, "Kochen mit Oma"), (D.Name, "Waldtag mit dem Förster"), (C.Name, "Parkbad-Nachmittag"), (C.Name, "Fußballturnier")];
+        [(D.Name, "Kochen mit Oma"), (D.Name, "Waldtag mit dem Förster"), (C.Name, "Parkbad-Nachmittag"), (C.Name, "Fußballturnier"),
+         (B.Name, "Kreativwerkstatt"), (B.Name, "Waldtag mit dem Förster")];
 
     /// <summary>Waiting-list ticks in the "Ferienprogramm", set while it was visible.</summary>
-    public static readonly IReadOnlyList<(string Name, string Title)> HolidayTicks = [(C.Name, "Kochen mit Oma")];
+    public static readonly IReadOnlyList<(string Name, string Title)> HolidayTicks = [(C.Name, "Kochen mit Oma"), (B.Name, "Kochen mit Oma")];
 
+    /// <summary>Two leaders with e-mail addresses, so the lists and the mails about changes to them can be shown.</summary>
     public static IReadOnlyList<Activity> HolidayProgramme() => Build("ferien",
         ("Kochen mit Oma", 7, ("2026-07-14T09:00", "2026-07-14T13:00", "Pfarrheim St. Markus", 8)),
         ("Parkbad-Nachmittag", 8, ("2026-07-21T13:00", "2026-07-21T18:00", "Parkbad Linz", 25)),
         ("Waldtag mit dem Förster", 6, ("2026-07-28T09:00", "2026-07-28T15:00", "Pöstlingberg", 15)),
         ("Kreativwerkstatt", 5, ("2026-08-04T09:00", "2026-08-04T12:00", "Pfarrsaal Hl. Geist", 12)),
-        ("Fußballturnier", 9, ("2026-08-11T14:00", "2026-08-11T18:00", "Sportplatz Urfahr", 30)));
+        ("Fußballturnier", 9, ("2026-08-11T14:00", "2026-08-11T18:00", "Sportplatz Urfahr", 30)))
+        .Select(a => a.Title is "Kochen mit Oma" or "Kreativwerkstatt"
+            ? a with { Leader = "Hermine Gruber", LeaderEmail = "hermine.gruber@example.org" }
+            : a with { Leader = "Lukas Mayr", LeaderEmail = "lukas.mayr@example.org" }).ToList();
 
     public static IReadOnlyList<Activity> Camp() => Build("lager",
         ("Sommerlager Woche 1 (8–10 Jahre)", 8, ("2027-07-11T10:00", "2027-07-17T12:00", "Jungscharhaus Kirchschlag", 40)),

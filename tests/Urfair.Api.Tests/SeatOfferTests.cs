@@ -11,7 +11,7 @@ namespace Urfair.Api.Tests;
 /// <summary>Filling a seat after the lists are final, in the demo "Ferienprogramm" (SeatOffers.cs).</summary>
 public class SeatOfferTests
 {
-	const string Clara = "Clara Czerny", David = "David Doppler", Kochen = "Kochen mit Oma";
+	const string Ben = "Ben Berger", Clara = "Clara Czerny", David = "David Doppler", Kochen = "Kochen mit Oma", Waldtag = "Waldtag mit dem Förster";
 
 	static async Task<JsonElement> PersonAsync(HttpClient organiser, Guid slot, string name) =>
 		(await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/allocation")).GetProperty("participants").EnumerateArray()
@@ -46,8 +46,11 @@ public class SeatOfferTests
 	static Task<HttpResponseMessage> FillAsync(HttpClient organiser, Guid slot, string session) =>
 		organiser.PostAsJsonAsync($"/api/admin/slots/{slot}/offers", new { sessionId = session });
 
-	static Task<HttpResponseMessage> AnswerAsync(HttpClient client, Guid slot, string offer, string answer) =>
-		client.PostAsJsonAsync($"/api/slots/{slot}/offers/{offer}/{answer}", new { name = Clara });
+	static Task<HttpResponseMessage> AnswerAsync(HttpClient client, Guid slot, string offer, string answer, string name = Clara) =>
+		client.PostAsJsonAsync($"/api/slots/{slot}/offers/{offer}/{answer}", new { name });
+
+	static async Task<string> OfferIdAsync(HttpClient client, Guid slot, string name) =>
+		(await DemoApp.StatusAsync(client, slot, name)).GetProperty("offer").GetProperty("id").GetString()!;
 
 	static async Task<string> MailBodyAsync(HttpClient organiser, Guid slot, string subjectStart) =>
 		(await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/mails")).EnumerateArray()
@@ -115,7 +118,7 @@ public class SeatOfferTests
 	}
 
 	[Fact]
-	public async Task When_closed_Clara_can_remove_her_tick_but_not_add_one_and_is_then_not_asked()
+	public async Task When_closed_Clara_can_remove_her_tick_but_not_add_one_and_Ben_is_asked_instead()
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
@@ -133,7 +136,9 @@ public class SeatOfferTests
 		var david = DemoApp.Activity(await DemoApp.StatusAsync(client, slot, David), Kochen).GetProperty("activityId").GetString()!;
 		(await DemoApp.GiveBackAsync(client, slot, David, david, replacement: false)).EnsureSuccessStatusCode();
 		Assert.Equal(JsonValueKind.Null, (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").ValueKind);
-		Assert.Contains("Niemand wartet auf diesen Platz", await MailBodyAsync(organiser, slot, "Absage: David"));
+		var offer = (await DemoApp.StatusAsync(client, slot, Ben)).GetProperty("offer");
+		Assert.Equal(Kochen, offer.GetProperty("title").GetString());
+		Assert.Equal(Waldtag, offer.GetProperty("givesUp").GetString());
 	}
 
 	[Fact]
@@ -167,15 +172,19 @@ public class SeatOfferTests
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
 		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
-		var offer = (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").GetProperty("id").GetString()!;
+		var offer = await OfferIdAsync(client, slot, Clara);
 
 		(await AnswerAsync(client, slot, offer, "decline")).EnsureSuccessStatusCode();
 
 		Assert.Equal(["Parkbad-Nachmittag", "Fußballturnier"], Seats(await PersonAsync(organiser, slot, Clara)));
 		var log = await DemoApp.LogAsync(organiser, slot);
 		Assert.Contains(("offerDeclined", Clara), log);
-		Assert.Equal("offerNone", log[0].Kind);
+		Assert.Equal(("offered", Ben), log[0]);
 		Assert.Equal(HttpStatusCode.BadRequest, (await AnswerAsync(client, slot, offer, "accept")).StatusCode);
+
+		(await AnswerAsync(client, slot, await OfferIdAsync(client, slot, Ben), "decline", Ben)).EnsureSuccessStatusCode();
+
+		Assert.Equal("offerNone", (await DemoApp.LogAsync(organiser, slot))[0].Kind);
 		Assert.Contains("nobodyLeft", await (await FillAsync(organiser, slot, session)).Content.ReadAsStringAsync());
 	}
 
@@ -185,19 +194,25 @@ public class SeatOfferTests
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
 		var (slot, client, session) = await DavidCancelsAsync(organiser, app);
-		using (var scope = app.Services.CreateScope())
+		async Task ExpireAsync()
 		{
+			using var scope = app.Services.CreateScope();
 			var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-			(await db.SeatOffers.SingleAsync()).ExpiresAt = Phases.Now().AddMinutes(-1);
+			(await db.SeatOffers.SingleAsync(o => o.Status == OfferStatus.Open)).ExpiresAt = Phases.Now().AddMinutes(-1);
 			await db.SaveChangesAsync();
 			await Phases.TickAsync(db);
 		}
 
+		await ExpireAsync();
+
 		Assert.Contains(("offerExpired", Clara), await DemoApp.LogAsync(organiser, slot));
 		Assert.Contains(await DemoApp.MailSubjectsAsync(organiser, slot), s => s.StartsWith("Angebot abgelaufen"));
 		Assert.Equal(JsonValueKind.Null, (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer").ValueKind);
+		Assert.Equal(Kochen, (await DemoApp.StatusAsync(client, slot, Ben)).GetProperty("offer").GetProperty("title").GetString());
 
-		// A new round: the organisers may ask again only people not yet asked, so nobody is left.
+		// Ben lets it expire too; a new round may ask only people not yet asked, so nobody is left.
+		await ExpireAsync();
+		Assert.Contains(("offerExpired", Ben), await DemoApp.LogAsync(organiser, slot));
 		Assert.Contains("nobodyLeft", await (await FillAsync(organiser, slot, session)).Content.ReadAsStringAsync());
 	}
 

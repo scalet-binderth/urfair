@@ -168,6 +168,7 @@ public static class Endpoints
             else ballot.KeepGiveUpForTicks();
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
+            await LeaderNotices.SendAsync(db, slot);
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
@@ -212,6 +213,7 @@ public static class Endpoints
             }
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
+            await LeaderNotices.SendAsync(db, slot);
             var status = await StatusAsync(db, slot, name);
             // While visible the organisers only hear about it if the person is now short of seats in that group.
             if (!closed && status.Missing?.FirstOrDefault(m => (m.GroupId ?? "") == group) is { } shortOf)
@@ -243,6 +245,7 @@ public static class Endpoints
             AllocationEndpoints.Log(db, id, name, "tookSeat", name, AllocationEndpoints.SeatText(activities, seats),
                 AllocationEndpoints.SeatText(activities, seats.Append(req.SessionId)));
             await db.SaveChangesAsync();
+            await LeaderNotices.SendAsync(db, slot);
             return Results.Ok(await StatusAsync(db, slot, name));
         });
 
@@ -257,6 +260,7 @@ public static class Endpoints
             var error = answer == "accept"
                 ? await SeatOffers.AcceptAsync(db, slot, offerId, name, url)
                 : await SeatOffers.DeclineAsync(db, slot, offerId, name, url);
+            if (error is null) await LeaderNotices.SendAsync(db, slot);
             return error is null ? Results.Ok(await StatusAsync(db, slot, name)) : Errors(error);
         });
 

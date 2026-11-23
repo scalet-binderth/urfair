@@ -280,10 +280,10 @@ public static class AdminEndpoints
         });
 
         // Demo only: rebuild every demo FairSlot (since migrations, deploys keep the data).
-        admin.MapPost("/reset-all", async (AppDbContext db, IConfiguration cfg) =>
+        admin.MapPost("/reset-all", async (AppDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             if (!Database.IsDemo(cfg)) return Results.NotFound();
-            await Database.ResetDemoAsync(db);
+            await Database.ResetDemoAsync(db, Mailing.BaseUrl(http.Request));
             return Results.NoContent();
         });
 

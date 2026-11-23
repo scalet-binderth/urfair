@@ -28,7 +28,11 @@ export interface ParticipantInput { name: string; email: string | null; birthDat
 export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
 /** manual: copied by hand; pending: waiting to be sent (also after an error); sent; failed: gave up. */
 export type MailStatus = 'manual' | 'pending' | 'sent' | 'failed';
-export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; status: MailStatus; sentAt: string | null; error: string | null; replyTo: string | null; }
+/** from: on whose behalf it went out (the organiser, for mails to the organiser the participant concerned); null = the app itself. */
+export interface Mail { id: string; to: string; subject: string; body: string; createdAt: string; status: MailStatus; sentAt: string | null; error: string | null; replyTo: string | null; from: string | null; }
+export type MailboxRole = 'organiser' | 'leader' | 'participant' | 'other';
+/** Demo: everyone the mails of a vote go to or come from. */
+export interface Mailbox { address: string; name: string; roles: MailboxRole[]; }
 /** A mail as the participant would receive it (demo mailbox). */
 export interface MyMail { subject: string; body: string; createdAt: string; }
 /** check = confirmed date of birth, baptism = confirmed date of baptism ('' if none is asked). */
@@ -202,6 +206,7 @@ export class Api {
   }
   createInvitations(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/invitations`, {}, this.admin())); }
   mails(id: string) { return this.call(this.http.get<Mail[]>(`/api/admin/slots/${id}/mails`, this.admin())); }
+  mailboxes(id: string) { return this.call(this.http.get<Mailbox[]>(`/api/admin/slots/${id}/mailboxes`, this.admin())); }
   removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
   exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { ...this.admin(), responseType: 'blob' })); }
   importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean }) {

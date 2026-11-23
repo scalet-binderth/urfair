@@ -62,7 +62,7 @@ system assigns the seats:
   in the order of moving up (e-mail with the personal link; 48 hours to answer, 24 if the date is less than a week
   ahead, 12 if less than three days, at most until a day before; not for dates less than 36 hours ahead). The
   allocation shows per free seat who would be asked next.
-  Declined or expired: the next person; accepted: the seat given up is offered next; nobody left: e-mail to the
+  Declined or expired: the next person; accepted: confirmed by e-mail and the seat given up is offered next; nobody left: e-mail to the
   organisers. People who still need a replacement get one-click suggestions in the allocation (free seats, or
   overbooking their best full wish).
 - **Automatic deletion** (`Retention.cs`): a vote that has ended (by itself or by hand) is deleted with everything in
@@ -88,7 +88,9 @@ system assigns the seats:
 - **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
-  prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).
+  prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see). Once a
+  leader got their lists by mail, every later change is mailed to them ("Änderung Teilnahmeliste", `LeaderNotices.cs`):
+  changes by participants at once, others after 10 quiet minutes, so a series of edits makes one mail.
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
 - **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
 - **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.
@@ -122,8 +124,9 @@ In demo mode the organisation area has a button to reset the whole demo.
 The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
 `Geburtsdatum`, `Taufdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
 if a date of birth and/or baptism is stored it is asked after the click. Invitations with the link are prepared in the vote's
-"Einladungen" tab: in demo mode as a demo mailbox (participants also see the mails addressed to them on their own page,
-"Deine Mails (Demo)"); on a real instance the app sends them itself if a mail server is
+"Einladungen" tab: in demo mode as a demo mailbox with the whole mail traffic or one mailbox (organisers, leaders,
+participants) with inbox and sent; the demo starts with invitations, results and leader lists already sent (participants
+also see the mails addressed to them on their own page, "Deine Mails (Demo)"); on a real instance the app sends them itself if a mail server is
 set up (see `Mail__*` below), otherwise they are texts to copy. Each mail shows its status (waiting, sent, not sent with
 the error and "send again"). Replies go to the vote's "E-Mail für Antworten" (settings, optional).
 While registration is open the same tab prepares reminders for everyone who has not voted yet; the participant
