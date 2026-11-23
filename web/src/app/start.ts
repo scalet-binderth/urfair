@@ -122,7 +122,7 @@ export class StartPage {
   /** Demo people, matching the seeded participant lists on the server (DemoData.cs); tries = numbered texts start.try.{key}{n}. */
   protected readonly people = [
     { key: 'A', name: 'Anna Ammer', tries: [1, 2] }, { key: 'B', name: 'Ben Berger', tries: [1, 2, 3, 4] },
-    { key: 'C', name: 'Clara Czerny', tries: [1, 2, 3, 4, 5, 6] }, { key: 'D', name: 'David Doppler', tries: [1, 2, 3, 4, 5] },
+    { key: 'C', name: 'Clara Czerny', tries: [1, 2, 3, 4, 5, 6, 7] }, { key: 'D', name: 'David Doppler', tries: [1, 2, 3, 4, 5] },
   ];
   protected key = '';
   protected email = '';

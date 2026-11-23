@@ -251,6 +251,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<string>("Gender")
                         .HasColumnType("text");
 
+                    b.PrimitiveCollection<List<string>>("GiveUp")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
                     b.Property<bool>("IsSample")
                         .HasColumnType("boolean");
 

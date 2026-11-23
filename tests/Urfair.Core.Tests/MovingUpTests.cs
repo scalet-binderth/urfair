@@ -190,4 +190,63 @@ public class MovingUpTests
 		Assert.False(alloc.CanAdd(x, acts[0].Sessions[0], 2)); // already held
 		Assert.False(alloc.CanAdd(x, acts[1].Sessions[0], 1)); // no seat missing
 	}
+
+	// x holds b (10) and c (30), ticked a (60): b is the weakest and pre-selected, c can be chosen instead.
+	private static (Activity[] Acts, Allocator Alloc, Ballot X) TwoSeats(Dictionary<string, string>? giveUp, bool lockC = false)
+	{
+		Activity[] acts = [Act("a", 1, hour: 9), Act("b", 1, hour: 12), Act("c", 1, hour: 15)];
+		var x = Ballot("x", new() { ["a"] = 60, ["b"] = 10, ["c"] = 30 }, waitlist: ["a"]) with { GiveUp = giveUp };
+		return (acts, Frozen(acts, [x], ("x", "b", false), ("x", "c", lockC)), x);
+	}
+
+	[Fact]
+	public void Give_up_options_list_every_seat_that_could_go_weakest_first()
+	{
+		var (acts, alloc, x) = TwoSeats(null);
+
+		Assert.Equal(["b", "c"], alloc.GiveUpOptions(x, acts[0], 2).Select(s => s.ActivityId));
+		Assert.Empty(alloc.GiveUpOptions(x, acts[0], 3)); // a seat missing: nothing to give up
+	}
+
+	[Fact]
+	public void Without_a_choice_the_weakest_seat_goes()
+	{
+		var (_, alloc, _) = TwoSeats(null);
+
+		var move = Assert.Single(alloc.FillFreeSeats(2, 1));
+
+		Assert.Equal("b1", move.GaveUp?.Id);
+		Assert.Equal(["a", "c"], Seats(alloc, "x"));
+	}
+
+	[Fact]
+	public void The_chosen_seat_goes_instead_of_the_weakest()
+	{
+		var (acts, alloc, x) = TwoSeats(new() { ["a"] = "c" });
+
+		Assert.Equal("c", alloc.MoveUpFor(x, acts[0], 2).GivesUp?.ActivityId);
+		var move = Assert.Single(alloc.FillFreeSeats(2, 1));
+
+		Assert.Equal("c1", move.GaveUp?.Id);
+		Assert.Equal(["a", "b"], Seats(alloc, "x"));
+	}
+
+	[Fact]
+	public void A_chosen_seat_that_cannot_go_blocks_moving_up_instead_of_giving_up_another()
+	{
+		var (acts, alloc, x) = TwoSeats(new() { ["a"] = "c" }, lockC: true);
+
+		Assert.False(alloc.MoveUpFor(x, acts[0], 2).Possible);
+		Assert.Empty(alloc.FillFreeSeats(2, 1));
+		Assert.Equal(["b", "c"], Seats(alloc, "x"));
+		Assert.Equal(["b"], alloc.GiveUpOptions(x, acts[0], 2).Select(s => s.ActivityId));
+	}
+
+	[Fact]
+	public void A_choice_for_a_seat_no_longer_held_falls_back_to_the_weakest()
+	{
+		var (_, alloc, _) = TwoSeats(new() { ["a"] = "d" });
+
+		Assert.Equal("b1", Assert.Single(alloc.FillFreeSeats(2, 1)).GaveUp?.Id);
+	}
 }

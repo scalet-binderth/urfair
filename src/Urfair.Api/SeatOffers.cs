@@ -102,6 +102,7 @@ public static class SeatOffers
 		if (givesUp is not null) db.Assignments.RemoveRange(seats.Where(a => a.SessionId == givesUp.Id));
 		db.Assignments.Add(new AssignmentEntity { FairSlotId = slot.Id, BallotId = ballot.Id, SessionId = session.Id });
 		ballot.Waitlist = ballot.Waitlist.Where(x => x != session.ActivityId).ToList();
+		ballot.KeepGiveUpForTicks();
 		(offer.Status, offer.AnsweredAt) = (OfferStatus.Accepted, DateTime.UtcNow);
 		var after = AllocationEndpoints.SeatText(activities, seats.Select(a => a.SessionId).Where(x => x != givesUp?.Id).Append(session.Id));
 		AllocationEndpoints.Log(db, slot.Id, name, "offerAccepted", name, before, after);

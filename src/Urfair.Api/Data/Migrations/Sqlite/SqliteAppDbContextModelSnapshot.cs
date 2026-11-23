@@ -243,6 +243,10 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<string>("Gender")
                         .HasColumnType("TEXT");
 
+                    b.PrimitiveCollection<string>("GiveUp")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsSample")
                         .HasColumnType("INTEGER");
 

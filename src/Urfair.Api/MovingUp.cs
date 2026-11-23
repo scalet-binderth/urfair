@@ -39,6 +39,7 @@ public static class MovingUp
 			stored.Add(seat);
 			db.Assignments.Add(seat);
 			ballot.Waitlist = ballot.Waitlist.Where(x => x != m.Session.ActivityId).ToList();
+			ballot.KeepGiveUpForTicks();
 			var after = AllocationEndpoints.SeatText(activities, stored.Where(a => a.BallotId == ballot.Id).Select(a => a.SessionId));
 			AllocationEndpoints.Log(db, slot.Id, Phases.Clock, "movedUp", ballot.Name, before, after);
 		}

@@ -36,6 +36,8 @@ public sealed record Activity(
 /// The point distribution a participant submitted. For moving up after the allocation: <paramref name="Declined"/> activities
 /// were given back and are never allocated again, <paramref name="Waitlist"/> activities are ticked to move up into, and
 /// <paramref name="NoReplacement"/> holds the groups (id, "" without a group) where a missing seat is not filled on its own.
+/// <paramref name="GiveUp"/> maps a ticked activity to the activity whose seat the person chose to give up for it
+/// (otherwise the weakest seat of the group goes).
 /// </summary>
 public sealed record Ballot(
     string Id,
@@ -45,7 +47,8 @@ public sealed record Ballot(
     string? Gender = null,
     IReadOnlySet<string>? Declined = null,
     IReadOnlySet<string>? Waitlist = null,
-    IReadOnlySet<string>? NoReplacement = null)
+    IReadOnlySet<string>? NoReplacement = null,
+    IReadOnlyDictionary<string, string>? GiveUp = null)
 {
     public int PointsFor(string activityId) => Points.GetValueOrDefault(activityId);
     public bool HasDeclined(string activityId) => Declined?.Contains(activityId) == true;

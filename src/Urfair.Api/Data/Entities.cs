@@ -118,10 +118,20 @@ public class BallotEntity
     public List<string> Declined { get; set; } = [];
     /// <summary>Groups (id, "" without a group) where a missing seat is not filled automatically: given back without a replacement or set by hand.</summary>
     public List<string> NoReplacement { get; set; } = [];
+    /// <summary>Seat chosen to give up for a tick, as "tickedActivityId&gt;givenActivityId" (otherwise the weakest goes).</summary>
+    public List<string> GiveUp { get; set; } = [];
+
+    public Dictionary<string, string> GiveUpMap() => ParseGiveUp(GiveUp);
+
+    public static Dictionary<string, string> ParseGiveUp(IEnumerable<string>? pairs) =>
+        (pairs ?? []).Select(x => x.Split('>', 2)).Where(x => x.Length == 2).GroupBy(x => x[0]).ToDictionary(g => g.Key, g => g.Last()[1]);
+
+    /// <summary>Keeps only the choices for activities that are still ticked.</summary>
+    public void KeepGiveUpForTicks() => GiveUp = GiveUp.Where(x => Waitlist.Contains(x.Split('>', 2)[0])).ToList();
 
     public Ballot ToModel() => new(Id.ToString(), Name,
         Points.ToDictionary(p => p.ActivityId, p => p.Points),
-        UnavailableSessions.ToHashSet(), Gender, Declined.ToHashSet(), Waitlist.ToHashSet(), NoReplacement.ToHashSet());
+        UnavailableSessions.ToHashSet(), Gender, Declined.ToHashSet(), Waitlist.ToHashSet(), NoReplacement.ToHashSet(), GiveUpMap());
 }
 /// <summary>
 /// A person allowed to vote in a FairSlot. Signs in with a personal link (token) and, if a date of birth is stored,
