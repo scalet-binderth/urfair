@@ -139,6 +139,8 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.key': 'Zugangsschlüssel für die Organisation', 'admin.keyNeeded': 'Für diesen Bereich ist ein Zugangsschlüssel nötig.',
     'admin.new': 'Neue Wahl', 'admin.newName': 'Name, z. B. „Ferienprogramm Sommer 2027“',
     'admin.withSample': 'Mit Beispieldaten (Firmvorbereitung Urfahr) füllen', 'admin.create': 'Anlegen',
+    'admin.template': 'Vorlage', 'admin.templateNone': 'Keine (leere Wahl)', 'admin.shiftWeeks': 'Termine verschieben um Wochen',
+    'admin.templateHint': 'Übernommen werden Einstellungen, Regeln, Gruppen, Veranstaltungen und Termine (52 Wochen später = gleicher Wochentag ein Jahr später). Teilnehmende, Anmeldungen und Zuteilung bleiben in der Vorlage. Die neue Wahl beginnt als Entwurf.',
     'admin.col.name': 'Name', 'admin.col.phase': 'Phase', 'admin.col.deadline': 'Anmeldeschluss',
     'admin.col.activities': 'Veranstaltungen', 'admin.col.ballots': 'Anmeldungen', 'admin.none': 'Noch keine Wahlen angelegt.',
     'admin.back': '← Alle Wahlen',
@@ -249,6 +251,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'restore.confirm': 'Zurücksetzen ({n} Personen)', 'restore.done': 'Zuteilung zurückgesetzt.',
 
     'error.nameRequired': 'Bitte gib einen Namen an.',
+    'error.shiftWeeks': 'Die Termine lassen sich um 0 bis {max} Wochen verschieben.',
     'error.unknownActivity': 'Unbekannte Veranstaltung.',
     'error.negativePoints': 'Punkte dürfen nicht negativ sein.',
     'error.pointStep': 'Punkte bitte in {step}er-Schritten vergeben.',
@@ -541,6 +544,8 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.key': 'Organisation access key', 'admin.keyNeeded': 'An access key is required for this area.',
     'admin.new': 'New vote', 'admin.newName': 'Name, e.g. “Summer holiday programme 2027”',
     'admin.withSample': 'Fill with sample data (confirmation preparation Urfahr)', 'admin.create': 'Create',
+    'admin.template': 'Template', 'admin.templateNone': 'None (empty vote)', 'admin.shiftWeeks': 'Move dates by weeks',
+    'admin.templateHint': 'Settings, rules, groups, activities and dates are copied (52 weeks later = the same weekday a year later). Participants, registrations and the allocation stay in the template. The new vote starts as a draft.',
     'admin.col.name': 'Name', 'admin.col.phase': 'Phase', 'admin.col.deadline': 'Registration closes',
     'admin.col.activities': 'Activities', 'admin.col.ballots': 'Registrations', 'admin.none': 'No votes yet.',
     'admin.back': '← All votes',
@@ -650,6 +655,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'restore.confirm': 'Set back ({n} people)', 'restore.done': 'Allocation set back.',
 
     'error.nameRequired': 'Please enter a name.',
+    'error.shiftWeeks': 'Dates can be moved by 0 to {max} weeks.',
     'error.unknownActivity': 'Unknown activity.',
     'error.negativePoints': 'Points cannot be negative.',
     'error.pointStep': 'Please give points in steps of {step}.',

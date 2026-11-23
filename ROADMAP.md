@@ -131,6 +131,11 @@ and English; keep both in sync.
   `/datenschutz`), texts from `Legal__Imprint` and `Legal__Privacy`; without them a marked German template is shown.
   Still open: the real texts (legal basis, supervisory authority) with the parish and the data protection officer.
   Demo: set the "Ferienprogramm" to Ended to see the deletion date
+- **Copy a vote as a template.** "Neue Wahl" can start from any vote the account sees, also an ended one (before it
+  is deleted): settings, rules, groups, activities and dates are copied, the dates moved by whole weeks (default 52 =
+  the same weekday a year later, at most 104). Participants, points, seats, mails and the log are not copied; the
+  copy starts as a draft. Pfarrgemeinde admins copy into their own Pfarrgemeinde, never read-only for themselves.
+  Demo: create "Ferienprogramm 2028" from the "Ferienprogramm"
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -187,7 +192,6 @@ original allocation so organisers can see and restore it; a log records every ch
 ## Later
 
 - "Together with friends" (concept decided, see requirement notes)
-- Copy last year's vote as a template
 - Take over participants from another vote
 - "Open to everyone" with an exclusion list (e.g. last year's participants)
 

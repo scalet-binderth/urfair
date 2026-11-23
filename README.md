@@ -59,6 +59,9 @@ system assigns the seats:
 - **Automatic deletion** (`Retention.cs`): a vote that has ended (by itself or by hand) is deleted with everything in
   it (participants, points, seats, mails, log) after `Retention__Days` days (default 90). Organisers and participants
   see the date; going back from Ended stops the countdown. Votes that never end are not deleted automatically.
+- **Copy as a template** (`SlotCopy.cs`): "Neue Wahl" can start from an existing vote (e.g. last year's, also when
+  ended): settings, rules, groups, activities and dates, the dates moved by whole weeks (52 = same weekday a year
+  later). Participants, registrations, seats, mails and the log stay behind; the copy is a draft.
 - **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or

@@ -4,7 +4,7 @@ using Urfair.Core;
 
 namespace Urfair.Api;
 
-public record CreateSlotRequest(string Name, bool WithSampleData);
+public record CreateSlotRequest(string Name, bool WithSampleData, Guid? CopyFrom = null, int ShiftWeeks = 0);
 public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
     string? Parish, Visibility Visibility, bool CanEdit);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
@@ -40,15 +40,29 @@ public static class AdminEndpoints
         });
 
         // A Pfarrgemeinde admin creates FairSlots for their own (first) Pfarrgemeinde, visible only there; Junia admins for all.
+        // With CopyFrom a vote the account may see (also an ended one) is the template (SlotCopy.cs).
         admin.MapPost("/slots", async (CreateSlotRequest req, AppDbContext db, IConfiguration cfg, HttpContext http) =>
         {
             var name = (req.Name ?? "").Trim();
             if (name.Length == 0) return Endpoints.Errors("nameRequired");
+            if (req.ShiftWeeks is < 0 or > SlotCopy.MaxShiftWeeks)
+                return Results.BadRequest(new ErrorsDto([new ValidationError("shiftWeeks", new Dictionary<string, object> { ["max"] = SlotCopy.MaxShiftWeeks })]));
             var account = Access.Account(http);
-            var slot = req.WithSampleData && Database.IsDemo(cfg)
+            FairSlotEntity slot;
+            if (req.CopyFrom is { } sourceId)
+            {
+                var source = await db.FairSlots.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sourceId);
+                if (source is null || !Access.CanSee(account, source)) return Results.NotFound();
+                slot = await SlotCopy.CopyAsync(db, source, name, req.ShiftWeeks);
+            }
+            else slot = req.WithSampleData && Database.IsDemo(cfg)
                 ? await Database.CreateDemoSlotAsync(db, name, Phase.Draft, 140)
                 : new FairSlotEntity { Name = name };
-            if (!account.IsJuniaAdmin) (slot.Parish, slot.Visibility) = (account.Parishes.FirstOrDefault(), Visibility.ParishOnly);
+            // A copy may stay in the account's own Pfarrgemeinde, but never read-only for its own organisers.
+            if (!account.IsJuniaAdmin)
+                (slot.Parish, slot.Visibility) = req.CopyFrom is not null && slot.Parish is { } own && account.Parishes.Contains(own)
+                    ? (own, slot.Visibility == Visibility.JuniaReadOnly ? Visibility.ParishOnly : slot.Visibility)
+                    : (account.Parishes.FirstOrDefault(), Visibility.ParishOnly);
             if (db.Entry(slot).State == EntityState.Detached) db.FairSlots.Add(slot);
             await db.SaveChangesAsync();
             return Results.Ok(new { slot.Id });
