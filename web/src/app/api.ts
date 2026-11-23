@@ -9,8 +9,8 @@ export interface Group { id: string; name: string; perParticipant: number; minAc
 export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey'];
 /** maxExtra: "more than required", participants may offer up to this many seats more (0 = off). requiredStaffing: every date must be filled. */
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; maxExtra?: number; requiredStaffing?: boolean; }
-export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; }
+export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; deleteOn?: string | null; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; deleteOn?: string | null; }
 /** missing: required staffing, people still missing on this date (participant view). */
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; missing?: number | null; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
@@ -106,6 +106,8 @@ export class Api {
 
   // ---------- general ----------
   info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[]; version?: string }>('/api/info')); }
+  /** Legal notice and privacy policy of this instance; null: not set, the page shows its template. */
+  legal() { return this.call(this.http.get<{ imprint: string | null; privacy: string | null; retentionDays: number }>('/api/legal')); }
 
   // ---------- participants ----------
   /** Personal link of the signed-in participant (token and confirmed dates of birth and baptism), sent with participant requests. */

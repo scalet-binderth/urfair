@@ -124,6 +124,13 @@ and English; keep both in sync.
   points first, group quotas do not limit them and nobody loses a seat for them. Lowering the maximum cuts offers
   down (new columns `FairSlots.MaxExtra`, `FairSlots.RequiredStaffing`, `Ballots.Extra`). Demo: the "Pfarrfest"
   shows the people still missing per shift; D offers one seat more and gets a third shift
+- **Automatic deletion and legal pages.** When a vote becomes Ended (after the last date or by hand) its deletion
+  period starts (`FairSlots.EndedAt`); after `Retention__Days` days (default 90) the background clock deletes it with
+  all its data. Organisers and participants see the deletion date; going back from Ended stops it. Votes that never
+  end (e.g. without dates) are not covered yet. Legal notice and privacy policy in the footer (`/impressum`,
+  `/datenschutz`), texts from `Legal__Imprint` and `Legal__Privacy`; without them a marked German template is shown.
+  Still open: the real texts (legal basis, supervisory authority) with the parish and the data protection officer.
+  Demo: set the "Ferienprogramm" to Ended to see the deletion date
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -139,7 +146,7 @@ and English; keep both in sync.
 | 8 ✓ | done, see above (later: activities, participant list and rules; points hang on them, the CSV export is the backup until then) | |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
-officer, legal notice and privacy policy, automatic deletion after an event.
+officer, the real texts of the legal notice and privacy policy (pages and automatic deletion are done).
 
 ## Process model (decided 22 November 2026)
 

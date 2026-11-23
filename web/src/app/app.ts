@@ -41,7 +41,8 @@ import { Toast } from './toast';
     </header>
     @if (info.demo()) { <div class="wrap demo small">{{ i18n.t('app.demo') }}</div> }
     <main class="wrap"><router-outlet /></main>
-    <footer class="wrap small">{{ i18n.t('app.madeFor') }}@if (info.version(); as v) { · {{ i18n.t('app.version', { v }) }} }</footer>
+    <footer class="wrap small">{{ i18n.t('app.madeFor') }}@if (info.version(); as v) { · {{ i18n.t('app.version', { v }) }} }
+      · <a routerLink="/impressum">{{ i18n.t('legal.imprint') }}</a> · <a routerLink="/datenschutz">{{ i18n.t('legal.privacy') }}</a></footer>
     @if (toast.message(); as m) {
       <div class="toast" role="status">{{ m }}</div>
     }
@@ -133,6 +134,9 @@ import { Toast } from './toast';
       color: var(--muted);
       padding-block: 16px 32px;
       border-top: 1px solid var(--line);
+    }
+    footer a {
+      color: inherit;
     }
   `,
 })

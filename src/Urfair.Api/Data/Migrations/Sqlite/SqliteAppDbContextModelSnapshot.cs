@@ -289,6 +289,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("TEXT");
 

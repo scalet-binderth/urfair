@@ -102,6 +102,7 @@ public static class AdminEndpoints
             var before = slot.Phase;
             var settingsChanged = rulesChanged || slot.RegistrationDeadline != req.RegistrationDeadline;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
+            slot.EndedAt = slot.Phase == Phase.Ended ? slot.EndedAt ?? Phases.Now() : null;
             (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);
             // Fewer extra seats allowed: offers above the new maximum are cut down.

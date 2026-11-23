@@ -297,6 +297,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("timestamp without time zone");
 

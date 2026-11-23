@@ -42,7 +42,7 @@ import { SessionService } from './session';
               @if (s.phase === 'Allocation') {
                 <p class="muted small">{{ i18n.t('home.closed') }}</p>
               } @else {
-                <p class="muted small">{{ i18n.t(s.phase === 'Ended' ? 'home.ended' : 'home.published') }}</p>
+                <p class="muted small">{{ i18n.t(s.phase === 'Ended' ? 'home.ended' : 'home.published') }}@if (s.deleteOn) { {{ i18n.t('home.deleteOn', { date: i18n.day(s.deleteOn) }) }} }</p>
                 @if (s.phase === 'Published' || s.phase === 'Closed') {
                   <a class="btn ghost" [routerLink]="['/s', s.id]">{{ i18n.t(s.phase === 'Closed' ? 'home.seeStatusClosed' : 'home.seeStatus') }}</a>
                 } @else {

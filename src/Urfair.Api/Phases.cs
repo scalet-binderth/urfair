@@ -38,7 +38,8 @@ public static class Phases
 	/// Registration closes at the deadline: the allocation is calculated and frozen (Allocation, internal).
 	/// After the last date an allocation phase becomes Ended. Allocation phases without a frozen allocation (from before
 	/// the phases were tied to freezing) are frozen. Free seats of visible allocations move up (e.g. after a participant was deleted).
-	/// Seat offers that expired go to the next person (<see cref="SeatOffers"/>).
+	/// Seat offers that expired go to the next person (<see cref="SeatOffers"/>). Ended votes are deleted after the retention period
+	/// by <see cref="PhaseClock"/> (<see cref="Retention"/>).
 	/// </summary>
 	public static async Task TickAsync(AppDbContext db)
 	{
@@ -58,6 +59,7 @@ public static class Phases
 			{
 				Log(db, slot.Id, "phase", slot.Phase.ToString(), nameof(Phase.Ended));
 				slot.Phase = Phase.Ended;
+				slot.EndedAt = now;
 			}
 			if (slot.FrozenAt is null)
 			{
@@ -66,6 +68,9 @@ public static class Phases
 			}
 			await MovingUp.FillAsync(db, slot);
 		}
+		// Ended before the deletion period was stored: it starts now.
+		foreach (var slot in await db.FairSlots.Where(s => s.Phase == Phase.Ended && s.EndedAt == null).ToListAsync())
+			slot.EndedAt = now;
 		await db.SaveChangesAsync();
 		await SeatOffers.TickAsync(db);
 	}
@@ -80,8 +85,8 @@ public static class Phases
 	}
 }
 
-/// <summary>Checks the time-driven phase changes once a minute (and right after the start).</summary>
-public sealed class PhaseClock(IServiceScopeFactory scopes, ILogger<PhaseClock> logger) : BackgroundService
+/// <summary>Checks the time-driven phase changes and the automatic deletion once a minute (and right after the start).</summary>
+public sealed class PhaseClock(IServiceScopeFactory scopes, IConfiguration cfg, ILogger<PhaseClock> logger) : BackgroundService
 {
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 	{
@@ -91,7 +96,11 @@ public sealed class PhaseClock(IServiceScopeFactory scopes, ILogger<PhaseClock> 
 			try
 			{
 				using var scope = scopes.CreateScope();
-				await Phases.TickAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+				var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+				await Phases.TickAsync(db);
+				var days = Retention.Days(cfg);
+				foreach (var name in await Retention.DeleteExpiredAsync(db, days))
+					logger.LogInformation("Deleted the vote \"{Name}\" with all its data, {Days} days after it ended.", name, days);
 			}
 			catch (Exception e) when (e is not OperationCanceledException)
 			{
