@@ -173,6 +173,29 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.ToTable("AllocationLog");
                 });
 
+            modelBuilder.Entity("Urfair.Api.Data.AllocationSnapshotEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FairSlotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LogId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FairSlotId", "LogId");
+
+                    b.ToTable("AllocationSnapshots");
+                });
+
             modelBuilder.Entity("Urfair.Api.Data.AssignmentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -498,6 +521,15 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                 });
 
             modelBuilder.Entity("Urfair.Api.Data.AllocationLogEntity", b =>
+                {
+                    b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FairSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Urfair.Api.Data.AllocationSnapshotEntity", b =>
                 {
                     b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
                         .WithMany()

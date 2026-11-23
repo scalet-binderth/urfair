@@ -59,11 +59,15 @@ export interface ListSession { id: string; start: string; end: string | null; fl
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
 export interface LogEntry {
-  at: string; actor: string; person: string | null; before: string | null; after: string | null;
+  id: string; at: string; actor: string; person: string | null; before: string | null; after: string | null;
+  /** A save point exists: the allocation can go back to the state after this entry. */
+  canRestore: boolean;
   kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
     | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
-    | 'participantsImported';
+    | 'participantsImported' | 'restored';
 }
+export interface RestoreChange { name: string; isSample: boolean; before: string; after: string; keptGivenBack: string | null; }
+export interface RestorePreview { at: string; changes: RestoreChange[]; mails: number; movesUp: boolean; }
 
 /** Thrown for 400/401 answers and server errors (with error number); carries the error codes for translation. */
 export class ApiFailure extends Error {
@@ -178,6 +182,10 @@ export class Api {
     return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
   }
   allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`, this.admin())); }
+  restorePreview(id: string, logId: string) {
+    return this.call(this.http.get<RestorePreview>(`/api/admin/slots/${id}/allocation/restore/${logId}`, this.admin()));
+  }
+  restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {}, this.admin())); }
   leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
   leaderMails(id: string, body: { activityIds: string[]; withEmail: boolean; withBirthDate: boolean; withBaptismDate: boolean }) {
     return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body, this.admin()));

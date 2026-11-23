@@ -15,8 +15,20 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
     public DbSet<AssignmentEntity> Assignments => Set<AssignmentEntity>();
     public DbSet<OriginalAssignmentEntity> OriginalAssignments => Set<OriginalAssignmentEntity>();
     public DbSet<AllocationLogEntity> AllocationLog => Set<AllocationLogEntity>();
+    public DbSet<AllocationSnapshotEntity> AllocationSnapshots => Set<AllocationSnapshotEntity>();
     /// <summary>Keys for the sign-in cookies, so they stay valid when the server restarts.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    /// <summary>After a change to seats has been saved, a save point with the new state is stored (see <see cref="SavePoints"/>).</summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var points = SavePoints.Pending(this);
+        var count = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (points.Count == 0) return count;
+        foreach (var (slotId, logId) in points) await SavePoints.AddAsync(this, slotId, logId, cancellationToken);
+        await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        return count;
+    }
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -99,6 +111,12 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
             e.Property(x => x.Before).HasMaxLength(1000);
             e.Property(x => x.After).HasMaxLength(1000);
             e.HasIndex(x => x.FairSlotId);
+            e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AllocationSnapshotEntity>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FairSlotId, x.LogId });
             e.HasOne<FairSlotEntity>().WithMany().HasForeignKey(x => x.FairSlotId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<ActivityEntity>(e =>
