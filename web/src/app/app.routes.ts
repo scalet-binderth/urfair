@@ -9,6 +9,7 @@ import { AccountsPage } from './accounts';
 import { SetPasswordPage } from './set-password';
 import { AdminListPage } from './admin-list';
 import { AdminSlotPage } from './admin-slot';
+import { LegalPage } from './legal';
 import { adminGuard, participantGuard } from './session';
 
 export const routes: Routes = [
@@ -22,5 +23,7 @@ export const routes: Routes = [
   { path: 'admin', component: AdminListPage, canActivate: [adminGuard] },
   { path: 'admin/accounts', component: AccountsPage, canActivate: [adminGuard] },
   { path: 'admin/s/:slotId', component: AdminSlotPage, canActivate: [adminGuard] },
+  { path: 'impressum', component: LegalPage, data: { kind: 'imprint' } },
+  { path: 'datenschutz', component: LegalPage, data: { kind: 'privacy' } },
   { path: '**', redirectTo: '' },
 ];

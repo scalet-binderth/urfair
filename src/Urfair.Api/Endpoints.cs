@@ -8,9 +8,10 @@ namespace Urfair.Api;
 /// <param name="Missing">Required staffing: people still missing on this date by the current allocation (null without a seat count).</param>
 public record SessionDto(string Id, DateTime Start, DateTime? End, string Location, int? Capacity, bool Flexible, int? Missing = null);
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
-public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount);
+/// <param name="DeleteOn">Ended: the day the vote is deleted with all its data (<see cref="Retention"/>).</param>
+public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount, DateOnly? DeleteOn = null);
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
-    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null);
+    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null);
 /// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
@@ -50,6 +51,14 @@ public static class Endpoints
         });
         api.MapOperations();
 
+        // Legal notice and privacy policy of this instance (Legal:Imprint, Legal:Privacy); null: the UI shows its template.
+        api.MapGet("/legal", (IConfiguration cfg) => new
+        {
+            imprint = string.IsNullOrWhiteSpace(cfg["Legal:Imprint"]) ? null : cfg["Legal:Imprint"],
+            privacy = string.IsNullOrWhiteSpace(cfg["Legal:Privacy"]) ? null : cfg["Legal:Privacy"],
+            retentionDays = Retention.Days(cfg),
+        });
+
         // Reloads the own previously submitted ballot so it can be changed.
         api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
@@ -64,15 +73,17 @@ public static class Endpoints
         });
 
         // FairSlots this person is listed in (drafts stay hidden). Identified by personal link, in demo mode also by name.
-        api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db, HttpContext http) =>
+        api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db, HttpContext http, IConfiguration cfg) =>
         {
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
             var name = who.ToLower();
-            return Results.Ok(await db.FairSlots
+            var days = Retention.Days(cfg);
+            var slots = await db.FairSlots
                 .Where(s => s.Phase != Phase.Draft && (s.Participants.Any(p => p.Name.ToLower() == name) || (s.OpenToAll && name != DemoData.NobodyName)))
                 .OrderBy(s => s.Phase).ThenBy(s => s.RegistrationDeadline)
-                .Select(s => new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count))
-                .ToListAsync());
+                .Select(s => new { Dto = new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count, null), s.EndedAt })
+                .ToListAsync();
+            return Results.Ok(slots.Select(x => x.Dto with { DeleteOn = Retention.DeleteOn(x.EndedAt, days) }));
         });
 
         // The own allocation once the organisers have published it.
@@ -259,7 +270,8 @@ public static class Endpoints
         var s = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (s is null) return null;
         var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
-        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim);
+        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim,
+            DeleteOn: Retention.DeleteOn(s.EndedAt, Retention.Days(cfg)));
     }
 
     public static ActivityDto ToDto(Activity a) => new(a.Id, a.Title, a.RestrictedTo, a.Seats,

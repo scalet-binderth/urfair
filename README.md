@@ -56,6 +56,11 @@ system assigns the seats:
   Declined or expired: the next person; accepted: the seat given up is offered next; nobody left: e-mail to the
   organisers. People who still need a replacement get one-click suggestions in the allocation (free seats, or
   overbooking their best full wish).
+- **Automatic deletion** (`Retention.cs`): a vote that has ended (by itself or by hand) is deleted with everything in
+  it (participants, points, seats, mails, log) after `Retention__Days` days (default 90). Organisers and participants
+  see the date; going back from Ended stops the countdown. Votes that never end are not deleted automatically.
+- **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
+  and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
   prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
@@ -133,6 +138,8 @@ Tests: `dotnet test Urfair.slnx`
 | `Mail__User`, `Mail__Password` | SMTP login (optional). Keep the password secret. |
 | `Mail__From`, `Mail__FromName` | Sender address (default `Mail__User`) and name (default `Urfair`). |
 | `Mail__Ssl` | `true` (default): STARTTLS. `false` only for a local test server. |
+| `Retention__Days` | Days after the end of a vote until it is deleted with all its data, default `90`. |
+| `Legal__Imprint`, `Legal__Privacy` | Texts of the legal notice and privacy policy (German, plain text; lines starting with `## ` are headings, blank lines separate paragraphs). Without them the pages show a template to be completed. Required on a real instance. |
 
 E-mails are kept in the database as an outbox and sent in the background every 20 seconds; failed attempts are retried
 after 1, 5, 30 and 120 minutes, then they are shown as "not sent" until an organiser clicks "send again".

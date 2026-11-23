@@ -33,7 +33,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
       </div>
 
       @if (!canEdit()) { <p class="card small readonly no-print">{{ i18n.t('admin.readOnly') }}</p> }
-      @else if (s.phase === 'Ended') { <p class="card small readonly no-print">{{ i18n.t('admin.ended') }}</p> }
+      @else if (s.phase === 'Ended') { <p class="card small readonly no-print">{{ i18n.t('admin.ended') }}@if (s.deleteOn) { {{ i18n.t('admin.deleteOn', { date: i18n.day(s.deleteOn) }) }} }</p> }
       <nav class="tabs no-print" role="tablist">
         @for (t of tabs; track t) {
           <button type="button" role="tab" [attr.aria-selected]="tab() === t" [class.on]="tab() === t" (click)="show(t)">

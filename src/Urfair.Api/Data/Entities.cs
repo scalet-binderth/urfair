@@ -49,6 +49,8 @@ public class FairSlotEntity
     public Visibility Visibility { get; set; } = Visibility.JuniaShared;
     /// <summary>Set when the allocation is frozen: from then on the stored <see cref="AssignmentEntity"/> rows count, nothing is recalculated on its own.</summary>
     public DateTime? FrozenAt { get; set; }
+    /// <summary>When the vote became Ended (Vienna time, like the deadlines): the deletion period starts (<see cref="Retention"/>). Cleared when it leaves Ended.</summary>
+    public DateTime? EndedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<ActivityEntity> Activities { get; set; } = [];
     public List<BallotEntity> Ballots { get; set; } = [];
