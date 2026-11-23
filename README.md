@@ -62,6 +62,10 @@ system assigns the seats:
 - **Copy as a template** (`SlotCopy.cs`): "Neue Wahl" can start from an existing vote (e.g. last year's, also when
   ended): settings, rules, groups, activities and dates, the dates moved by whole weeks (52 = same weekday a year
   later). Participants, registrations, seats, mails and the log stay behind; the copy is a draft.
+- **Taking over participants** (tab "Teilnehmende", "Aus anderer Wahl übernehmen"): the people of another vote the
+  account sees (also an ended one) with e-mail, dates and Pfarrgemeinde, after a preview with the counts. Everyone gets
+  a new personal link and counts as not invited; names already listed are skipped. Pfarrgemeinde admins take over
+  only people of their own Pfarrgemeinden.
 - **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
