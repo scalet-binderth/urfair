@@ -8,9 +8,12 @@ namespace Urfair.Api;
 public record AssignmentDto(string ActivityId, string Title, string? GroupId, string SessionId, DateTime Start, DateTime? End, bool Flexible, string Location, int Points,
 	bool IsFallback, bool Locked);
 /// <param name="NeedsReplacement">A real person who gave back or cancelled a seat, wants a replacement and still lacks a seat.</param>
+/// <param name="Suggestions">For <paramref name="NeedsReplacement"/>: seats organisers could give them with one click.</param>
 public record ParticipantDto(string BallotId, string Name, bool IsSample, double Satisfaction, IReadOnlyList<AssignmentDto> Assignments,
 	IReadOnlyDictionary<string, int> Points, IReadOnlyList<string> Original, IReadOnlyList<string> Waitlist, IReadOnlyList<string> Declined,
-	bool NeedsReplacement = false);
+	bool NeedsReplacement = false, IReadOnlyList<SuggestionDto>? Suggestions = null);
+/// <param name="Kind">otherDate (another date of an activity they gave back), pointed (free, with points), free (free, without points) or overbook (full, most points).</param>
+public record SuggestionDto(string SessionId, string ActivityId, string Title, DateTime Start, bool Flexible, int Points, string Kind);
 public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Metrics FirstComeFirstServed,
 	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt, bool WasVisible = false);
 public record SeatRequest(string SessionId, bool Locked);
@@ -91,6 +94,7 @@ public static class AllocationEndpoints
 				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After, l.Id, restorable.Contains(l.Id))));
 		});
 		admin.MapSavePoints();
+		admin.MapSeatOfferAdmin();
 
 		// Who goes where, per activity and date, for the activity leaders.
 		admin.MapGet("/slots/{id:guid}/allocation/lists", async (Guid id, AppDbContext db, HttpContext http) =>
@@ -276,18 +280,51 @@ public static class AllocationEndpoints
 		var original = slot.FrozenAt is null ? [] : (await db.OriginalAssignments.AsNoTracking().Where(a => a.FairSlotId == slot.Id).ToListAsync())
 			.GroupBy(a => a.BallotId.ToString()).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(a => a.SessionId).ToList());
 
-		var participants = ballots.Select(b => new ParticipantDto(b.Id, b.Name, isSample[b.Id], allocation.Satisfaction(b, k),
-			allocation.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
-				x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
-				x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback, x.Locked)).ToList(),
-			b.Points, original.GetValueOrDefault(b.Id, []), entity[b.Id].Waitlist, entity[b.Id].Declined,
-			!isSample[b.Id] && entity[b.Id].Declined.Count > 0 && allocation.MissingSeats(b, k).Any(m => b.WantsReplacement(m.Group?.Id ?? "")))).ToList();
+		var reserved = await ReservedAsync(db, slot);
+		var now = Phases.Now();
+		var participants = ballots.Select(b =>
+		{
+			var needs = !isSample[b.Id] && entity[b.Id].Declined.Count > 0 && allocation.MissingSeats(b, k).Any(m => b.WantsReplacement(m.Group?.Id ?? ""));
+			return new ParticipantDto(b.Id, b.Name, isSample[b.Id], allocation.Satisfaction(b, k),
+				allocation.Assignments[b.Id].OrderBy(x => x.Session.Start).Select(x => new AssignmentDto(
+					x.Session.ActivityId, titles[x.Session.ActivityId], groupOf[x.Session.ActivityId], x.Session.Id, x.Session.Start, x.Session.End,
+					x.Session.Flexible, x.Session.Location, x.Points, x.IsFallback, x.Locked)).ToList(),
+				b.Points, original.GetValueOrDefault(b.Id, []), entity[b.Id].Waitlist, entity[b.Id].Declined,
+				needs, needs ? Suggest() : null);
+
+			// Free seats first (another date of what they gave back, then by points), then overbooking their best wish.
+			IReadOnlyList<SuggestionDto> Suggest()
+			{
+				var mine = original.GetValueOrDefault(b.Id, []);
+				var options = activities
+					.Where(a => a.RestrictedTo is null || b.Gender is null || a.RestrictedTo == b.Gender)
+					.Where(a => !b.HasDeclined(a.Id) || a.Sessions.Count > 1)
+					.SelectMany(a => a.Sessions)
+					.Where(s => s.Start > now && allocation.CanAdd(b, s, k) && !(b.HasDeclined(s.ActivityId) && mine.Contains(s.Id)))
+					.Select(s => (Session: s, Free: s.Capacity is { } c ? c - allocation.Load(s) - reserved.GetValueOrDefault(s.Id) : int.MaxValue,
+						Points: b.PointsFor(s.ActivityId), Declined: b.HasDeclined(s.ActivityId)))
+					.ToList();
+				SuggestionDto Dto((Session Session, int Free, int Points, bool Declined) o, string kind) =>
+					new(o.Session.Id, o.Session.ActivityId, titles[o.Session.ActivityId], o.Session.Start, o.Session.Flexible, o.Points, kind);
+				return [
+					.. options.Where(o => o.Free > 0).OrderByDescending(o => o.Declined).ThenByDescending(o => o.Points).ThenBy(o => o.Session.Start).Take(3)
+						.Select(o => Dto(o, o.Declined ? "otherDate" : o.Points > 0 ? "pointed" : "free")),
+					.. options.Where(o => o.Free <= 0 && o.Points > 0 && !o.Declined).OrderByDescending(o => o.Points).ThenBy(o => o.Session.Start).Take(1)
+						.Select(o => Dto(o, "overbook")),
+				];
+			}
+		}).ToList();
 
 		var load = activities.SelectMany(a => a.Sessions).ToDictionary(x => x.Id, allocation.Load);
 		// Stored as UTC; the database returns it without a kind.
 		DateTime? frozen = slot.FrozenAt is { } f ? DateTime.SpecifyKind(f, DateTimeKind.Utc) : null;
 		return new AllocationDto(slot.Seed, k, allocation.Evaluate(k), fcfs.Evaluate(k), load, participants, frozen, await WasVisibleAsync(db, slot.Id));
 	}
+
+	/// <summary>Seats held for open offers (<see cref="SeatOffers"/>), per session.</summary>
+	public static async Task<Dictionary<string, int>> ReservedAsync(AppDbContext db, FairSlotEntity slot) =>
+		(await db.SeatOffers.AsNoTracking().Where(o => o.FairSlotId == slot.Id && o.Status == OfferStatus.Open).Select(o => o.SessionId).ToListAsync())
+			.CountBy(x => x).ToDictionary();
 
 	/// <summary>
 	/// Participants have seen the allocation once (the log shows a visible phase or their own changes). Then it is not

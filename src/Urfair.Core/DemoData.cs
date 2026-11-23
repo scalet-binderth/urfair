@@ -71,6 +71,24 @@ public static class DemoData
     public static readonly IReadOnlyList<(string Name, string Title)> ExcursionSeats =
         [(D.Name, "Kletterwald Linz"), (C.Name, "Tiergarten Walding"), (B.Name, "Ars Electronica Center")];
 
+    /// <summary>
+    /// Fixed points of C and D in the closed "Ferienprogramm", so filling a seat can be tried: D sits in "Kochen mit Oma" and can
+    /// cancel it; C ticked it while the allocation was visible, so she is offered the seat and would give up her weakest seat
+    /// (Fußballturnier), which nobody else wants. D is then left one seat short and the organisers get suggestions for him.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> HolidayChoices = new Dictionary<string, IReadOnlyDictionary<string, int>>
+    {
+        [C.Name] = new Dictionary<string, int> { ["Kochen mit Oma"] = 50, ["Parkbad-Nachmittag"] = 30, ["Fußballturnier"] = 20 },
+        [D.Name] = new Dictionary<string, int> { ["Kochen mit Oma"] = 40, ["Waldtag mit dem Förster"] = 35, ["Kreativwerkstatt"] = 25 },
+    };
+
+    /// <summary>Seats of C and D in the "Ferienprogramm" after the allocation.</summary>
+    public static readonly IReadOnlyList<(string Name, string Title)> HolidaySeats =
+        [(D.Name, "Kochen mit Oma"), (D.Name, "Waldtag mit dem Förster"), (C.Name, "Parkbad-Nachmittag"), (C.Name, "Fußballturnier")];
+
+    /// <summary>Waiting-list ticks in the "Ferienprogramm", set while it was visible.</summary>
+    public static readonly IReadOnlyList<(string Name, string Title)> HolidayTicks = [(C.Name, "Kochen mit Oma")];
+
     public static IReadOnlyList<Activity> HolidayProgramme() => Build("ferien",
         ("Kochen mit Oma", 7, ("2026-07-14T09:00", "2026-07-14T13:00", "Pfarrheim St. Markus", 8)),
         ("Parkbad-Nachmittag", 8, ("2026-07-21T13:00", "2026-07-21T18:00", "Parkbad Linz", 25)),

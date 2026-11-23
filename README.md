@@ -45,6 +45,12 @@ system assigns the seats:
 - **Moving up** (phase Published): no recalculation any more. Participants tick activities to move up into, give back
   a seat or take a free one; free seats fill by themselves within the activity group, need before wish, more points
   first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Every step is logged.
+- **Filling a seat** (phase Closed, `SeatOffers.cs`): nothing moves by itself. Participants can still cancel; for a free
+  seat organisers start "Platz nachbesetzen", which offers it to one person at a time in the order of moving up (e-mail
+  with the personal link, 48 hours, at most until a day before the date; not for dates less than two days ahead).
+  Declined or expired: the next person; accepted: the seat given up is offered next; nobody left: e-mail to the
+  organisers. People who still need a replacement get one-click suggestions in the allocation (free seats, or
+  overbooking their best full wish).
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
   prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.

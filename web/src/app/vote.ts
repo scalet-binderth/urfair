@@ -28,6 +28,18 @@ import { Toast } from './toast';
         <section class="card stack status">
           <h2>{{ i18n.t(interim() ? 'status.title' : 'status.titleFinal') }}</h2>
           <p class="muted small">{{ i18n.t(interim() ? 'status.lead' : closed() ? 'status.leadClosed' : 'status.leadFinal') }}</p>
+          @if (closed() && status()!.offer; as o) {
+            <div class="offer stack">
+              <p class="small"><b>{{ i18n.t('status.offerTitle', { title: o.title }) }}</b></p>
+              <p class="small">{{ i18n.when(o) }}@if (o.location) { · {{ o.location }} }</p>
+              <p class="small">{{ o.givesUp ? i18n.t('status.offerSwap', { seat: o.givesUp }) : i18n.t('status.offerMissing') }}</p>
+              <p class="muted small">{{ i18n.t('status.offerUntil', { date: i18n.date(o.expiresAt) }) }}</p>
+              <div class="row">
+                <button class="btn small" type="button" [disabled]="busy()" (click)="answerOffer(o.id, 'accept')">{{ i18n.t('status.offerAccept') }}</button>
+                <button class="btn ghost small" type="button" [disabled]="busy()" (click)="answerOffer(o.id, 'decline')">{{ i18n.t('status.offerDecline') }}</button>
+              </div>
+            </div>
+          }
           <ul class="st">
             @for (x of status()!.activities; track x.activityId) {
               <li>
@@ -191,6 +203,8 @@ import { Toast } from './toast';
     .btn.small { padding: 5px 10px; font-size: 13px }
     .missing { gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--warn-soft) }
     .missing p { margin: 0 }
+    .offer { gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); border-left: 4px solid var(--accent) }
+    .offer p { margin: 0 }
     .open { color: var(--ink); font-size: 14px; gap: 6px }
     .open li { display: flex; justify-content: space-between; align-items: center; gap: 10px }
     .tag.full { background: var(--warn-soft); color: var(--warn) }
@@ -313,6 +327,10 @@ export class VotePage implements OnInit {
 
   protected takeSeat(sessionId: string): Promise<void> {
     return this.update(() => this.api.takeSeat(this.slotId(), this.name(), sessionId), 'status.taken');
+  }
+
+  protected answerOffer(offerId: string, answer: 'accept' | 'decline'): Promise<void> {
+    return this.update(() => this.api.answerOffer(this.slotId(), this.name(), offerId, answer), answer === 'accept' ? 'status.offerAccepted' : 'status.offerDeclined');
   }
 
   /** Saves a change of the allocation status; free seats may move up at once, so the full status comes back. */

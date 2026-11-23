@@ -21,7 +21,7 @@ public record RestorePreviewDto(DateTime At, IReadOnlyList<RestoreChangeDto> Cha
 public static class SavePoints
 {
 	/// <summary>Log kinds after which a save point is stored.</summary>
-	static readonly HashSet<string> Kinds = ["frozen", "recalculated", "seats", "movedUp", "givenBack", "cancelled", "tookSeat", "restored"];
+	static readonly HashSet<string> Kinds = ["frozen", "recalculated", "seats", "movedUp", "givenBack", "cancelled", "tookSeat", "offerAccepted", "restored"];
 
 	/// <summary>One ballot in a save point. Short names keep the JSON small.</summary>
 	sealed record BallotState(

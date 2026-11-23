@@ -38,6 +38,7 @@ public static class Phases
 	/// Registration closes at the deadline: the allocation is calculated and frozen (Allocation, internal).
 	/// After the last date an allocation phase becomes Ended. Allocation phases without a frozen allocation (from before
 	/// the phases were tied to freezing) are frozen. Free seats of visible allocations move up (e.g. after a participant was deleted).
+	/// Seat offers that expired go to the next person (<see cref="SeatOffers"/>).
 	/// </summary>
 	public static async Task TickAsync(AppDbContext db)
 	{
@@ -66,6 +67,7 @@ public static class Phases
 			await MovingUp.FillAsync(db, slot);
 		}
 		await db.SaveChangesAsync();
+		await SeatOffers.TickAsync(db);
 	}
 
 	private static void Log(AppDbContext db, Guid slotId, string kind, string? before = null, string? after = null) =>

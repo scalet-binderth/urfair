@@ -230,6 +230,27 @@ public class AllocationSnapshotEntity
     public string Data { get; set; } = "";
 }
 
+public enum OfferStatus { Open, Accepted, Declined, Expired, Withdrawn }
+
+/// <summary>
+/// A free seat offered to one person after the lists are final (Closed), see <see cref="SeatOffers"/>. The person accepts
+/// (giving up <see cref="GivesUpSessionId"/> if set) or declines until <see cref="ExpiresAt"/>; then the next person is asked.
+/// Deleted with its FairSlot.
+/// </summary>
+public class SeatOfferEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    public string SessionId { get; set; } = "";
+    public Guid BallotId { get; set; }
+    public string? GivesUpSessionId { get; set; }
+    public OfferStatus Status { get; set; } = OfferStatus.Open;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>Wall-clock time in Austria, like the dates of the sessions.</summary>
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? AnsweredAt { get; set; }
+}
+
 public static class Ids
 {
     /// <summary>Short random id for activities and sessions.</summary>

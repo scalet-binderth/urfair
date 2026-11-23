@@ -138,8 +138,7 @@ public sealed class Allocator
     /// </summary>
     public List<MoveUp> FillFreeSeats(int perParticipant, int seed)
     {
-        var rnd = new Random(seed);
-        var lottery = _ballots.ToDictionary(b => b.Id, _ => rnd.NextDouble());
+        var lottery = Lottery(seed);
         var sessions = _activities.SelectMany(a => a.Sessions).ToList();
         var moves = new List<MoveUp>();
         for (var step = 0; step < 100_000; step++)
@@ -167,6 +166,42 @@ public sealed class Allocator
         }
         return moves;
     }
+
+    /// <summary>
+    /// Who is next for a free seat in this session, in the order of <see cref="FillFreeSeats"/> (need before tick, more
+    /// points, then the lottery), leaving out <paramref name="skip"/>. Null if nobody fits.
+    /// </summary>
+    public MoveUp? NextFor(Session s, int perParticipant, int seed, Func<Ballot, bool> skip)
+    {
+        var lottery = Lottery(seed);
+        (Ballot Ballot, Assignment? GiveUp, bool Need, int Points)? best = null;
+        foreach (var b in _ballots.Where(b => !skip(b)))
+        {
+            var (possible, giveUp) = Exchange(b, s, perParticipant);
+            if (!possible) continue;
+            var need = giveUp is null && b.WantsReplacement(GroupKey(s.ActivityId));
+            if (!need && !b.Ticked(s.ActivityId)) continue;
+            var points = b.PointsFor(s.ActivityId);
+            if (best is { } x && (x.Need, x.Points, -lottery[x.Ballot.Id]).CompareTo((need, points, -lottery[b.Id])) >= 0) continue;
+            best = (b, giveUp, need, points);
+        }
+        return best is { } m ? new MoveUp(m.Ballot.Id, s, m.GiveUp?.Session, m.Need) : null;
+    }
+
+    /// <summary>Whether the person could move into this session (ignoring free seats), and which seat of theirs would go for it.</summary>
+    public (bool Possible, Session? GivesUp) ExchangeFor(Ballot b, Session s, int perParticipant)
+    {
+        var (possible, giveUp) = Exchange(b, s, perParticipant);
+        return (possible, giveUp?.Session);
+    }
+
+    /// <summary>
+    /// Whether organisers could add this session to a person short of a seat in its group: no clash, not the same
+    /// activity twice, time for it and room in the group. Ignores points, seats given back and free seats.
+    /// </summary>
+    public bool CanAdd(Ballot b, Session s, int perParticipant) =>
+        !b.UnavailableSessions.Contains(s.Id) && SameGroup(b, s.ActivityId).Count < Quota(s.ActivityId, perParticipant) &&
+        _assignments[b.Id].All(x => x.Session.ActivityId != s.ActivityId && !x.Session.Overlaps(s));
 
     /// <summary>
     /// Whether the person could move into a session of this activity if a seat were free, and which seat of theirs
@@ -226,6 +261,12 @@ public sealed class Allocator
     }
 
     // ---------- internals ----------
+
+    private Dictionary<string, double> Lottery(int seed)
+    {
+        var rnd = new Random(seed);
+        return _ballots.ToDictionary(b => b.Id, _ => rnd.NextDouble());
+    }
 
     private List<Activity> Ranking(Ballot b) => _activities
         .Where(x => b.PointsFor(x.Id) > 0)

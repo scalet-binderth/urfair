@@ -477,6 +477,52 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.ToTable("Participants");
                 });
 
+            modelBuilder.Entity("Urfair.Api.Data.SeatOfferEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("AnsweredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BallotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FairSlotId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GivesUpSessionId")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SessionId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BallotId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("FairSlotId", "Status");
+
+                    b.ToTable("SeatOffers");
+                });
+
             modelBuilder.Entity("Urfair.Api.Data.SessionEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -665,6 +711,27 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
                         .WithMany("Participants")
                         .HasForeignKey("FairSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Urfair.Api.Data.SeatOfferEntity", b =>
+                {
+                    b.HasOne("Urfair.Api.Data.BallotEntity", null)
+                        .WithMany()
+                        .HasForeignKey("BallotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FairSlotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Urfair.Api.Data.SessionEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

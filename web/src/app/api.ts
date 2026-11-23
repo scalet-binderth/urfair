@@ -42,7 +42,13 @@ export interface Participant {
   waitlist: string[]; declined: string[];
   /** Gave back or cancelled a seat, wants a replacement and still lacks a seat. */
   needsReplacement: boolean;
+  /** For needsReplacement: seats organisers could give with one click. */
+  suggestions?: Suggestion[] | null;
 }
+export interface Suggestion { sessionId: string; activityId: string; title: string; start: string; flexible: boolean; points: number; kind: 'otherDate' | 'pointed' | 'free' | 'overbook'; }
+/** A free seat offered to one person when closed. */
+export interface Offer { id: string; sessionId: string; person: string; status: 'open' | 'accepted' | 'declined' | 'expired' | 'withdrawn'; givesUp: string | null; expiresAt: string; createdAt: string; answeredAt: string | null; }
+export interface MyOffer { id: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; givesUp: string | null; expiresAt: string; }
 export interface MyActivityStatus {
   activityId: string; title: string; groupId: string | null; points: number; status: 'fixed' | 'waitlist' | 'free' | 'givenBack'; position: number | null; waitlisted: boolean;
   start: string | null; end: string | null; flexible: boolean; location: string | null;
@@ -51,7 +57,7 @@ export interface MyActivityStatus {
 }
 export interface OpenSeat { sessionId: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; points: number; }
 export interface Missing { groupId: string | null; count: number; open: OpenSeat[]; }
-export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; }
+export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; offer?: MyOffer | null; }
 export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; wasVisible?: boolean; }
 export interface Seat { sessionId: string; locked: boolean; }
 export interface ListPerson { name: string; parish: string | null; email: string | null; birthDate: string | null; baptismDate: string | null; }
@@ -64,7 +70,7 @@ export interface LogEntry {
   canRestore: boolean;
   kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
     | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
-    | 'participantsImported' | 'restored';
+    | 'participantsImported' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone';
 }
 export interface RestoreChange { name: string; isSample: boolean; before: string; after: string; keptGivenBack: string | null; }
 export interface RestorePreview { at: string; changes: RestoreChange[]; mails: number; movesUp: boolean; }
@@ -137,6 +143,9 @@ export class Api {
   takeSeat(id: string, name: string, sessionId: string) {
     return this.call(this.http.post<MyStatus>(`/api/slots/${id}/take-seat`, { name, sessionId }, this.me()));
   }
+  answerOffer(id: string, name: string, offerId: string, answer: 'accept' | 'decline') {
+    return this.call(this.http.post<MyStatus>(`/api/slots/${id}/offers/${offerId}/${answer}`, { name }, this.me()));
+  }
   slot(id: string) { return this.call(this.http.get<Slot>(`/api/slots/${id}`)); }
   activities(id: string) { return this.call(this.http.get<Activity[]>(`/api/slots/${id}/activities`)); }
   submitBallot(id: string, body: { name: string; points: Record<string, number>; unavailableSessions: string[] }) {
@@ -186,6 +195,8 @@ export class Api {
     return this.call(this.http.get<RestorePreview>(`/api/admin/slots/${id}/allocation/restore/${logId}`, this.admin()));
   }
   restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {}, this.admin())); }
+  offers(id: string) { return this.call(this.http.get<Offer[]>(`/api/admin/slots/${id}/offers`, this.admin())); }
+  fillSeat(id: string, sessionId: string) { return this.call(this.http.post(`/api/admin/slots/${id}/offers`, { sessionId }, this.admin())); }
   leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
   leaderMails(id: string, body: { activityIds: string[]; withEmail: boolean; withBirthDate: boolean; withBaptismDate: boolean }) {
     return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body, this.admin()));

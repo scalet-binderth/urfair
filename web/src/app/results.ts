@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Participant, Phase, RestorePreview, Seat } from './api';
+import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
 import { I18n } from './i18n';
 import { Toast } from './toast';
 
@@ -113,6 +113,30 @@ interface Card {
           </div>
         </div>
 
+        @if (d.frozenAt && phase() === 'Closed' && canEdit() && freeSeats().length) {
+          <div class="card stack">
+            <h2>{{ i18n.t('results.freeTitle') }}</h2>
+            <p class="muted small">{{ i18n.t('results.freeHint') }}</p>
+            <ul class="free">
+              @for (f of freeSeats(); track f.id) {
+                <li>
+                  <b>{{ f.title }}</b> · {{ f.when }} · {{ i18n.t('results.freeCount', { n: f.free }) }}
+                  @for (o of f.open; track o.id) {
+                    <div class="muted small">
+                      {{ i18n.t(o.givesUp ? 'results.offerOpenSwap' : 'results.offerOpen', { person: o.person, date: i18n.date(o.expiresAt), seat: o.givesUp ?? '' }) }}
+                    </div>
+                  }
+                  @if (f.tooLate) {
+                    <div class="muted small">{{ i18n.t('results.fillTooLate') }}</div>
+                  } @else if (f.free > f.open.length) {
+                    <div><button class="btn ghost small" type="button" [disabled]="busy()" (click)="fill(f.id)">{{ i18n.t('results.fill') }}</button></div>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         <div class="card stack">
           <div class="row" style="justify-content:space-between">
             <h2>{{ i18n.t('results.people') }}</h2>
@@ -201,6 +225,17 @@ interface Card {
                       }
                       @if (p.waitlist.length || p.declined.length) {
                         <p class="muted small orig">{{ waitText(p) }}</p>
+                      }
+                      @if (editable() && p.suggestions?.length) {
+                        <div class="chips orig">
+                          <span class="muted small">{{ i18n.t('results.suggest') }}</span>
+                          @for (s of p.suggestions ?? []; track s.sessionId) {
+                            <button class="chip sug" [class.fb]="s.kind === 'overbook'" type="button" [disabled]="busy()"
+                              [title]="i18n.t(s.kind === 'overbook' ? 'results.suggestOverbook' : 'results.suggestTitle')" (click)="assign(p, s)">
+                              + {{ suggestText(s) }}
+                            </button>
+                          }
+                        </div>
                       }
                       }
                     </td>
@@ -327,6 +362,22 @@ interface Card {
       overflow: auto;
       display: grid;
       gap: 6px;
+    }
+    .free {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 8px;
+    }
+    .chip.sug {
+      border: 1px dashed var(--accent);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+    }
+    .chip.sug.fb {
+      border-color: var(--warn);
     }
     .restore {
       margin: 6px 0;
@@ -543,6 +594,29 @@ export class ResultsPage implements OnInit {
   protected log = signal<LogEntry[]>([]);
   /** The log entry whose state is being previewed for going back to it. */
   protected restoring = signal<{ id: string; preview: RestorePreview | null } | null>(null);
+  /** Seats offered one by one when the lists are final (Closed). */
+  protected offers = signal<Offer[]>([]);
+
+  /** Dates with free seats while closed, with the open offers; dates less than two days ahead are no longer offered. */
+  protected freeSeats = computed(() => {
+    const d = this.data();
+    if (!d?.frozenAt || this.phase() !== 'Closed') return [];
+    const now = Date.now(), soon = now + 2 * 24 * 3600 * 1000;
+    const open = this.offers().filter((o) => o.status === 'open');
+    return this.activities().flatMap((a) =>
+      a.sessions
+        .filter((s) => s.capacity && new Date(s.start).getTime() > now)
+        .map((s) => ({
+          id: s.id,
+          title: a.title,
+          when: this.i18n.when(s),
+          free: (s.capacity ?? 0) - (d.sessionLoad[s.id] ?? 0),
+          open: open.filter((o) => o.sessionId === s.id),
+          tooLate: new Date(s.start).getTime() < soon,
+        }))
+        .filter((f) => f.free > 0 || f.open.length),
+    );
+  });
 
   protected editable = computed(() => !!this.data()?.frozenAt && this.canEdit());
   protected lockedCount = computed(() =>
@@ -647,7 +721,37 @@ export class ResultsPage implements OnInit {
   /** Phase changes name the phases in the current language; a restore names the time it went back to. */
   protected logText(l: LogEntry): string {
     const name = (x: string | null | undefined) => (l.kind === 'phase' && x ? this.i18n.t('phase.' + x) : l.kind === 'restored' && x ? this.i18n.date(x) : x || '–');
-    return this.i18n.t('log.' + l.kind, { person: l.person ?? '', before: name(l.before), after: name(l.after) });
+    const key = l.kind === 'offered' && l.before ? 'offeredSwap' : l.kind;
+    return this.i18n.t('log.' + key, { person: l.person ?? '', before: name(l.before), after: name(l.after) });
+  }
+
+  /** Offers the free seat of this date to the next person. */
+  protected async fill(sessionId: string): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.api.fillSeat(this.slotId(), sessionId);
+      this.toast.show(this.i18n.t('results.fillStarted'));
+      await this.loadLog();
+    } catch (e) {
+      this.error.set(this.i18n.errors(e).join(' '));
+      await this.loadLog();
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** "Title (date) · why" for a suggested seat. */
+  protected suggestText(s: Suggestion): string {
+    const many = (this.activities().find((a) => a.id === s.activityId)?.sessions.length ?? 1) > 1;
+    const title = many ? `${s.title} (${s.flexible ? this.i18n.t('results.flexible') : this.shortDate(s.start)})` : s.title;
+    return `${title} · ${this.i18n.t('results.suggest.' + s.kind, { n: s.points })}`;
+  }
+
+  /** Adds the suggested seat to the person's seats (overbooking a full date on purpose). */
+  protected assign(p: Participant, s: Suggestion): Promise<void> {
+    const seats = [...p.assignments.map((x) => ({ sessionId: x.sessionId, locked: !!x.locked })), { sessionId: s.sessionId, locked: true }];
+    return this.act(() => this.api.setSeats(this.slotId(), p.ballotId, seats), 'results.assigned');
   }
 
   /** People whose seats change (not those who only keep a seat given back). */
@@ -730,6 +834,12 @@ export class ResultsPage implements OnInit {
       this.log.set(await this.api.allocationLog(this.slotId()));
     } catch {
       this.log.set([]);
+    }
+    if (this.phase() !== 'Closed' || !this.canEdit()) return;
+    try {
+      this.offers.set(await this.api.offers(this.slotId()));
+    } catch {
+      this.offers.set([]);
     }
   }
 
