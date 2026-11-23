@@ -61,6 +61,8 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
               @if (form.phase === 'Ended') { <p class="muted small">{{ i18n.t('admin.endedHint') }}</p> }
               <label class="check"><input type="checkbox" [(ngModel)]="form.showInterim" />{{ i18n.t('admin.showInterim') }}</label>
               <p class="muted small">{{ i18n.t('admin.showInterimHint') }}</p>
+              <label class="check"><input type="checkbox" [(ngModel)]="form.autoFill" />{{ i18n.t('admin.autoFill') }}</label>
+              <p class="muted small">{{ i18n.t('admin.autoFillHint') }}</p>
               <div class="row">
                 <div class="field grow"><label for="s-parish">{{ i18n.t('admin.parish') }}</label>
                   <select id="s-parish" [(ngModel)]="form.parish">
@@ -302,8 +304,8 @@ export class AdminSlotPage implements OnInit {
   protected busy = signal(false);
   protected confirmClear = signal(false);
   protected showImport = signal(false);
-  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; excluded: string; showInterim: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
-    { name: '', phase: 'Draft', deadline: '', openToAll: false, excluded: '', showInterim: false, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null, maxExtra: 0, requiredStaffing: false, friends: 0 } };
+  protected form: { name: string; phase: Phase; deadline: string; openToAll: boolean; excluded: string; showInterim: boolean; autoFill: boolean; parish: string; organiser: string; organiserEmail: string; visibility: Visibility; rules: Rules } =
+    { name: '', phase: 'Draft', deadline: '', openToAll: false, excluded: '', showInterim: false, autoFill: true, parish: '', organiser: '', organiserEmail: '', visibility: 'JuniaShared', rules: { pointBudget: 100, minActivities: 5, maxPerActivity: 40, perParticipant: 3, step: 5, groups: null, maxExtra: 0, requiredStaffing: false, friends: 0 } };
   protected readonly friendSizes = [0, 2, 3, 4, 5];
   protected formGroups: Group[] = [];
   /** Votes whose participants can be excluded (loaded when "open to everyone" is on). */
@@ -321,7 +323,7 @@ export class AdminSlotPage implements OnInit {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, excluded: (slot.excluded ?? []).join('\n'), showInterim: slot.showInterim,
+      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, excluded: (slot.excluded ?? []).join('\n'), showInterim: slot.showInterim, autoFill: slot.autoFill ?? true,
         parish: slot.parish ?? '', organiser: slot.organiser ?? '', organiserEmail: slot.organiserEmail ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
       this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
@@ -376,7 +378,7 @@ export class AdminSlotPage implements OnInit {
   protected saveSettings(): Promise<void> {
     return this.run(async () => {
       await this.api.updateSlot(this.slotId(), {
-        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim,
+        name: this.form.name, phase: this.form.phase, registrationDeadline: fromLocalInput(this.form.deadline), openToAll: this.form.openToAll, showInterim: this.form.showInterim, autoFill: this.form.autoFill,
         excluded: this.form.excluded.split('\n').map(n => n.trim()).filter(n => n),
         parish: this.form.parish.trim() || null, organiser: this.form.organiser.trim() || null, organiserEmail: this.form.organiserEmail.trim() || null, visibility: this.form.visibility,
         rules: { ...this.form.rules, maxExtra: Number(this.form.rules.maxExtra || 0), requiredStaffing: !!this.form.rules.requiredStaffing, friends: Number(this.form.rules.friends || 0),

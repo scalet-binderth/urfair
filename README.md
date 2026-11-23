@@ -56,9 +56,12 @@ system assigns the seats:
   a seat or take a free one; free seats fill by themselves within the activity group, need before wish, more points
   first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Whoever moves up gives up their weakest seat of the group unless
   they chose another one next to the tick (`Ballots.GiveUp`, `Allocator.GiveUpOptions`). Every step is logged.
-- **Filling a seat** (phase Closed, `SeatOffers.cs`): nothing moves by itself. Participants can still cancel; for a free
-  seat organisers start "Platz nachbesetzen", which offers it to one person at a time in the order of moving up (e-mail
-  with the personal link, 48 hours, at most until a day before the date; not for dates less than two days ahead).
+- **Filling a seat** (phase Closed, `SeatOffers.cs`): participants can still cancel and remove waiting-list ticks.
+  A cancelled seat is offered at once if the vote's setting "Bei Absage automatisch nachbesetzen" is on (default);
+  otherwise, and for other free seats, organisers start "Platz nachbesetzen". The seat goes to one person at a time
+  in the order of moving up (e-mail with the personal link; 48 hours to answer, 24 if the date is less than a week
+  ahead, 12 if less than three days, at most until a day before; not for dates less than 36 hours ahead). The
+  allocation shows per free seat who would be asked next.
   Declined or expired: the next person; accepted: the seat given up is offered next; nobody left: e-mail to the
   organisers. People who still need a replacement get one-click suggestions in the allocation (free seats, or
   overbooking their best full wish).
@@ -119,7 +122,8 @@ In demo mode the organisation area has a button to reset the whole demo.
 The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
 `Geburtsdatum`, `Taufdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
 if a date of birth and/or baptism is stored it is asked after the click. Invitations with the link are prepared in the vote's
-"Einladungen" tab: in demo mode as a demo mailbox; on a real instance the app sends them itself if a mail server is
+"Einladungen" tab: in demo mode as a demo mailbox (participants also see the mails addressed to them on their own page,
+"Deine Mails (Demo)"); on a real instance the app sends them itself if a mail server is
 set up (see `Mail__*` below), otherwise they are texts to copy. Each mail shows its status (waiting, sent, not sent with
 the error and "send again"). Replies go to the vote's "E-Mail für Antworten" (settings, optional).
 While registration is open the same tab prepares reminders for everyone who has not voted yet; the participant

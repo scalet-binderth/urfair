@@ -10,19 +10,33 @@ public record OfferDto(Guid Id, string SessionId, string Person, string Status, 
 public record MyOfferDto(Guid Id, string ActivityId, string Title, DateTime Start, DateTime? End, bool Flexible, string Location, string? GivesUp, DateTime ExpiresAt);
 public record OfferRequest(string SessionId);
 public record OfferAnswerRequest(string Name);
+/// <param name="Need">The person lacks a seat in the group (otherwise they ticked it).</param>
+public record NextPersonDto(string Person, string? GivesUp, bool Need);
+public record OfferPreviewDto(string SessionId, IReadOnlyList<NextPersonDto> Next);
 
 /// <summary>
-/// Filling a free seat after the lists are final (Closed), where nothing moves on its own: organisers start it per date,
-/// and the seat is offered to one person at a time in the order of moving up (missing a seat before a tick, more points,
-/// lottery). Only real people are asked, each once per date, and nobody with another open offer. They have 48 hours,
-/// at most until a day before the date, and dates less than two days ahead are not offered. Declined or expired: the next
-/// person is asked. Accepted: the seat they give up is offered next (a chain). When the phase changes, open offers are withdrawn.
+/// Filling a free seat after the lists are final (Closed): when someone cancels, the seat is offered at once (setting
+/// "Bei Absage automatisch nachbesetzen", on by default), otherwise organisers start it per date. The seat is offered to one
+/// person at a time in the order of moving up (missing a seat before a tick, more points, lottery). Only real people are
+/// asked, each once per date, and nobody with another open offer. The closer the date, the shorter the time to answer
+/// (<see cref="AnswerTimeFor"/>), at most until a day before the date; dates less than 36 hours ahead are not offered.
+/// Declined or expired: the next person is asked. Accepted: the seat they give up is offered next (a chain). When the phase
+/// changes, open offers are withdrawn.
 /// </summary>
 public static class SeatOffers
 {
-	static readonly TimeSpan AnswerTime = TimeSpan.FromHours(48);
 	static readonly TimeSpan BeforeStart = TimeSpan.FromHours(24);
-	static readonly TimeSpan MinAhead = TimeSpan.FromDays(2);
+	/// <summary>A day before the date plus the shortest time to answer.</summary>
+	static readonly TimeSpan MinAhead = TimeSpan.FromHours(36);
+	const int PreviewSize = 3;
+
+	/// <summary>48 hours; 24 hours if the date is less than a week ahead; 12 hours if less than three days.</summary>
+	public static TimeSpan AnswerTimeFor(DateTime start, DateTime now) => (start - now) switch
+	{
+		var ahead when ahead < TimeSpan.FromDays(3) => TimeSpan.FromHours(12),
+		var ahead when ahead < TimeSpan.FromDays(7) => TimeSpan.FromHours(24),
+		_ => TimeSpan.FromHours(48),
+	};
 
 	public static void MapSeatOfferAdmin(this RouteGroupBuilder admin)
 	{
@@ -45,6 +59,38 @@ public static class SeatOffers
 			var error = await StartAsync(db, slot, req.SessionId, Access.Account(http).Name, Mailing.BaseUrl(http.Request));
 			return error is null ? Results.NoContent() : Endpoints.Errors(error);
 		});
+
+		// Who would be asked next for each date with a free seat (not yet offered), so organisers see what a cancellation means.
+		admin.MapGet("/slots/{id:guid}/offers/next", async (Guid id, AppDbContext db) =>
+			await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await PreviewAsync(db, slot)) : Results.NotFound());
+	}
+
+	/// <summary>Per date still offered and with a free seat nobody holds an offer for: the next people in offer order.</summary>
+	public static async Task<List<OfferPreviewDto>> PreviewAsync(AppDbContext db, FairSlotEntity slot)
+	{
+		if (slot.Phase != Phase.Closed || slot.FrozenAt is null) return [];
+		var (allocation, activities, ballots) = await AllocationEndpoints.CurrentAsync(db, slot);
+		var offers = await db.SeatOffers.AsNoTracking().Where(o => o.FairSlotId == slot.Id).ToListAsync();
+		var open = offers.Where(o => o.Status == OfferStatus.Open).ToList();
+		var samples = ballots.Where(b => b.IsSample).Select(b => b.Id.ToString()).ToHashSet();
+		var names = ballots.ToDictionary(b => b.Id.ToString(), b => b.Name);
+		var now = Phases.Now();
+		var result = new List<OfferPreviewDto>();
+		foreach (var session in activities.SelectMany(a => a.Sessions))
+		{
+			if (session.Capacity is not { } c || session.Start < now + MinAhead) continue;
+			if (c - allocation.Load(session) - open.Count(o => o.SessionId == session.Id) <= 0) continue;
+			var skip = offers.Where(o => o.SessionId == session.Id).Select(o => o.BallotId.ToString())
+				.Concat(open.Select(o => o.BallotId.ToString())).Concat(samples).ToHashSet();
+			var next = new List<NextPersonDto>();
+			while (next.Count < PreviewSize && allocation.NextFor(session, slot.PerParticipant, slot.Seed, b => skip.Contains(b.Id)) is { } m)
+			{
+				skip.Add(m.BallotId);
+				next.Add(new NextPersonDto(names[m.BallotId], m.GaveUp is { } g ? AllocationEndpoints.SeatText(activities, [g.Id]) : null, m.Need));
+			}
+			result.Add(new OfferPreviewDto(session.Id, next));
+		}
+		return result;
 	}
 
 	/// <summary>Offers a free seat of the session to the next person; returns an error code if it cannot.</summary>
@@ -66,7 +112,7 @@ public static class SeatOffers
 			return "nobodyLeft";
 
 		var ballot = ballots.Single(b => b.Id.ToString() == next.BallotId);
-		var expires = new[] { now + AnswerTime, session.Start - BeforeStart }.Min();
+		var expires = new[] { now + AnswerTimeFor(session.Start, now), session.Start - BeforeStart }.Min();
 		db.SeatOffers.Add(new SeatOfferEntity
 		{
 			FairSlotId = slot.Id, SessionId = sessionId, BallotId = ballot.Id, GivesUpSessionId = next.GaveUp?.Id, ExpiresAt = expires,

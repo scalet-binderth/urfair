@@ -8,7 +8,8 @@ public record CreateSlotRequest(string Name, bool WithSampleData, Guid? CopyFrom
 public record AdminSlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount,
     string? Parish, Visibility Visibility, bool CanEdit);
 public record UpdateSlotRequest(string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, bool OpenToAll = false, string? Parish = null,
-    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false, string? OrganiserEmail = null, List<string>? Excluded = null);
+    string? Organiser = null, Visibility Visibility = Visibility.JuniaShared, bool ShowInterim = false, string? OrganiserEmail = null, List<string>? Excluded = null,
+    bool AutoFill = true);
 public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? Location, int? Capacity, bool Flexible);
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
@@ -134,6 +135,7 @@ public static class AdminEndpoints
             var undo = settingsChanged && before != Phase.Draft ? Undo.Json(new(Settings: await Undo.SettingsAsync(db, slot))) : null;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
             slot.Excluded = excluded;
+            slot.AutoFill = req.AutoFill;
             slot.EndedAt = slot.Phase == Phase.Ended ? slot.EndedAt ?? Phases.Now() : null;
             (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);

@@ -164,6 +164,15 @@ and English; keep both in sync.
   Limits: draft changes are not logged and cannot be undone; offers and the original seats on deleted dates do not
   come back; details of removed people stay in the log until the vote is deleted. Demo: delete "Tiergarten Walding" in
   the "Ministrantenausflug" and undo it, Clara gets her seat back
+- **Filling seats automatically when closed.** New setting "Bei Absage automatisch nachbesetzen" (column
+  `FairSlots.AutoFill`, on by default, also for existing votes, copied with a vote): a cancellation in "closed" offers
+  the seat at once, as "fill seat" would; the organisers' e-mail says whether it was offered, nobody waits for it or
+  the date is too close. The time to answer depends on the date: 48 hours, 24 if it is less than a week ahead, 12 if
+  less than three days, at most until a day before; dates less than 36 hours ahead are not offered (before: 2 days).
+  For every free seat not yet offered the allocation shows who would be asked next (up to three, with the seat they
+  would give up). Participants can remove waiting-list ticks when closed (not add any), so they are no longer asked.
+  Demo: participants see the e-mails of the vote addressed to them ("Deine Mails (Demo)" on their page); D cancels
+  "Kochen mit Oma" in the "Ferienprogramm" and C finds the offer there at once
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -192,8 +201,9 @@ officer, the real texts of the legal notice and privacy policy (pages and automa
      waiting-list ticks and give back a seat they no longer want. No complete recalculation any more, only local
      changes: a free seat (given back, deleted, more capacity) moves up automatically (rules below).
    - More capacity never sends the vote back to registration; the new seats fill from the waiting list.
-4. **Closed:** the lists are final. Participants can still cancel (e.g. ill); nothing moves automatically. The
-   organisers choose per seat: "fill seat" (offers with a deadline, see below), overbook on purpose or leave it free.
+4. **Closed:** the lists are final. Participants can still cancel (e.g. ill) and remove waiting-list ticks. A
+   cancelled seat is offered at once (offers with a deadline, see below; switchable per vote). Otherwise, and for
+   other free seats, the organisers choose per seat: "fill seat", overbook on purpose or leave it free.
    Going back to allocation stays possible for bigger changes (it reopens automatic moving up for everyone).
 5. **Ended:** after the last date (automatically) or earlier by hand; read only, starts the deletion period.
 
@@ -206,7 +216,8 @@ Rules for free seats:
 - **Chain:** the seat given up is free again and the next round starts, until nobody is left. In allocation this is
   automatic; when closed every step is an offer with a deadline to accept (e-mail to the next person and also when
   it expires). Each step improves someone by their own points and a seat given up is never offered back to the same
-  person, so the chain ends. No offers for a date less than N days ahead (default 2); then only by hand.
+  person, so the chain ends. The closer the date, the shorter the deadline (48, 24 or 12 hours, at most until a day
+  before); no offers for a date less than 36 hours ahead; then only by hand.
 - **Replacement for someone who cancels:** they are asked "do you need a replacement?" (pre-selected if a required
   seat is now missing). Order: another date of the same activity; free seats in the same group they gave points to
   (by points); other free seats in the same group (they choose); if nothing is free, the organisers overbook one date

@@ -55,13 +55,9 @@ public class GiveUpChoiceTests
 		(await client.PostAsJsonAsync($"/api/slots/{slot}/waitlist", new { name = Clara, activityIds = new[] { kochenId } })).EnsureSuccessStatusCode();
 		Assert.Equal(parkbad, DemoApp.Activity(await DemoApp.StatusAsync(client, slot, Clara), Kochen).GetProperty("giveUpChoice").GetString());
 
-		// Lists final: David cancels and the organisers offer his seat; Clara's offer names the seat she chose.
+		// Lists final: David cancels and his seat is offered at once; Clara's offer names the seat she chose.
 		await SetPhaseAsync(organiser, slot, "Closed");
-		var session = (await organiser.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{slot}/allocation")).GetProperty("participants").EnumerateArray()
-			.Single(p => p.GetProperty("name").GetString() == David).GetProperty("assignments").EnumerateArray()
-			.Single(a => a.GetProperty("title").GetString() == Kochen).GetProperty("sessionId").GetString()!;
 		(await DemoApp.GiveBackAsync(client, slot, David, kochenId, replacement: false)).EnsureSuccessStatusCode();
-		Assert.Equal(HttpStatusCode.NoContent, (await organiser.PostAsJsonAsync($"/api/admin/slots/{slot}/offers", new { sessionId = session })).StatusCode);
 
 		var offer = (await DemoApp.StatusAsync(client, slot, Clara)).GetProperty("offer");
 		Assert.Equal("Parkbad-Nachmittag", offer.GetProperty("givesUp").GetString());

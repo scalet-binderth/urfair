@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, output, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
+import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, OfferPreview, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
 import { I18n } from './i18n';
 import { Toast } from './toast';
 
@@ -132,6 +132,7 @@ interface Card {
                   @if (f.tooLate) {
                     <div class="muted small">{{ i18n.t('results.fillTooLate') }}</div>
                   } @else if (f.free > f.open.length) {
+                    <div class="muted small">{{ f.next.length ? i18n.t('results.nextUp', { list: nextText(f.next) }) : i18n.t('results.nextNobody') }}</div>
                     <div><button class="btn ghost small" type="button" [disabled]="busy()" (click)="fill(f.id)">{{ i18n.t('results.fill') }}</button></div>
                   }
                 </li>
@@ -622,13 +623,16 @@ export class ResultsPage implements OnInit {
   protected undoing = signal<string | null>(null);
   /** Seats offered one by one when the lists are final (Closed). */
   protected offers = signal<Offer[]>([]);
+  /** Per date with a free seat: who would be asked next. */
+  protected offerPreview = signal<OfferPreview[]>([]);
 
-  /** Dates with free seats while closed, with the open offers; dates less than two days ahead are no longer offered. */
+  /** Dates with free seats while closed, with the open offers; dates less than 36 hours ahead are no longer offered. */
   protected freeSeats = computed(() => {
     const d = this.data();
     if (!d?.frozenAt || this.phase() !== 'Closed') return [];
-    const now = Date.now(), soon = now + 2 * 24 * 3600 * 1000;
+    const now = Date.now(), soon = now + 36 * 3600 * 1000;
     const open = this.offers().filter((o) => o.status === 'open');
+    const preview = this.offerPreview();
     return this.activities().flatMap((a) =>
       a.sessions
         .filter((s) => s.capacity && new Date(s.start).getTime() > now)
@@ -639,6 +643,7 @@ export class ResultsPage implements OnInit {
           free: (s.capacity ?? 0) - (d.sessionLoad[s.id] ?? 0),
           open: open.filter((o) => o.sessionId === s.id),
           tooLate: new Date(s.start).getTime() < soon,
+          next: preview.find((p) => p.sessionId === s.id)?.next ?? [],
         }))
         .filter((f) => f.free > 0 || f.open.length),
     );
@@ -776,6 +781,13 @@ export class ResultsPage implements OnInit {
     }
   }
 
+  /** "Clara (gives up Fußballturnier), Ben (lacks a seat)" for the preview of a free seat. */
+  protected nextText(next: OfferPreview['next']): string {
+    return next
+      .map((n) => `${n.person} (${n.givesUp ? this.i18n.t('results.nextSwap', { seat: n.givesUp }) : this.i18n.t(n.need ? 'results.nextNeed' : 'results.nextTick')})`)
+      .join(', ');
+  }
+
   /** Offers the free seat of this date to the next person. */
   protected async fill(sessionId: string): Promise<void> {
     this.busy.set(true);
@@ -888,9 +900,12 @@ export class ResultsPage implements OnInit {
     }
     if (this.phase() !== 'Closed' || !this.canEdit()) return;
     try {
-      this.offers.set(await this.api.offers(this.slotId()));
+      const [offers, preview] = await Promise.all([this.api.offers(this.slotId()), this.api.offerPreview(this.slotId())]);
+      this.offers.set(offers);
+      this.offerPreview.set(preview);
     } catch {
       this.offers.set([]);
+      this.offerPreview.set([]);
     }
   }
 
