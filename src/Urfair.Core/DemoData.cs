@@ -52,6 +52,19 @@ public static class DemoData
             ? a with { Leader = "Miriam Koller", LeaderEmail = "miriam.koller@example.org" }
             : a with { Leader = "Florian Stadler", LeaderEmail = "florian.stadler@example.org" }).ToList();
 
+    /// <summary>
+    /// Fixed points of C and D in the "Ministrantenausflug", so the waiting list can be tried: C did not get Kletterwald
+    /// (her maximum) and can tick it, D sits there and can give it back.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> ExcursionChoices = new Dictionary<string, IReadOnlyDictionary<string, int>>
+    {
+        [C.Name] = new Dictionary<string, int> { ["Kletterwald Linz"] = 70, ["Tiergarten Walding"] = 30 },
+        [D.Name] = new Dictionary<string, int> { ["Kletterwald Linz"] = 40, ["Pöstlingbergbahn und Grottenbahn"] = 35, ["Ars Electronica Center"] = 25 },
+    };
+
+    /// <summary>Seats of C and D in the "Ministrantenausflug" after the allocation, whatever the lottery gave them.</summary>
+    public static readonly IReadOnlyList<(string Name, string Title)> ExcursionSeats = [(D.Name, "Kletterwald Linz"), (C.Name, "Tiergarten Walding")];
+
     public static IReadOnlyList<Activity> HolidayProgramme() => Build("ferien",
         ("Kochen mit Oma", 7, ("2026-07-14T09:00", "2026-07-14T13:00", "Pfarrheim St. Markus", 8)),
         ("Parkbad-Nachmittag", 8, ("2026-07-21T13:00", "2026-07-21T18:00", "Parkbad Linz", 25)),

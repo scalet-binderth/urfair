@@ -34,7 +34,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'result.noVote': 'Du hast bei dieser Wahl nicht abgestimmt.',
     'start.demoPeople': 'Oder als Demo-Person anmelden:',
     'start.demo.A': 'für keine Wahl freigeschaltet', 'start.demo.B': 'zwei offene Wahlen, schon abgestimmt',
-    'start.demo.C': 'zwei offene (abgestimmt), eine abgeschlossene mit Ergebnis', 'start.demo.D': 'zwei offene (abgestimmt), zwei abgeschlossene',
+    'start.demo.C': 'zwei offene (abgestimmt), eine sichtbare: Kletterwald auf der Warteliste', 'start.demo.D': 'zwei offene (abgestimmt), eine sichtbare: kann den Kletterwald zurückgeben, eine abgeschlossene',
     'home.activities': '{n} Veranstaltungen', 'home.go': 'Zur Wahl',
     'home.hello': 'Hallo {name}, wofür möchtest du abstimmen?',
 
@@ -342,7 +342,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'result.noVote': 'You did not vote in this round.',
     'start.demoPeople': 'Or sign in as a demo person:',
     'start.demo.A': 'not listed anywhere', 'start.demo.B': 'two open votes, already voted',
-    'start.demo.C': 'two open (voted), one finished with result', 'start.demo.D': 'two open (voted), two finished',
+    'start.demo.C': 'two open (voted), one visible: Kletterwald on the waiting list', 'start.demo.D': 'two open (voted), one visible: can give back Kletterwald, one closed',
     'home.activities': '{n} activities', 'home.go': 'Go to vote',
     'home.hello': 'Hello {name}, what would you like to vote on?',
 
