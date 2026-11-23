@@ -90,16 +90,16 @@ public static class Database
         if (IsDemo(config))
         {
             await AuthEndpoints.SeedDemoAccountsAsync(db);
-            if (!await db.FairSlots.AnyAsync()) await SeedDemoAsync(db);
+            if (!await db.FairSlots.AnyAsync()) await SeedDemoAsync(db, config["App:BaseUrl"]?.TrimEnd('/') ?? "");
         }
     }
 
-    /// <summary>Removes all FairSlots and seeds the demo again (demo mode only).</summary>
-    public static async Task ResetDemoAsync(AppDbContext db)
+    /// <summary>Removes all FairSlots and seeds the demo again (demo mode only); <paramref name="baseUrl"/> is for the links in the seeded mails.</summary>
+    public static async Task ResetDemoAsync(AppDbContext db, string baseUrl)
     {
         db.FairSlots.RemoveRange(await db.FairSlots.ToListAsync());
         await db.SaveChangesAsync();
-        await SeedDemoAsync(db);
+        await SeedDemoAsync(db, baseUrl);
     }
 
     /// <summary>
@@ -112,10 +112,12 @@ public static class Database
     /// waiting lists, so a seat given back moves up. There C did not get her first wish (Kletterwald, full) and can tick it,
     /// while D holds a seat there he can give back: then C moves up first, as no ticked sample person gave it as many points.
     /// All its activities are full: B sits in his weakest wish and is warned that giving it back leaves him without a seat.
-    /// In the closed "Ferienprogramm" D can cancel a seat; the cancellation mail to the organiser is in the demo mailbox. When the
-    /// organisers fill his seat in "Kochen mit Oma", C is offered it (she ticked it) and accepts or declines under her link.
+    /// In the closed "Ferienprogramm" D can cancel a seat; the cancellation mail to the organiser is in the demo mailbox. His seat in
+    /// "Kochen mit Oma" is then offered to C, who ticked it with the most points, and if she declines to B, who ticked it as well.
+    /// The mails sent so far are seeded with earlier dates (invitations, results, lists for the leaders), so the demo mailboxes
+    /// show the whole traffic between organisers, leaders and participants.
     /// </summary>
-    private static async Task SeedDemoAsync(AppDbContext db)
+    private static async Task SeedDemoAsync(AppDbContext db, string baseUrl)
     {
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         var today = DateOnly.FromDateTime(Phases.Now());
@@ -123,12 +125,15 @@ public static class Database
             SampleData.FirmungRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
         // B and C entered the same friend code: they wish to share an activity.
         foreach (var x in await db.Ballots.Where(x => x.FairSlotId == firmung.Id && (x.Name == b || x.Name == c)).ToListAsync()) x.Friends = DemoData.FriendCode;
-        await CreateSlotAsync(db, "Ministrantenausflug", Phase.Published, DeadlineIn(-7),
+        await SeedMailsAsync(db, firmung, baseUrl);
+        var excursion = await CreateSlotAsync(db, "Ministrantenausflug", Phase.Published, DeadlineIn(-7),
             DemoData.ExcursionRules, DemoData.Excursion().MovedTo(today.AddDays(14)), 40, [b, c, d], withBallots: [b, c, d], parish: "Pfarrgemeinde Urfahr-Hl. Geist", organiser: "Miriam Koller", visibility: Visibility.ParishOnly,
             choices: DemoData.ExcursionChoices, seats: DemoData.ExcursionSeats, organiserEmail: "miriam.koller@example.org");
-        await CreateSlotAsync(db, "Ferienprogramm", Phase.Closed, DeadlineIn(-21),
-            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [c, d], withBallots: [c, d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber",
+        await SeedMailsAsync(db, excursion, baseUrl);
+        var holiday = await CreateSlotAsync(db, "Ferienprogramm", Phase.Closed, DeadlineIn(-21),
+            DemoData.HolidayRules, DemoData.HolidayProgramme().MovedTo(today.AddDays(7)), 60, [b, c, d], withBallots: [b, c, d], parish: "Pfarrgemeinde Urfahr-St. Magdalena", organiser: "Stefan Huber",
             organiserEmail: "stefan.huber@example.org", choices: DemoData.HolidayChoices, seats: DemoData.HolidaySeats, ticks: DemoData.HolidayTicks);
+        await SeedMailsAsync(db, holiday, baseUrl);
         await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
             DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
         var festival = await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
@@ -140,6 +145,30 @@ public static class Database
 
     /// <summary>A registration deadline at the end of the day, relative to today.</summary>
     private static DateTime DeadlineIn(int days) => Phases.Now().Date.AddDays(days).AddMinutes(23 * 60 + 59);
+
+    /// <summary>
+    /// Demo: the mails a vote in this phase would have sent so far, dated back. Invitations three weeks before the deadline; once
+    /// allocated the results the day after and the lists for the leaders the day after that (later changes are then mailed to them).
+    /// </summary>
+    private static async Task SeedMailsAsync(AppDbContext db, FairSlotEntity slot, string baseUrl)
+    {
+        var all = new SlotAccess(slot, true, null);
+        var deadline = (slot.RegistrationDeadline ?? Phases.Now()).Date;
+        async Task SentAsync(DateTime local, Func<Task> add)
+        {
+            await add();
+            var at = (DateTime.UtcNow - (Phases.Now() - local)).AddSeconds(30);
+            at = at.AddTicks(-(at.Ticks % TimeSpan.TicksPerMinute));
+            foreach (var m in db.ChangeTracker.Entries<MailEntity>().Where(e => e.State == EntityState.Added)) m.Entity.CreatedAt = at;
+            foreach (var p in db.ChangeTracker.Entries<ParticipantEntity>().Where(e => e.State == EntityState.Modified)) p.Entity.InvitedAt = at;
+            await db.SaveChangesAsync();
+        }
+        await SentAsync(deadline.AddDays(-21).AddHours(18), () => ParticipantEndpoints.InvitationsAsync(db, slot, all, baseUrl));
+        if (slot.FrozenAt is null) return;
+        await SentAsync(deadline.AddDays(1).AddHours(9), () => ParticipantEndpoints.ResultMailsAsync(db, slot, all, baseUrl));
+        var lists = (await AllocationEndpoints.ListsAsync(db, slot, all)).Activities.ToList();
+        await SentAsync(deadline.AddDays(2).AddHours(10), () => AllocationEndpoints.LeaderMailsAsync(db, slot, lists, new LeaderMailRequest(null, false, false)));
+    }
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>

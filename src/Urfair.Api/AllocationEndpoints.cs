@@ -114,20 +114,31 @@ public static class AllocationEndpoints
 			if (access.Scope is not null) return Endpoints.Errors("leaderMailsNeedAll");
 			var wanted = req.ActivityIds is { Count: > 0 } ids ? ids.ToHashSet() : null;
 			var chosen = (await ListsAsync(db, slot, access)).Activities.Where(a => wanted is null || wanted.Contains(a.Id)).ToList();
-			var mails = chosen.Where(a => a.LeaderEmail is not null)
-				.GroupBy(a => a.LeaderEmail!.ToLowerInvariant())
-				.Select(g => LeaderMail(slot, g.ToList(), req)).ToList();
-			foreach (var mail in mails) Mailing.Add(db, slot, mail);
+			var mails = await LeaderMailsAsync(db, slot, chosen, req);
 			await db.SaveChangesAsync();
-			return Results.Ok(new { created = mails.Count, withoutEmail = chosen.Count(a => a.LeaderEmail is null) });
+			return Results.Ok(new { created = mails, withoutEmail = chosen.Count(a => a.LeaderEmail is null) });
 		});
+	}
+
+	/// <summary>
+	/// One mail per leader e-mail address with the lists of their activities; what they got is remembered, so later changes
+	/// are mailed to them (<see cref="LeaderNotices"/>). Saved by the caller.
+	/// </summary>
+	public static async Task<int> LeaderMailsAsync(AppDbContext db, FairSlotEntity slot, List<ListActivityDto> chosen, LeaderMailRequest req)
+	{
+		var withEmail = chosen.Where(a => a.LeaderEmail is not null).ToList();
+		var mails = withEmail.GroupBy(a => a.LeaderEmail!.ToLowerInvariant()).Select(g => LeaderMail(slot, g.ToList(), req)).ToList();
+		foreach (var mail in mails) Mailing.Add(db, slot, mail);
+		var lists = withEmail.SelectMany(a => a.Sessions).ToDictionary(s => s.Id, s => LeaderNotices.ListText(s.People.Select(p => p.Name)));
+		foreach (var s in await db.Sessions.Where(s => lists.Keys.Contains(s.Id)).ToListAsync()) s.LeaderList = lists[s.Id];
+		return mails.Count;
 	}
 
 	/// <summary>
 	/// The lists per activity and date. E-mail address and dates of birth and baptism only of participants in the account's own
 	/// Pfarrgemeinden (as in the participant list). Without a leader the vote's organiser is named, as on the activity.
 	/// </summary>
-	static async Task<LeaderListsDto> ListsAsync(AppDbContext db, FairSlotEntity slot, SlotAccess access)
+	public static async Task<LeaderListsDto> ListsAsync(AppDbContext db, FairSlotEntity slot, SlotAccess access)
 	{
 		var (allocation, activities, ballots) = await CurrentAsync(db, slot);
 		var listed = (await db.Participants.AsNoTracking().Where(p => p.FairSlotId == slot.Id).ToListAsync())
@@ -169,15 +180,18 @@ public static class AllocationEndpoints
 				body.Append($"{i + 1,3}. {string.Join(", ", parts)}\n");
 			}
 		}
-		body.Append("\nÄndert sich noch etwas, bekommst du eine neue Liste.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
+		body.Append("\nÄndert sich noch etwas, bekommst du eine Mail mit den Änderungen.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
 		return new MailEntity { FairSlotId = slot.Id, To = activities[0].LeaderEmail!, Subject = $"Teilnahmeliste: {slot.Name}", Body = body.ToString() };
 	}
 
-	static string When(ListSessionDto s) =>
-		s.Flexible ? $"bis {s.Start:dd.MM.yyyy}, nach Vereinbarung"
-		: s.End is not { } end ? $"{s.Start:dd.MM.yyyy, HH:mm} Uhr"
-		: end.Date == s.Start.Date ? $"{s.Start:dd.MM.yyyy, HH:mm}–{end:HH:mm} Uhr"
-		: $"{s.Start:dd.MM.yyyy, HH:mm} Uhr bis {end:dd.MM.yyyy, HH:mm} Uhr";
+	static string When(ListSessionDto s) => When(s.Start, s.End, s.Flexible);
+
+	/// <summary>A date as text for mails, e.g. "14.07.2026, 09:00–13:00 Uhr".</summary>
+	public static string When(DateTime start, DateTime? end, bool flexible) =>
+		flexible ? $"bis {start:dd.MM.yyyy}, nach Vereinbarung"
+		: end is not { } e ? $"{start:dd.MM.yyyy, HH:mm} Uhr"
+		: e.Date == start.Date ? $"{start:dd.MM.yyyy, HH:mm}–{e:HH:mm} Uhr"
+		: $"{start:dd.MM.yyyy, HH:mm} Uhr bis {e:dd.MM.yyyy, HH:mm} Uhr";
 
 	/// <summary>Adds a log entry; it is saved with the next SaveChanges.</summary>
 	/// <param name="undo">How the things the change touched were before (<see cref="Undo"/>), so it can be undone.</param>

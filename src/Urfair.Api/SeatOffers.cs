@@ -152,6 +152,7 @@ public static class SeatOffers
 		(offer.Status, offer.AnsweredAt) = (OfferStatus.Accepted, DateTime.UtcNow);
 		var after = AllocationEndpoints.SeatText(activities, seats.Select(a => a.SessionId).Where(x => x != givesUp?.Id).Append(session.Id));
 		AllocationEndpoints.Log(db, slot.Id, name, "offerAccepted", name, before, after);
+		await AcceptedMailAsync(db, slot, name, activities, session, givesUp is null ? null : AllocationEndpoints.SeatText(activities, [givesUp.Id]), after);
 		await db.SaveChangesAsync();
 		if (givesUp is not null) await NextAsync(db, slot, givesUp.Id, activities, baseUrl);
 		return null;
@@ -263,6 +264,17 @@ public static class SeatOffers
 			: "Zusagen oder absagen kannst du unter deinem persönlichen Link aus der Einladung.\n\n");
 		body.Append(slot.Organiser ?? "Dein Organisationsteam");
 		Mailing.Add(db, slot, new MailEntity { ParticipantId = p.Id, To = p.Email!, Subject = $"Freier Platz für dich: {slot.Name}", Body = body.ToString() });
+	}
+
+	static async Task AcceptedMailAsync(AppDbContext db, FairSlotEntity slot, string name, List<Activity> activities, Session session, string? gaveUp, string seats)
+	{
+		if (await ListedAsync(db, slot, name) is not { } p) return;
+		var body = new StringBuilder()
+			.Append($"Hallo {p.Name},\n\n")
+			.Append($"danke für deine Zusage: Bei „{slot.Name}“ hast du jetzt einen Platz bei {AllocationEndpoints.SeatText(activities, [session.Id])}, {When(session)}.\n");
+		if (gaveUp is not null) body.Append($"Deinen Platz bei {gaveUp} hast du dafür abgegeben.\n");
+		body.Append($"\nDeine Plätze jetzt: {seats}\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
+		Mailing.Add(db, slot, new MailEntity { ParticipantId = p.Id, To = p.Email!, Subject = $"Platz bestätigt: {slot.Name}", Body = body.ToString() });
 	}
 
 	static async Task ExpiredMailAsync(AppDbContext db, FairSlotEntity slot, SeatOfferEntity offer, List<Activity> activities)

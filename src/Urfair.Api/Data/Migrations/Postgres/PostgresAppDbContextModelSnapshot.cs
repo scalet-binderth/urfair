@@ -583,6 +583,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<bool>("Flexible")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("LeaderList")
+                        .HasColumnType("text");
+
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasMaxLength(200)

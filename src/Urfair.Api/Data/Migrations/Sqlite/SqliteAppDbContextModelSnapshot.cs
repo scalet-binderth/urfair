@@ -575,6 +575,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.Property<bool>("Flexible")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("LeaderList")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasMaxLength(200)

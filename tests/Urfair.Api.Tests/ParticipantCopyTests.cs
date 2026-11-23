@@ -22,13 +22,12 @@ public class ParticipantCopyTests
 	{
 		using var app = new DemoApp();
 		var organiser = await app.OrganiserAsync();
-		var firmung = await DemoApp.SlotIdAsync(organiser, "Firmvorbereitung");
 		var holiday = await DemoApp.SlotIdAsync(organiser, "Ferienprogramm");
 		var camp = await DemoApp.SlotIdAsync(organiser, "Sommerlager");
 		Assert.Empty(await ParticipantsAsync(organiser, camp));
 
 		var preview = await CopyAsync(organiser, camp, holiday, false);
-		Assert.Equal((2, 0, false), (preview.GetProperty("new").GetInt32(), preview.GetProperty("known").GetInt32(), preview.GetProperty("saved").GetBoolean()));
+		Assert.Equal((3, 0, false), (preview.GetProperty("new").GetInt32(), preview.GetProperty("known").GetInt32(), preview.GetProperty("saved").GetBoolean()));
 		Assert.Empty(await ParticipantsAsync(organiser, camp));
 
 		Assert.True((await CopyAsync(organiser, camp, holiday, true)).GetProperty("saved").GetBoolean());
@@ -40,12 +39,13 @@ public class ParticipantCopyTests
 		Assert.All(copied, p => Assert.Equal(JsonValueKind.Null, p.GetProperty("invitedAt").ValueKind));
 
 		var again = await CopyAsync(organiser, camp, holiday, true);
-		Assert.Equal((0, 2, false), (again.GetProperty("new").GetInt32(), again.GetProperty("known").GetInt32(), again.GetProperty("saved").GetBoolean()));
+		Assert.Equal((0, 3, false), (again.GetProperty("new").GetInt32(), again.GetProperty("known").GetInt32(), again.GetProperty("saved").GetBoolean()));
 
 		// Into a vote after the draft: only the new person is added, and it is logged.
-		var more = await CopyAsync(organiser, holiday, firmung, true);
-		Assert.Equal((1, 2), (more.GetProperty("new").GetInt32(), more.GetProperty("known").GetInt32()));
-		Assert.Equal(3, (await ParticipantsAsync(organiser, holiday)).Count);
+		(await organiser.PostAsJsonAsync($"/api/admin/slots/{camp}/participants", new { name = "Emma Eder" })).EnsureSuccessStatusCode();
+		var more = await CopyAsync(organiser, holiday, camp, true);
+		Assert.Equal((1, 3), (more.GetProperty("new").GetInt32(), more.GetProperty("known").GetInt32()));
+		Assert.Equal(4, (await ParticipantsAsync(organiser, holiday)).Count);
 		Assert.Contains(("participantsCopied", (string?)null), await DemoApp.LogAsync(organiser, holiday));
 	}
 

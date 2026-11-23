@@ -14,7 +14,12 @@ public record ParticipantImportDto(IReadOnlyList<ParticipantCsv.Person> People, 
 public record ParticipantCopyRequest(Guid From, bool Commit);
 /// <param name="Known">Already on the list; skipped.</param>
 public record ParticipantCopyDto(int New, int Known, bool Saved);
-public record MailDto(Guid Id, string To, string Subject, string Body, DateTime CreatedAt, string Status, DateTime? SentAt, string? Error, string? ReplyTo);
+/// <param name="From">On whose behalf it went out: the organiser's address, for mails to the organiser the participant who
+/// caused it; null for the app itself.</param>
+public record MailDto(Guid Id, string To, string Subject, string Body, DateTime CreatedAt, string Status, DateTime? SentAt, string? Error, string? ReplyTo,
+    string? From = null);
+/// <param name="Roles">organiser, leader, participant or other (only an address mails went to).</param>
+public record MailboxDto(string Address, string Name, IReadOnlyList<string> Roles);
 /// <param name="NeedsCheck">The date of birth is asked.</param>
 /// <param name="NeedsBaptism">The date of baptism is asked.</param>
 public record LinkInfoDto(Guid SlotId, string SlotName, bool NeedsCheck, bool NeedsBaptism);
@@ -164,17 +169,9 @@ public static class ParticipantEndpoints
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
-            var baseUrl = Mailing.BaseUrl(ctx.Request);
-            var access = Access.Slot(ctx);
-            var due = (await db.Participants.Where(p => p.FairSlotId == id && p.Email != null && p.InvitedAt == null).ToListAsync())
-                .Where(p => access.InScope(p.Parish)).ToList();
-            foreach (var p in due)
-            {
-                Mailing.Add(db, slot, Invitation(slot, p, baseUrl));
-                p.InvitedAt = DateTime.UtcNow;
-            }
+            var created = await InvitationsAsync(db, slot, Access.Slot(ctx), Mailing.BaseUrl(ctx.Request));
             await db.SaveChangesAsync();
-            return Results.Ok(new { created = due.Count });
+            return Results.Ok(new { created });
         });
 
         // Reminder with the personal link for everyone with an e-mail address who has not voted yet (only while registration is open).
@@ -204,28 +201,48 @@ public static class ParticipantEndpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             if (slot.Phase != Phase.Published) return Endpoints.Errors("resultMailsNeedPublished");
-            var baseUrl = Mailing.BaseUrl(ctx.Request);
-            var access = Access.Slot(ctx);
-            var (allocation, activities, ballots) = await AllocationEndpoints.CurrentAsync(db, slot);
-            var byName = ballots.Where(b => !b.IsSample).GroupBy(b => b.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First());
-            var due = (await db.Participants.Where(p => p.FairSlotId == id && p.Email != null).ToListAsync())
-                .Where(p => access.InScope(p.Parish) && byName.ContainsKey(p.Name.ToLowerInvariant())).ToList();
-            foreach (var p in due)
-            {
-                var seats = allocation.Assignments.GetValueOrDefault(byName[p.Name.ToLowerInvariant()].Id.ToString(), []).Select(x => x.Session.Id);
-                Mailing.Add(db, slot, Result(slot, p, AllocationEndpoints.SeatText(activities, seats), baseUrl));
-            }
+            var created = await ResultMailsAsync(db, slot, Access.Slot(ctx), Mailing.BaseUrl(ctx.Request));
             await db.SaveChangesAsync();
-            return Results.Ok(new { created = due.Count });
+            return Results.Ok(new { created });
         });
 
         admin.MapGet("/slots/{id:guid}/mails", async (Guid id, AppDbContext db, HttpContext http) =>
         {
-            var inScope = await InScopeAsync(db, id, Access.Slot(http));
+            var access = Access.Slot(http);
+            var inScope = await InScopeAsync(db, id, access);
+            var emails = await db.Participants.Where(p => p.FairSlotId == id && p.Email != null).ToDictionaryAsync(p => p.Id, p => p.Email!);
+            var organiser = access.Slot.OrganiserEmail is { Length: > 0 } o ? o : null;
+            string? From(MailEntity m) => organiser is null ? null
+                : !m.To.Equals(organiser, StringComparison.OrdinalIgnoreCase) ? organiser
+                : m.ParticipantId is { } p ? emails.GetValueOrDefault(p) : null;
             return (await db.Mails.Where(m => m.FairSlotId == id).ToListAsync())
                 .Where(inScope)
                 .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Utc(sent) : null, m.Error, m.ReplyTo));
+                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Utc(sent) : null, m.Error, m.ReplyTo,
+                    From(m)));
+        });
+
+        // Demo only: everyone this vote's mails go to or come from (organiser, leaders, participants), for the demo mailboxes.
+        admin.MapGet("/slots/{id:guid}/mailboxes", async (Guid id, AppDbContext db, HttpContext http, IConfiguration cfg) =>
+        {
+            if (!Database.IsDemo(cfg)) return Results.NotFound();
+            var access = Access.Slot(http);
+            var boxes = new Dictionary<string, (string Address, string Name, List<string> Roles)>(StringComparer.OrdinalIgnoreCase);
+            void Add(string? address, string? name, string role)
+            {
+                if (string.IsNullOrWhiteSpace(address)) return;
+                if (!boxes.TryGetValue(address, out var box)) boxes[address] = box = (address, string.IsNullOrWhiteSpace(name) ? address : name, []);
+                if (!box.Roles.Contains(role)) box.Roles.Add(role);
+            }
+            Add(access.Slot.OrganiserEmail, access.Slot.Organiser, "organiser");
+            foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.LeaderEmail != null).OrderBy(a => a.SortOrder).ToListAsync())
+                Add(a.LeaderEmail, a.Leader, "leader");
+            foreach (var p in (await db.Participants.Where(p => p.FairSlotId == id && p.Email != null).OrderBy(p => p.Name).ToListAsync()).Where(p => access.InScope(p.Parish)))
+                Add(p.Email, p.Name, "participant");
+            var inScope = await InScopeAsync(db, id, access);
+            foreach (var to in (await db.Mails.Where(m => m.FairSlotId == id).ToListAsync()).Where(inScope).Select(m => m.To).Distinct())
+                if (!boxes.ContainsKey(to)) Add(to, null, "other");
+            return Results.Ok(boxes.Values.Select(b => new MailboxDto(b.Address, b.Name, b.Roles)));
         });
 
         // Tries a mail that could not be sent again at once.
@@ -326,6 +343,34 @@ public static class ParticipantEndpoints
         if (!string.IsNullOrWhiteSpace(req.Parish) && parish is null)
             return Results.BadRequest(new ErrorsDto([new("parishUnknown", new Dictionary<string, object> { ["value"] = req.Parish.Trim() })]));
         return null;
+    }
+
+    /// <summary>Invitations for everyone in scope with an e-mail address and no invitation yet. Saved by the caller.</summary>
+    public static async Task<int> InvitationsAsync(AppDbContext db, FairSlotEntity slot, SlotAccess access, string baseUrl)
+    {
+        var due = (await db.Participants.Where(p => p.FairSlotId == slot.Id && p.Email != null && p.InvitedAt == null).OrderBy(p => p.Name).ToListAsync())
+            .Where(p => access.InScope(p.Parish)).ToList();
+        foreach (var p in due)
+        {
+            Mailing.Add(db, slot, Invitation(slot, p, baseUrl));
+            p.InvitedAt = DateTime.UtcNow;
+        }
+        return due.Count;
+    }
+
+    /// <summary>Everyone in scope with an e-mail address who voted gets their seats and the personal link. Saved by the caller.</summary>
+    public static async Task<int> ResultMailsAsync(AppDbContext db, FairSlotEntity slot, SlotAccess access, string baseUrl)
+    {
+        var (allocation, activities, ballots) = await AllocationEndpoints.CurrentAsync(db, slot);
+        var byName = ballots.Where(b => !b.IsSample).GroupBy(b => b.Name.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.First());
+        var due = (await db.Participants.Where(p => p.FairSlotId == slot.Id && p.Email != null).OrderBy(p => p.Name).ToListAsync())
+            .Where(p => access.InScope(p.Parish) && byName.ContainsKey(p.Name.ToLowerInvariant())).ToList();
+        foreach (var p in due)
+        {
+            var seats = allocation.Assignments.GetValueOrDefault(byName[p.Name.ToLowerInvariant()].Id.ToString(), []).Select(x => x.Session.Id);
+            Mailing.Add(db, slot, Result(slot, p, AllocationEndpoints.SeatText(activities, seats), baseUrl));
+        }
+        return due.Count;
     }
 
     private static MailEntity Reminder(FairSlotEntity slot, ParticipantEntity p, string baseUrl)
