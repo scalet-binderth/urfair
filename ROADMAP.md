@@ -64,7 +64,8 @@ and English; keep both in sync.
   and gave the activity points, then ticks; more points win, ties by lottery; whoever moves up gives up their weakest
   unlocked seat of that group, which fills again (chain). Triggered at once and checked every minute; each step is
   in the log with "Urfair" as actor. Recalculating is only possible in the internal allocation. Organisers see ticks
-  and seats given back per person. Demo: the visible "Ministrantenausflug" has full activities and ticked sample people
+  and seats given back per person. Demo: the visible "Ministrantenausflug" has full activities and ticked sample people;
+  demo person C did not get Kletterwald and can tick it, D sits there and can give it back, so C moves up (with mail)
 - **Step 6, part 1:** e-mails from the app. All mails (invitations, reminders, leader lists, new: allocation and moved
   up) are kept as an outbox; with a mail server (`Mail__Host`, built-in .NET SMTP client, STARTTLS) and outside demo
   mode a background job sends them every 20 seconds with retries (1, 5, 30, 120 minutes, then "not sent" with the

@@ -22,7 +22,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
   de: {
     title: 'Umsetzungsplan',
     lead: 'Die Demo ist vorzeigbar. Bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlen vor allem Dinge, die man in der Vorführung nicht sieht.',
-    asOf: 'Stand: 22. November 2026',
+    asOf: 'Stand: 23. November 2026',
     nowTitle: 'Was die Demo schon kann',
     now: [
       'Anmeldung als Teilnehmer:in oder Organisation, Demo-Personen A bis D',
@@ -45,6 +45,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Optionales Taufdatum pro Person; wenn eingetragen, fragt der persönliche Link es zusätzlich ab',
       '„Noch nicht abgestimmt“: Filter, E-Mail-Adressen kopieren, Erinnerungen mit persönlichem Link',
       'E-Mails aus der App: Versand über den eigenen Mailserver mit Status pro Mail, Antworten an die verantwortliche Person, Mail beim Nachrücken und zur Zuteilung',
+      'Nachrücken zum Ausprobieren im „Ministrantenausflug“: Clara (C) hakt den Kletterwald auf der Warteliste an, David (D) gibt dort seinen Platz zurück, Clara rückt nach',
       'Eigenes Ergebnis nach Veröffentlichung, Deutsch und Englisch',
     ],
     phasesTitle: 'Reihenfolge',
@@ -100,7 +101,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
   en: {
     title: 'Roadmap',
     lead: 'The demo is ready to show. Before real use in the Pfarre Urfahr-St. Junia, mostly invisible things are missing.',
-    asOf: 'As of 22 November 2026',
+    asOf: 'As of 23 November 2026',
     nowTitle: 'What the demo can do',
     now: [
       'Sign in as participant or organiser, demo people A to D',
@@ -123,6 +124,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
       'Optional date of baptism per person; if stored, the personal link asks for it as well',
       '“Not voted yet”: filter, copy e-mail addresses, reminders with the personal link',
       'E-mails from the app: sent via your own mail server with a status per mail, replies to the person responsible, mails when moving up and about the allocation',
+      'Try moving up in the “Ministrantenausflug”: Clara (C) ticks Kletterwald on the waiting list, David (D) gives back his seat there, Clara moves up',
       'Own result after publishing, German and English',
     ],
     phasesTitle: 'Order',
