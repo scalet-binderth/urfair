@@ -91,6 +91,7 @@ public static class AdminEndpoints
             if (slot.FrozenAt is not null && rulesChanged && !reopen)
                 errors.Add(new ValidationError("allocationFrozen"));
             if (reopen && slot.Phase != Phase.Allocation) errors.Add(new ValidationError("unpublishFirst"));
+            else if (reopen && await AllocationEndpoints.WasVisibleAsync(db, id)) errors.Add(new ValidationError("wasVisible"));
             if (req.Phase == Phase.Open && req.RegistrationDeadline is { } deadline && deadline <= Phases.Now())
                 errors.Add(new ValidationError("deadlinePassed"));
             // It would end again at once.
@@ -99,6 +100,7 @@ public static class AdminEndpoints
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
             var before = slot.Phase;
+            var settingsChanged = rulesChanged || slot.RegistrationDeadline != req.RegistrationDeadline;
             (slot.Name, slot.Phase, slot.RegistrationDeadline, slot.OpenToAll, slot.ShowInterim) = (name, req.Phase, req.RegistrationDeadline, req.OpenToAll, req.ShowInterim);
             (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);
@@ -107,6 +109,7 @@ public static class AdminEndpoints
             foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())
                 if (!ids.Contains(a.GroupId!)) a.GroupId = null;
             if (before != slot.Phase) AllocationEndpoints.Log(db, http, id, "phase", null, before.ToString(), slot.Phase.ToString());
+            if (settingsChanged && before != Phase.Draft) AllocationEndpoints.Log(db, http, id, "settings");
             await db.SaveChangesAsync();
             if (reopen)
             {
@@ -138,31 +141,35 @@ public static class AdminEndpoints
         admin.MapGet("/slots/{id:guid}/activities", async (Guid id, AppDbContext db) =>
             (await Database.LoadActivitiesAsync(db, id)).Select(Endpoints.ToAdminDto));
 
-        admin.MapPost("/slots/{id:guid}/activities", async (Guid id, ActivityRequest req, AppDbContext db) =>
+        admin.MapPost("/slots/{id:guid}/activities", async (Guid id, ActivityRequest req, AppDbContext db, HttpContext http) =>
         {
             if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
             var entity = new ActivityEntity { FairSlotId = id, SortOrder = await db.Activities.CountAsync(a => a.FairSlotId == id) };
             if (Apply(entity, req) is { } error) return error;
             db.Activities.Add(entity);
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "activityAdded", entity.Title, null, AllocationEndpoints.SeatsText(entity.Sessions));
             await db.SaveChangesAsync();
             return Results.Ok(new { entity.Id });
         });
 
-        admin.MapPut("/activities/{activityId}", async (string activityId, ActivityRequest req, AppDbContext db) =>
+        admin.MapPut("/activities/{activityId}", async (string activityId, ActivityRequest req, AppDbContext db, HttpContext http) =>
         {
             var entity = await db.Activities.Include(a => a.Sessions).SingleOrDefaultAsync(a => a.Id == activityId);
             if (entity is null) return Results.NotFound();
+            var seats = AllocationEndpoints.SeatsText(entity.Sessions);
             if (Apply(entity, req) is { } error) return error;
+            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activity", entity.Title, seats, AllocationEndpoints.SeatsText(entity.Sessions));
             await db.SaveChangesAsync();
             // More seats while visible: they fill from the waiting list.
             if (await db.FairSlots.FindAsync(entity.FairSlotId) is { } slot) await MovingUp.FillAsync(db, slot);
             return Results.NoContent();
         });
 
-        admin.MapDelete("/activities/{activityId}", async (string activityId, AppDbContext db) =>
+        admin.MapDelete("/activities/{activityId}", async (string activityId, AppDbContext db, HttpContext http) =>
         {
             var entity = await db.Activities.SingleOrDefaultAsync(a => a.Id == activityId);
             if (entity is null) return Results.NotFound();
+            await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activityRemoved", entity.Title);
             // Remove the points ballots gave to this activity.
             foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == entity.FairSlotId).ToListAsync())
                 b.Points.RemoveAll(p => p.ActivityId == activityId);
@@ -185,7 +192,7 @@ public static class AdminEndpoints
         });
 
         // Preview (commit=false) or take over (commit=true) activities from CSV text.
-        admin.MapPost("/slots/{id:guid}/import", async (Guid id, ImportRequest req, AppDbContext db) =>
+        admin.MapPost("/slots/{id:guid}/import", async (Guid id, ImportRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
@@ -203,6 +210,7 @@ public static class AdminEndpoints
                 order = 0;
             }
             foreach (var a in result.Activities) db.Activities.Add(Database.ToEntity(a, id, order++));
+            await AllocationEndpoints.LogChangeAsync(db, http, id, req.Replace ? "activitiesReplaced" : "activitiesImported", null, null, result.Activities.Count.ToString());
             await db.SaveChangesAsync();
             if (req.Replace) await Database.ResetSamplesAsync(db, id); // sample ballots must refer to the new activities
             return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), [], true));

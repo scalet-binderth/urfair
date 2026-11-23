@@ -17,9 +17,11 @@ builder.Services.AddDataProtection().SetApplicationName("Urfair").PersistKeysToD
 
 var app = builder.Build();
 
+app.Logger.LogInformation("Urfair version {Version} starting.", Operations.Version);
 await Database.InitialiseAsync(app.Services, app.Logger);
 Mailing.Configure(app.Configuration, app.Logger);
 
+app.UseErrorNumbers();
 // The Angular app is built into wwwroot; unknown paths fall back to index.html (client-side routing).
 app.UseDefaultFiles();
 app.UseStaticFiles();

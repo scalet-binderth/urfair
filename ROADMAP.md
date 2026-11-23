@@ -83,6 +83,13 @@ and English; keep both in sync.
   Once participants see the allocation, every change by hand is mailed to the person with their new seats.
   Demo: B sits in his weakest wish in the full "Ministrantenausflug"; the start page explains per demo person what
   can be tried
+- **Operations and troubleshooting:** the running version (commit) in the footer, `/api/info` and the log; unexpected
+  server errors show an error number that is also in the log; browser errors go to the server log (without personal
+  links); the log per vote also records rules, activities and participant list changes with the account; API tests
+  (`tests/Urfair.Api.Tests`) run the demo workflows on a fresh database in CI. Bug-fix routine in the README
+- **Seen stays seen:** once participants have seen an allocation (visible phase or their own changes in the log), it
+  can still go back to "internal" for quiet corrections by hand, but it is no longer recalculated and does not go back
+  to registration
 
 ## Next steps (each ends with a demo that can be shown)
 

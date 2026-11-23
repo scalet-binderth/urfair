@@ -31,7 +31,9 @@ interface Card {
           @if (d.frozenAt) {
             <p><b>{{ i18n.t('results.frozen', { date: i18n.date(d.frozenAt), n: lockedCount() }) }}</b></p>
             <p class="muted small">{{ i18n.t(phase() === 'Allocation' ? 'results.frozenInternal' : phase() === 'Ended' ? 'results.frozenEnded' : 'results.frozenPublished') }}</p>
-            @if (canEdit() && phase() === 'Allocation') {
+            @if (canEdit() && phase() === 'Allocation' && d.wasVisible) {
+              <p class="muted small">{{ i18n.t('results.wasVisibleHint') }}</p>
+            } @else if (canEdit() && phase() === 'Allocation') {
               <p class="muted small">{{ i18n.t('results.recalculateHint') }}</p>
               <div><button class="btn" type="button" [disabled]="busy()" (click)="recalculate()">{{ i18n.t('results.recalculate') }}</button></div>
             } @else if (phase() === 'Published') {

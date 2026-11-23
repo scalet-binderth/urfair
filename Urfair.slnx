@@ -4,6 +4,7 @@
     <Project Path="src/Urfair.Core/Urfair.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Urfair.Api.Tests/Urfair.Api.Tests.csproj" />
     <Project Path="tests/Urfair.Core.Tests/Urfair.Core.Tests.csproj" />
   </Folder>
 </Solution>

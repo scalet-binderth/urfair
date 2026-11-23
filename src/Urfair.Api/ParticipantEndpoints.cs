@@ -45,6 +45,7 @@ public static class ParticipantEndpoints
             if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (await Database.IsParticipantAsync(db, id, person.Name)) return Endpoints.Errors("alreadyListed");
             db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "listed", person.Name);
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -57,6 +58,8 @@ public static class ParticipantEndpoints
             if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (!p.Name.Equals(person.Name, StringComparison.OrdinalIgnoreCase) && await Database.IsParticipantAsync(db, p.FairSlotId, person.Name))
                 return Endpoints.Errors("alreadyListed");
+            var renamed = !p.Name.Equals(person.Name, StringComparison.Ordinal);
+            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, renamed ? "renamed" : "participantChanged", person.Name, p.Name, person.Name);
             (p.Name, p.Email, p.BirthDate, p.BaptismDate, p.Parish) = (person.Name, person.Email, person.BirthDate, person.BaptismDate, person.Parish);
             await db.SaveChangesAsync();
             return Results.NoContent();
@@ -66,6 +69,7 @@ public static class ParticipantEndpoints
         {
             var p = await db.Participants.FindAsync(participantId);
             if (p is null || !Access.Slot(http).InScope(p.Parish)) return Results.NotFound();
+            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, "unlisted", p.Name);
             db.Participants.Remove(p);
             await db.SaveChangesAsync();
             return Results.NoContent();
@@ -111,6 +115,7 @@ public static class ParticipantEndpoints
                 }
                 else db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
             }
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsImported", null, updated.ToString(), (result.People.Count - updated).ToString());
             await db.SaveChangesAsync();
             return Results.Ok(preview with { Saved = true });
         });
