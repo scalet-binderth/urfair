@@ -14,7 +14,8 @@ public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? Regist
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
     Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null, IReadOnlyList<string>? Excluded = null);
 /// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
-public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0);
+/// <param name="Friends">"Together with friends": the group code; everyone in the group enters it themselves.</param>
+public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0, string? Friends = null);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
 public record LookupRequest(string Name);
 /// <param name="GiveUp">Per ticked activity the activity whose seat goes for it; null keeps the earlier choices.</param>
@@ -70,7 +71,14 @@ public static class Endpoints
                 .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
             return ballot is null
                 ? Results.NotFound()
-                : Results.Ok(new { points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions, extra = ballot.Extra });
+                : Results.Ok(new
+                {
+                    points = ballot.Points.ToDictionary(p => p.ActivityId, p => p.Points), unavailableSessions = ballot.UnavailableSessions, extra = ballot.Extra,
+                    friends = ballot.Friends,
+                    // Everyone in the group entered the code themselves, so they may see each other's names.
+                    friendNames = ballot.Friends is null ? [] : await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample && b.Friends == ballot.Friends && b.Id != ballot.Id)
+                        .OrderBy(b => b.Name).Select(b => b.Name).ToListAsync(),
+                });
         });
 
         // FairSlots this person is listed in (drafts stay hidden). Identified by personal link, in demo mode also by name.
@@ -249,8 +257,12 @@ public static class Endpoints
             var activities = await Database.LoadActivitiesAsync(db, id);
             var points = (req.Points ?? []).Where(p => p.Value != 0).ToDictionary();
             var unavailable = (req.UnavailableSessions ?? []).ToHashSet();
-            var errors = Validation.Check(new Ballot("new", name, points, unavailable, Extra: req.Extra), slot.ToRules(), activities);
+            var friends = Validation.FriendCode(req.Friends);
+            var rules = slot.ToRules();
+            var errors = Validation.Check(new Ballot("new", name, points, unavailable, Extra: req.Extra, Friends: friends), rules, activities);
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
+            if (friends is not null && await db.Ballots.CountAsync(b => b.FairSlotId == id && !b.IsSample && b.Friends == friends && b.Name.ToLower() != name.ToLower()) >= rules.Friends)
+                return Results.BadRequest(new ErrorsDto([new ValidationError("friendsFull", new Dictionary<string, object> { ["max"] = rules.Friends })]));
 
             // A new ballot of the same person replaces the previous one.
             var existing = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower()).ToListAsync();
@@ -261,6 +273,7 @@ public static class Endpoints
                 Points = points.Select(p => new BallotPoints { ActivityId = p.Key, Points = p.Value }).ToList(),
                 UnavailableSessions = unavailable.ToList(),
                 Extra = req.Extra,
+                Friends = friends,
                 // Keep earlier waiting-list choices for activities that still have points.
                 Waitlist = existing.SelectMany(b => b.Waitlist).Where(points.ContainsKey).Distinct().ToList(),
                 GiveUp = existing.SelectMany(b => b.GiveUp).Where(x => points.ContainsKey(x.Split('>', 2)[0])).Distinct().ToList(),

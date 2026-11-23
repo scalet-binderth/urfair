@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Activity, Api, Group, MyActivityStatus, MyStatus, Slot } from './api';
+import { Activity, Api, Group, MyActivityStatus, MyStatus, PreviousBallot, Slot } from './api';
 import { I18n } from './i18n';
 import { SessionService } from './session';
 import { Toast } from './toast';
@@ -194,6 +194,15 @@ import { Toast } from './toast';
               </label>
               <p class="muted small">{{ i18n.t('vote.extraHint') }}</p>
             }
+            @if ((c.rules.friends ?? 0) >= 2) {
+              <label class="small" for="friends">{{ i18n.t('vote.friends', { n: c.rules.friends ?? 0 }) }}</label>
+              <div class="code">
+                <input id="friends" maxlength="20" autocomplete="off" [disabled]="!canVote()" [value]="friends()" (input)="friends.set($any($event.target).value)" />
+                @if (canVote()) { <button class="btn ghost small" type="button" (click)="newCode()">{{ i18n.t('vote.friendsNew') }}</button> }
+              </div>
+              @if (friendNames().length) { <p class="small">{{ i18n.t('vote.friendsWith', { names: friendNames().join(', ') }) }}</p> }
+              <p class="muted small">{{ i18n.t('vote.friendsHint') }}</p>
+            }
             @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
             <button class="btn" type="button" [disabled]="!canSubmit() || busy() || !canVote()" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
             @if (canVote()) { <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button> }
@@ -245,6 +254,8 @@ import { Toast } from './toast';
     .need { margin-left: 6px; font-weight: 600; color: var(--warn) }
     .need.ok { color: var(--good) }
     .extra { display: grid; gap: 4px }
+    .code { display: flex; gap: 6px; align-items: center }
+    .code input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: 1px }
     .stepper { display: flex; align-items: center; gap: 4px }
     .stepper button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 18px; line-height: 1 }
     .stepper button:hover:not(:disabled) { border-color: var(--accent) }
@@ -282,6 +293,9 @@ export class VotePage implements OnInit {
   /** "More than required": seats the person would also take. */
   protected extra = signal(0);
   protected extraOptions = computed(() => Array.from({ length: (this.slot()?.rules.maxExtra ?? 0) + 1 }, (_, i) => i));
+  /** "Together with friends": everyone of the group enters the same code. */
+  protected friends = signal('');
+  protected friendNames = signal<string[]>([]);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
 
@@ -428,6 +442,7 @@ export class VotePage implements OnInit {
         this.points.set(previous.points);
         this.unavailable.set(new Set(previous.unavailableSessions));
         this.extra.set(previous.extra ?? 0);
+        this.showFriends(previous);
         this.loadedPrevious.set(true);
       }
       await this.loadStatus();
@@ -437,6 +452,18 @@ export class VotePage implements OnInit {
   }
 
   protected pointsFor(id: string): number { return this.points()[id] ?? 0; }
+
+  private showFriends(ballot: PreviousBallot): void {
+    this.friends.set(ballot.friends ?? '');
+    this.friendNames.set(ballot.friendNames ?? []);
+  }
+
+  /** A random code without look-alike characters (0/O, 1/I), to pass on to the friends. */
+  protected newCode(): void {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    this.friends.set(Array.from(bytes, b => chars[b % chars.length]).join(''));
+  }
 
   protected sessionText(s: Activity['sessions'][number]): string {
     const seats = s.capacity ? ' · ' + this.i18n.t('common.seats', { n: s.capacity }) : '';
@@ -486,8 +513,13 @@ export class VotePage implements OnInit {
     this.busy.set(true);
     this.errors.set([]);
     try {
-      const res = await this.api.submitBallot(this.slotId(), { name: this.name().trim(), points: this.points(), unavailableSessions: [...this.unavailable()], extra: this.extra() });
+      const friends = (this.rules().friends ?? 0) >= 2 ? this.friends().trim() || null : null;
+      const res = await this.api.submitBallot(this.slotId(), { name: this.name().trim(), points: this.points(), unavailableSessions: [...this.unavailable()], extra: this.extra(), friends });
       this.toast.show(this.i18n.t(res.replaced ? 'vote.replaced' : 'vote.saved'));
+      if (friends !== null || this.friendNames().length) {
+        const saved = await this.api.lookupBallot(this.slotId(), this.name());
+        if (saved) this.showFriends(saved);
+      }
       // The people still missing per date change with every ballot.
       if (this.rules().requiredStaffing) this.activities.set(await this.api.activities(this.slotId()));
       await this.loadStatus();

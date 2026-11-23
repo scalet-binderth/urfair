@@ -153,6 +153,7 @@ public class AppDbContext(DbContextOptions options) : DbContext(options), IDataP
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Friends).HasMaxLength(20);
             e.HasIndex(x => new { x.FairSlotId, x.IsSample });
             e.OwnsMany(x => x.Points, p =>
             {

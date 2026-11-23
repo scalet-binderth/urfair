@@ -139,6 +139,10 @@ public static class AdminEndpoints
             // Fewer extra seats allowed: offers above the new maximum are cut down.
             foreach (var b in await db.Ballots.Where(b => b.FairSlotId == id && b.Extra > rules.MaxExtra).ToListAsync())
                 b.Extra = rules.MaxExtra;
+            // Smaller friend groups allowed: groups now too large are dissolved (all of them when switched off).
+            var withCode = await db.Ballots.Where(b => b.FairSlotId == id && b.Friends != null).ToListAsync();
+            foreach (var b in withCode.GroupBy(b => b.Friends).Where(g => rules.Friends < 2 || g.Count() > rules.Friends).SelectMany(g => g))
+                b.Friends = null;
             // Activities of a removed group become ungrouped.
             var ids = groups.Select(g => g.Id).ToHashSet();
             foreach (var a in await db.Activities.Where(a => a.FairSlotId == id && a.GroupId != null).ToListAsync())

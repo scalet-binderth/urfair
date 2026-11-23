@@ -63,6 +63,7 @@ public sealed class Allocator
             foreach (var b in withoutBid.OrderBy(b => lottery[b.Id])) a.AssignFallback(b);
         }
         a.ImproveBySwapping();
+        a.JoinFriends(perParticipant, lottery);
         a.AssignExtras(perParticipant, lottery, ranking);
         return a;
     }
@@ -432,5 +433,89 @@ public sealed class Allocator
 
             if (!changed) break;
         }
+    }
+
+    /// <summary>
+    /// "Together with friends": after the allocation every friend group (same <see cref="Ballot.Friends"/> code) is brought
+    /// into one shared session of an activity all members gave points to, the most points first. Only a wish: members may
+    /// give up a seat for it (they asked to be together), others only swap with them if they get at least as many points,
+    /// and a group is never placed as a block before others. Groups take turns by lottery; joined groups stay together.
+    /// </summary>
+    private void JoinFriends(int perParticipant, Dictionary<string, double> lottery)
+    {
+        var groups = _ballots.Where(b => Validation.FriendCode(b.Friends) is not null)
+            .GroupBy(b => Validation.FriendCode(b.Friends)!)
+            .Select(g => g.ToList()).Where(g => g.Count >= 2)
+            .OrderBy(g => g.Min(b => lottery[b.Id])).ToList();
+        var kept = new HashSet<Assignment>(ReferenceEqualityComparer.Instance);
+        foreach (var group in groups)
+        {
+            var shared = SharedSession(group) ?? Join(group, kept, perParticipant);
+            if (shared is null) continue;
+            foreach (var b in group) kept.Add(_assignments[b.Id].First(x => x.Session.Id == shared.Id));
+        }
+    }
+
+    private Session? SharedSession(List<Ballot> group) =>
+        _assignments[group[0].Id].Select(x => x.Session)
+            .FirstOrDefault(s => group.All(b => _assignments[b.Id].Any(x => x.Session.Id == s.Id)));
+
+    /// <summary>Tries the sessions of the activities all members want; applies the first plan that works for everyone.</summary>
+    private Session? Join(List<Ballot> group, HashSet<Assignment> kept, int perParticipant)
+    {
+        var members = group.Select(b => b.Id).ToHashSet();
+        var candidates = _activities.Where(a => group.All(b => b.PointsFor(a.Id) > 0))
+            .OrderByDescending(a => group.Sum(b => b.PointsFor(a.Id))).ThenBy(a => a.Popularity);
+        foreach (var act in candidates)
+        foreach (var s in act.Sessions.OrderByDescending(s => group.Count(b => _assignments[b.Id].Any(x => x.Session.Id == s.Id))).ThenByDescending(Free).ThenBy(s => s.Start))
+        {
+            if (Plan(group, members, s, kept, perParticipant) is not { } steps) continue;
+            foreach (var (b, mine, other) in steps)
+            {
+                var from = mine?.Session;
+                if (mine is null) Assign(b, s);
+                else Move(mine, s, b);
+                if (other is { } o) Move(o.Seat, from!, o.Ballot);
+            }
+            return s;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// For every member not yet in the session: the seat they give up (null if they lack one) and, if the session is full,
+    /// the outsider who takes that seat in exchange without losing points. Null if it does not work for everyone.
+    /// </summary>
+    private List<(Ballot Member, Assignment? Gives, (Ballot Ballot, Assignment Seat)? Other)>? Plan(
+        List<Ballot> group, HashSet<string> members, Session s, HashSet<Assignment> kept, int perParticipant)
+    {
+        var free = Free(s);
+        var taken = new HashSet<Assignment>(ReferenceEqualityComparer.Instance);
+        var steps = new List<(Ballot, Assignment?, (Ballot, Assignment)?)>();
+        foreach (var b in group.Where(b => _assignments[b.Id].All(x => x.Session.Id != s.Id)))
+        {
+            // Without giving up only if the person lacks a seat in the activity's group.
+            var lacksSeat = SameGroup(b, s.ActivityId).Count < Quota(s.ActivityId, perParticipant);
+            var options = (lacksSeat && Fits(b, s) ? new Assignment?[] { null } : [])
+                .Concat(_assignments[b.Id].Where(x => !x.Locked && !kept.Contains(x) && Fits(b, s, x)).OrderBy(x => x.Points));
+            var found = false;
+            foreach (var mine in options)
+            {
+                if (free > 0) { free--; steps.Add((b, mine, null)); found = true; break; }
+                if (mine is null) continue;
+                var other = _ballots.Where(o => !members.Contains(o.Id))
+                    .SelectMany(o => _assignments[o.Id].Where(x => x.Session.Id == s.Id && !x.Locked && !kept.Contains(x) && !taken.Contains(x)).Select(x => (Ballot: o, Seat: x)))
+                    .Where(o => o.Ballot.PointsFor(mine.Session.ActivityId) >= o.Seat.Points && Fits(o.Ballot, mine.Session, o.Seat))
+                    .OrderByDescending(o => o.Ballot.PointsFor(mine.Session.ActivityId) - o.Seat.Points)
+                    .FirstOrDefault();
+                if (other.Ballot is null) continue;
+                taken.Add(other.Seat);
+                steps.Add((b, mine, other));
+                found = true;
+                break;
+            }
+            if (!found) return null;
+        }
+        return steps;
     }
 }
