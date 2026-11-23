@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Participant, Phase, Seat } from './api';
+import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Participant, Phase, RestorePreview, Seat } from './api';
 import { I18n } from './i18n';
 import { Toast } from './toast';
 
@@ -235,6 +235,40 @@ interface Card {
                 <li>
                   <span class="muted small">{{ i18n.date(l.at) }} · {{ l.actor }}</span><br />
                   {{ logText(l) }}
+                  @if (l.canRestore && canEdit()) {
+                    @if (restoring()?.id === l.id) {
+                      <div class="restore stack">
+                        @if (restoring()?.preview; as pv) {
+                          <p class="small"><b>{{ i18n.t('restore.title', { date: i18n.date(pv.at) }) }}</b></p>
+                          @if (restoreCount(pv)) {
+                            <ul class="small">
+                              @for (c of pv.changes; track $index) {
+                                <li>
+                                  {{ c.name }}: {{ c.before || '–' }} → {{ c.after || '–' }}
+                                  @if (c.keptGivenBack) { <span class="muted">({{ i18n.t('restore.keptGivenBack', { seats: c.keptGivenBack }) }})</span> }
+                                </li>
+                              }
+                            </ul>
+                          } @else {
+                            <p class="muted small">{{ i18n.t('restore.nothing') }}</p>
+                          }
+                          @if (pv.mails) { <p class="muted small">{{ i18n.t('restore.mails', { n: pv.mails }) }}</p> }
+                          @if (pv.movesUp) { <p class="muted small">{{ i18n.t('restore.movesUp') }}</p> }
+                          <p class="muted small">{{ i18n.t('restore.undoable') }}</p>
+                          <div class="row">
+                            <button class="btn small" type="button" [disabled]="busy() || !restoreCount(pv)" (click)="confirmRestore(l)">
+                              {{ i18n.t('restore.confirm', { n: restoreCount(pv) }) }}
+                            </button>
+                            <button class="btn ghost small" type="button" (click)="restoring.set(null)">{{ i18n.t('common.cancel') }}</button>
+                          </div>
+                        } @else {
+                          <p class="muted small">{{ i18n.t('common.loading') }}</p>
+                        }
+                      </div>
+                    } @else {
+                      <div><button class="btn ghost small" type="button" [disabled]="busy()" (click)="previewRestore(l)">{{ i18n.t('restore.button') }}</button></div>
+                    }
+                  }
                 </li>
               }
             </ul>
@@ -293,6 +327,16 @@ interface Card {
       overflow: auto;
       display: grid;
       gap: 6px;
+    }
+    .restore {
+      margin: 6px 0;
+      padding: 8px 12px;
+      border-left: 3px solid var(--line);
+      gap: 6px;
+    }
+    .restore p,
+    .restore ul {
+      margin: 0;
     }
     .seat {
       align-items: center;
@@ -497,6 +541,8 @@ export class ResultsPage implements OnInit {
   /** Session choices for the person being edited, with their points and original seats. */
   protected editOptions: { id: string; activityId: string; label: string }[] = [];
   protected log = signal<LogEntry[]>([]);
+  /** The log entry whose state is being previewed for going back to it. */
+  protected restoring = signal<{ id: string; preview: RestorePreview | null } | null>(null);
 
   protected editable = computed(() => !!this.data()?.frozenAt && this.canEdit());
   protected lockedCount = computed(() =>
@@ -598,10 +644,32 @@ export class ResultsPage implements OnInit {
     return this.act(() => this.api.recalculateAllocation(this.slotId()), 'results.recalculated');
   }
 
-  /** Phase changes name the phases in the current language. */
+  /** Phase changes name the phases in the current language; a restore names the time it went back to. */
   protected logText(l: LogEntry): string {
-    const name = (x: string | null | undefined) => (l.kind === 'phase' && x ? this.i18n.t('phase.' + x) : x || '–');
+    const name = (x: string | null | undefined) => (l.kind === 'phase' && x ? this.i18n.t('phase.' + x) : l.kind === 'restored' && x ? this.i18n.date(x) : x || '–');
     return this.i18n.t('log.' + l.kind, { person: l.person ?? '', before: name(l.before), after: name(l.after) });
+  }
+
+  /** People whose seats change (not those who only keep a seat given back). */
+  protected restoreCount(p: RestorePreview): number {
+    return p.changes.filter((c) => c.before !== c.after).length;
+  }
+
+  protected async previewRestore(l: LogEntry): Promise<void> {
+    this.restoring.set({ id: l.id, preview: null });
+    this.error.set(null);
+    try {
+      const preview = await this.api.restorePreview(this.slotId(), l.id);
+      if (this.restoring()?.id === l.id) this.restoring.set({ id: l.id, preview });
+    } catch (e) {
+      this.restoring.set(null);
+      this.error.set(this.i18n.errors(e).join(' '));
+    }
+  }
+
+  protected async confirmRestore(l: LogEntry): Promise<void> {
+    await this.act(() => this.api.restore(this.slotId(), l.id), 'restore.done');
+    this.restoring.set(null);
   }
 
   protected edit(p: Participant): void {

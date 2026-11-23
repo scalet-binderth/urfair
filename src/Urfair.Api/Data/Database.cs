@@ -181,6 +181,12 @@ public static class Database
         if (Phases.HasAllocation(phase)) await AllocationEndpoints.FreezeAsync(db, slot);
         foreach (var (person, title) in seats ?? []) await SeatAsync(db, slot, person, title);
         if (phase == Phase.Published) await TickWaitlistsAsync(db, slot);
+        if (Phases.HasAllocation(phase))
+        {
+            // The first save point: the demo can be undone back to here.
+            AllocationEndpoints.Log(db, slot.Id, Phases.Clock, "frozen");
+            await db.SaveChangesAsync();
+        }
         return slot;
     }
 
@@ -297,6 +303,9 @@ public static class Database
         await db.SaveChangesAsync();
         await AllocationEndpoints.FreezeAsync(db, slot);
         if (slot.Phase == Phase.Published) await TickWaitlistsAsync(db, slot);
+        // A new start: older save points refer to ballots that are gone.
+        AllocationEndpoints.Log(db, slotId, Phases.Clock, "frozen");
+        await db.SaveChangesAsync();
     }
 
     public static async Task<List<Activity>> LoadActivitiesAsync(AppDbContext db, Guid slotId) =>

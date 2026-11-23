@@ -216,6 +216,20 @@ public class AllocationLogEntity
     public string? After { get; set; }
 }
 
+/// <summary>
+/// A save point: seats, fixed marks, waiting-list ticks and seats given back of every ballot right after a log entry
+/// that changed seats (see <see cref="SavePoints"/>). Deleted with its FairSlot.
+/// </summary>
+public class AllocationSnapshotEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FairSlotId { get; set; }
+    /// <summary>The log entry whose state this is.</summary>
+    public Guid LogId { get; set; }
+    /// <summary>JSON, one entry per ballot.</summary>
+    public string Data { get; set; } = "";
+}
+
 public static class Ids
 {
     /// <summary>Short random id for activities and sessions.</summary>

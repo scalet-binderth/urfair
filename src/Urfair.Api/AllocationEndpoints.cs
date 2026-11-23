@@ -15,7 +15,7 @@ public record AllocationDto(int Seed, int PerParticipant, Metrics PointBased, Me
 	IReadOnlyDictionary<string, int> SessionLoad, IReadOnlyList<ParticipantDto> Participants, DateTime? FrozenAt, bool WasVisible = false);
 public record SeatRequest(string SessionId, bool Locked);
 public record SeatsRequest(List<SeatRequest>? Seats);
-public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After);
+public record LogDto(DateTime At, string Actor, string Kind, string? Person, string? Before, string? After, Guid Id = default, bool CanRestore = false);
 public record ListPersonDto(string Name, string? Parish, string? Email, DateOnly? BirthDate, DateOnly? BaptismDate);
 public record ListSessionDto(string Id, DateTime Start, DateTime? End, bool Flexible, string Location, int? Capacity, IReadOnlyList<ListPersonDto> People);
 public record ListActivityDto(string Id, string Title, string? Leader, string? LeaderEmail, string? GroupId, IReadOnlyList<ListSessionDto> Sessions);
@@ -81,11 +81,16 @@ public static class AllocationEndpoints
 			return Results.Ok(await AllocateAsync(db, slot));
 		});
 
-		// Changes to the frozen allocation, newest first.
+		// Changes to the frozen allocation, newest first. Entries with a save point can be gone back to (SavePoints).
 		admin.MapGet("/slots/{id:guid}/allocation/log", async (Guid id, AppDbContext db) =>
-			(await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id).ToListAsync())
+		{
+			if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
+			var restorable = await SavePoints.RestorableAsync(db, slot);
+			return Results.Ok((await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id).ToListAsync())
 				.OrderByDescending(l => l.At).Take(300)
-				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After)));
+				.Select(l => new LogDto(DateTime.SpecifyKind(l.At, DateTimeKind.Utc), l.Actor, l.Kind, l.Person, l.Before, l.After, l.Id, restorable.Contains(l.Id))));
+		});
+		admin.MapSavePoints();
 
 		// Who goes where, per activity and date, for the activity leaders.
 		admin.MapGet("/slots/{id:guid}/allocation/lists", async (Guid id, AppDbContext db, HttpContext http) =>
@@ -187,7 +192,7 @@ public static class AllocationEndpoints
 		db.AllocationLog.Add(new AllocationLogEntity { FairSlotId = slotId, Actor = actor, Kind = kind, Person = person, Before = before, After = after });
 
 	/// <summary>Once participants see the allocation, a change by hand is mailed to the person (if on the list with an e-mail address).</summary>
-	static async Task SeatsChangedMailAsync(AppDbContext db, FairSlotEntity slot, BallotEntity ballot, List<Activity> activities,
+	public static async Task SeatsChangedMailAsync(AppDbContext db, FairSlotEntity slot, BallotEntity ballot, List<Activity> activities,
 		HashSet<string> before, HashSet<string> after, HttpContext http)
 	{
 		if (ballot.IsSample) return;

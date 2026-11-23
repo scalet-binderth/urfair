@@ -37,6 +37,11 @@ system assigns the seats:
   From Allocation on it is frozen; organisers move people by hand, lock seats and recalculate the rest. Going back to
   registration is possible only from the internal allocation and unfreezes it. Freezing
   keeps the original allocation (organisers can go back to it) and a log records every change, including phase changes.
+- **Undo with save points** (`SavePoints.cs`): after every change to seats (frozen, recalculated, by hand, moving up,
+  giving back, cancelling, restoring) the seats, fixed marks and ticks of all ballots are stored as a save point. In the
+  log, "Zu diesem Stand zurück" shows a preview (who gains or loses which seat) and sets the allocation back after a
+  confirmation. Seats a participant gave back stay given back; while visible or closed, affected people get "Deine
+  Plätze"; restoring is logged and can itself be undone. Only states since the last freeze can be restored.
 - **Moving up** (phase Published): no recalculation any more. Participants tick activities to move up into, give back
   a seat or take a free one; free seats fill by themselves within the activity group, need before wish, more points
   first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Every step is logged.
@@ -138,6 +143,7 @@ the image on every push and pull request.
   address and 10 minutes). Personal links appear as `/p/…`; no names or bodies are logged.
 - **Log per vote** (tab "Zuteilung"): from "Anmeldung" on, every change with account and time: phases, rules,
   activities, participant list, seats, giving back, moving up, cancelling. E-mails with their status are in the mailbox.
+  A wrong change to seats can be undone from there ("Zu diesem Stand zurück").
 - **Fixing a bug:** issue with error number and steps → a test that reproduces it (`tests/Urfair.Core.Tests` for the
   allocation, `tests/Urfair.Api.Tests` for whole workflows on a fresh demo database) → fix → CI green → merge;
   Render deploys `main`.
