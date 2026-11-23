@@ -174,6 +174,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("Undo")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FairSlotId");

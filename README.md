@@ -46,6 +46,12 @@ system assigns the seats:
   log, "Zu diesem Stand zurück" shows a preview (who gains or loses which seat) and sets the allocation back after a
   confirmation. Seats a participant gave back stay given back; while visible or closed, affected people get "Deine
   Plätze"; restoring is logged and can itself be undone. Only states since the last freeze can be restored.
+- **Undo for activities, participants and rules** (`Undo.cs`): from registration on, every logged change to them keeps
+  how the things it touched were before (`AllocationLog.Undo`, JSON). "Rückgängig machen" in the log sets exactly these
+  back and overwrites later changes to them: deleted activities come back with dates, points and (once frozen) the seats
+  people still lack; removed people with the same personal link; rule changes with the extra seats, friend codes and
+  activity groups they cut down. An undo never takes a seat away, is logged and can itself be undone. Draft changes
+  cannot be undone. Data protection: the details of a removed person stay in this log entry until the vote is deleted.
 - **Moving up** (phase Published): no recalculation any more. Participants tick activities to move up into, give back
   a seat or take a free one; free seats fill by themselves within the activity group, need before wish, more points
   first (`Allocator.FillFreeSeats`, `MovingUp.cs`). Whoever moves up gives up their weakest seat of the group unless
@@ -178,7 +184,8 @@ the image on every push and pull request.
   address and 10 minutes). Personal links appear as `/p/…`; no names or bodies are logged.
 - **Log per vote** (tab "Zuteilung"): from "Anmeldung" on, every change with account and time: phases, rules,
   activities, participant list, seats, giving back, moving up, cancelling. E-mails with their status are in the mailbox.
-  A wrong change to seats can be undone from there ("Zu diesem Stand zurück").
+  A wrong change to seats can be undone from there ("Zu diesem Stand zurück"), as can a change to activities, the
+  participant list or rules ("Rückgängig machen").
 - **Fixing a bug:** issue with error number and steps → a test that reproduces it (`tests/Urfair.Core.Tests` for the
   allocation, `tests/Urfair.Api.Tests` for whole workflows on a fresh demo database) → fix → CI green → merge;
   Render deploys `main`.

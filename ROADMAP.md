@@ -154,6 +154,16 @@ and English; keep both in sync.
   seat or by swapping with an outsider who does not lose points; members may give up a weaker seat. Limits: only in
   the calculated allocation; moving up may separate a group again; lowering the group size dissolves groups that are
   too large. Demo: "Firmvorbereitung" allows groups up to 3, B and C share the code `FIRM42`
+- **Undo for activities, the participant list and rules.** Every logged change to them (from registration on) keeps
+  how the things it touched were before (new column `AllocationLog.Undo`, JSON); the log offers "Rückgängig machen"
+  with a confirmation. Undoing sets exactly these back and overwrites later changes to them: a deleted activity comes
+  back with its dates, the points ballots gave it (as far as each budget allows) and, once frozen, the seats people
+  lost with it where they still lack a seat there; a removed person comes back with the same personal link; a rule
+  change comes back with the extra seats, friend codes and activity groups it cut down. An undo never takes a seat
+  away (it is refused instead), is logged and can itself be undone. Rules stay locked while the allocation is frozen.
+  Limits: draft changes are not logged and cannot be undone; offers and the original seats on deleted dates do not
+  come back; details of removed people stay in the log until the vote is deleted. Demo: delete "Tiergarten Walding" in
+  the "Ministrantenausflug" and undo it, Clara gets her seat back
 
 ## Next steps (each ends with a demo that can be shown)
 
@@ -166,7 +176,7 @@ and English; keep both in sync.
 | → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 ✓ | done, see above | |
 | 7 ✓ | done, see above | |
-| 8 ✓ | done, see above (later: activities, participant list and rules; points hang on them, the CSV export is the backup until then) | |
+| 8 ✓ | done, see above (also for activities, participant list and rules) | |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
 officer, the real texts of the legal notice and privacy policy (pages and automatic deletion are done).
@@ -209,7 +219,7 @@ original allocation so organisers can see and restore it; a log records every ch
 
 ## Later
 
-- Undo also for activities, the participant list and rules (step 8 covers the allocation only)
+- Nothing at the moment.
 
 ## Requirement notes
 

@@ -214,7 +214,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
 
-        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" /> }
+        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" (undone)="load()" /> }
         @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" /> }
 
         @case ('demo') {

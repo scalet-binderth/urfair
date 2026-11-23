@@ -166,6 +166,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Undo")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("FairSlotId");

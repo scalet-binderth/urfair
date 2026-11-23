@@ -47,8 +47,9 @@ public static class ParticipantEndpoints
             if (Check(req, out var person) is { } error) return error;
             if (!Access.Slot(http).InScope(person.Parish)) return Endpoints.Errors("parishNotOwn");
             if (await Database.IsParticipantAsync(db, id, person.Name)) return Endpoints.Errors("alreadyListed");
-            db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
-            await AllocationEndpoints.LogChangeAsync(db, http, id, "listed", person.Name);
+            var entity = new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish };
+            db.Participants.Add(entity);
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "listed", person.Name, undo: Undo.Json(new(ParticipantIds: [entity.Id])));
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
@@ -62,7 +63,8 @@ public static class ParticipantEndpoints
             if (!p.Name.Equals(person.Name, StringComparison.OrdinalIgnoreCase) && await Database.IsParticipantAsync(db, p.FairSlotId, person.Name))
                 return Endpoints.Errors("alreadyListed");
             var renamed = !p.Name.Equals(person.Name, StringComparison.Ordinal);
-            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, renamed ? "renamed" : "participantChanged", person.Name, p.Name, person.Name);
+            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, renamed ? "renamed" : "participantChanged", person.Name, p.Name, person.Name,
+                Undo.Json(new(Participants: [Undo.Copy(p)], ParticipantIds: [p.Id])));
             (p.Name, p.Email, p.BirthDate, p.BaptismDate, p.Parish) = (person.Name, person.Email, person.BirthDate, person.BaptismDate, person.Parish);
             await db.SaveChangesAsync();
             return Results.NoContent();
@@ -72,7 +74,7 @@ public static class ParticipantEndpoints
         {
             var p = await db.Participants.FindAsync(participantId);
             if (p is null || !Access.Slot(http).InScope(p.Parish)) return Results.NotFound();
-            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, "unlisted", p.Name);
+            await AllocationEndpoints.LogChangeAsync(db, http, p.FairSlotId, "unlisted", p.Name, undo: Undo.Json(new(Participants: [Undo.Copy(p)])));
             db.Participants.Remove(p);
             await db.SaveChangesAsync();
             return Results.NoContent();
@@ -106,6 +108,9 @@ public static class ParticipantEndpoints
             var preview = new ParticipantImportDto(result.People, errors, result.People.Count - updated, updated, false);
             if (!req.Commit || errors.Count > 0 || result.People.Count == 0) return Results.Ok(preview);
 
+            var known = result.People.Select(p => Known(p.Name)).OfType<ParticipantEntity>().Distinct().ToList();
+            var undo = known.Select(Undo.Copy).ToList();
+            var touched = known.Select(p => p.Id).ToList();
             foreach (var person in result.People)
             {
                 if (Known(person.Name) is { } p)
@@ -116,9 +121,15 @@ public static class ParticipantEndpoints
                     p.BaptismDate = person.BaptismDate ?? p.BaptismDate;
                     p.Parish = person.Parish ?? p.Parish;
                 }
-                else db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish });
+                else
+                {
+                    var entity = new ParticipantEntity { FairSlotId = id, Name = person.Name, Email = person.Email, BirthDate = person.BirthDate, BaptismDate = person.BaptismDate, Parish = person.Parish };
+                    db.Participants.Add(entity);
+                    touched.Add(entity.Id);
+                }
             }
-            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsImported", null, updated.ToString(), (result.People.Count - updated).ToString());
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsImported", null, updated.ToString(), (result.People.Count - updated).ToString(),
+                Undo.Json(new(Participants: undo, ParticipantIds: touched)));
             await db.SaveChangesAsync();
             return Results.Ok(preview with { Saved = true });
         });
@@ -140,9 +151,10 @@ public static class ParticipantEndpoints
             var preview = new ParticipantCopyDto(fresh.Count, people.Count - fresh.Count, false);
             if (!req.Commit || fresh.Count == 0) return Results.Ok(preview);
 
-            foreach (var p in fresh)
-                db.Participants.Add(new ParticipantEntity { FairSlotId = id, Name = p.Name, Email = p.Email, BirthDate = p.BirthDate, BaptismDate = p.BaptismDate, Parish = p.Parish });
-            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsCopied", null, source.Name, fresh.Count.ToString());
+            var added = fresh.Select(p => new ParticipantEntity { FairSlotId = id, Name = p.Name, Email = p.Email, BirthDate = p.BirthDate, BaptismDate = p.BaptismDate, Parish = p.Parish }).ToList();
+            db.Participants.AddRange(added);
+            await AllocationEndpoints.LogChangeAsync(db, http, id, "participantsCopied", null, source.Name, fresh.Count.ToString(),
+                Undo.Json(new(ParticipantIds: added.Select(p => p.Id).ToList())));
             await db.SaveChangesAsync();
             return Results.Ok(preview with { Saved = true });
         });
