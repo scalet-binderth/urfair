@@ -300,6 +300,10 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp without time zone");
 
+                    b.PrimitiveCollection<List<string>>("Excluded")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
                     b.Property<DateTime?>("FrozenAt")
                         .HasColumnType("timestamp without time zone");
 

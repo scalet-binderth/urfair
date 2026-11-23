@@ -10,8 +10,9 @@ public record SessionDto(string Id, DateTime Start, DateTime? End, string Locati
 public record ActivityDto(string Id, string Title, string? RestrictedTo, int? Seats, IReadOnlyList<SessionDto> Sessions, string? GroupId, string? Description, string? Parish, string? Leader, string? LeaderEmail = null);
 /// <param name="DeleteOn">Ended: the day the vote is deleted with all its data (<see cref="Retention"/>).</param>
 public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, int ActivityCount, int BallotCount, DateOnly? DeleteOn = null);
+/// <param name="Excluded">Only for organisers: names a vote open to everyone leaves out.</param>
 public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
-    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null);
+    Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null, IReadOnlyList<string>? Excluded = null);
 /// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
 public record BallotRequest(string Name, Dictionary<string, int> Points, List<string>? UnavailableSessions, int Extra = 0);
 public record ErrorsDto(IReadOnlyList<ValidationError> Errors);
@@ -79,11 +80,16 @@ public static class Endpoints
             var name = who.ToLower();
             var days = Retention.Days(cfg);
             var slots = await db.FairSlots
-                .Where(s => s.Phase != Phase.Draft && (s.Participants.Any(p => p.Name.ToLower() == name) || (s.OpenToAll && name != DemoData.NobodyName)))
+                .Where(s => s.Phase != Phase.Draft && (s.Participants.Any(p => p.Name.ToLower() == name) || s.OpenToAll))
                 .OrderBy(s => s.Phase).ThenBy(s => s.RegistrationDeadline)
-                .Select(s => new { Dto = new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count, null), s.EndedAt })
+                .Select(s => new
+                {
+                    Dto = new SlotSummaryDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.Activities.Count, s.Ballots.Count, null), s.EndedAt,
+                    Listed = s.Participants.Any(p => p.Name.ToLower() == name), s.Excluded,
+                })
                 .ToListAsync();
-            return Results.Ok(slots.Select(x => x.Dto with { DeleteOn = Retention.DeleteOn(x.EndedAt, days) }));
+            return Results.Ok(slots.Where(x => x.Listed || Database.OpenFor(x.Excluded, who))
+                .Select(x => x.Dto with { DeleteOn = Retention.DeleteOn(x.EndedAt, days) }));
         });
 
         // The own allocation once the organisers have published it.

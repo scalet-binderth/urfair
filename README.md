@@ -66,7 +66,10 @@ system assigns the seats:
   account sees (also an ended one) with e-mail, dates and Pfarrgemeinde, after a preview with the counts. Everyone gets
   a new personal link and counts as not invited; names already listed are skipped. Pfarrgemeinde admins take over
   only people of their own Pfarrgemeinden.
-- **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
+- **Open to everyone with exceptions** (settings, "Für alle offen"): everyone who signs in sees the vote and can
+  vote, except the names on its exclusion list (case-insensitive; the participants of another vote can be added in one
+  go, e.g. last year's confirmands). People on the participant list always take part; a vote already cast stays.
+  Without self-registration this only reaches people with a personal link from some vote (in the demo: any name). (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
   prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see).

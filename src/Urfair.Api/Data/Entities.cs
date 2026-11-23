@@ -39,6 +39,8 @@ public class FairSlotEntity
     public int SampleCount { get; set; }
     /// <summary>Anyone who signs in may see and vote, without being on the participant list (demo playground, later self-registration).</summary>
     public bool OpenToAll { get; set; }
+    /// <summary>Open to everyone except these names (case-insensitive, e.g. last year's participants); people on the participant list still take part.</summary>
+    public List<string> Excluded { get; set; } = [];
     /// <summary>Participants see their interim status while registration is open. Off by default: it invites tactics.</summary>
     public bool ShowInterim { get; set; }
     /// <summary>Organising parish and person responsible, shown to participants (optional).</summary>

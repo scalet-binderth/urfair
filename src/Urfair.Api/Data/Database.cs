@@ -277,12 +277,20 @@ public static class Database
         return entity;
     }
 
-    /// <summary>Whether a person may see and vote in a FairSlot: listed, or the FairSlot is open to all (demo person A excluded).</summary>
+    /// <summary>Whether a person may see and vote in a FairSlot: listed, or the FairSlot is open to all and the person is not excluded (demo person A neither).</summary>
     public static async Task<bool> CanTakePartAsync(AppDbContext db, Guid slotId, string name)
     {
-        var n = name.Trim().ToLower();
-        if (n.Length > 0 && n != DemoData.NobodyName && await db.FairSlots.AnyAsync(s => s.Id == slotId && s.OpenToAll)) return true;
+        var open = await db.FairSlots.Where(s => s.Id == slotId && s.OpenToAll).Select(s => s.Excluded).FirstOrDefaultAsync();
+        if (open is not null && OpenFor(open, name)) return true;
         return await IsParticipantAsync(db, slotId, name);
+    }
+
+    /// <summary>Whether a FairSlot open to all lets this person in, given its exclusion list.</summary>
+    public static bool OpenFor(IEnumerable<string> excluded, string name)
+    {
+        var n = name.Trim();
+        return n.Length > 0 && !n.Equals(DemoData.NobodyName, StringComparison.OrdinalIgnoreCase)
+            && !excluded.Any(x => x.Equals(n, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Whether a person (by name) is on the participant list of a FairSlot.</summary>
