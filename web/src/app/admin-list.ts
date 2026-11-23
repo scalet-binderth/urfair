@@ -27,7 +27,25 @@ import { Toast } from './toast';
           </div>
           <button class="btn" type="button" [disabled]="busy() || !name.trim()" (click)="create()">{{ i18n.t('admin.create') }}</button>
         </div>
-        @if (info.demo()) { <label class="check"><input type="checkbox" [(ngModel)]="withSample" />{{ i18n.t('admin.withSample') }}</label> }
+        @if (slots()?.length) {
+          <div class="row">
+            <div class="field grow">
+              <label for="new-template">{{ i18n.t('admin.template') }}</label>
+              <select id="new-template" [(ngModel)]="copyFrom" (ngModelChange)="templateChosen($event)">
+                <option [ngValue]="null">{{ i18n.t('admin.templateNone') }}</option>
+                @for (s of slots(); track s.id) { <option [ngValue]="s.id">{{ s.name }}</option> }
+              </select>
+            </div>
+            @if (copyFrom) {
+              <div class="field">
+                <label for="new-shift">{{ i18n.t('admin.shiftWeeks') }}</label>
+                <input id="new-shift" type="number" min="0" max="104" [(ngModel)]="shiftWeeks" />
+              </div>
+            }
+          </div>
+          @if (copyFrom) { <p class="muted small">{{ i18n.t('admin.templateHint') }}</p> }
+        }
+        @if (info.demo() && !copyFrom) { <label class="check"><input type="checkbox" [(ngModel)]="withSample" />{{ i18n.t('admin.withSample') }}</label> }
         @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
       </div>
 
@@ -90,6 +108,9 @@ export class AdminListPage {
   protected busy = signal(false);
   protected name = '';
   protected withSample = false;
+  protected copyFrom: string | null = null;
+  /** 52 weeks: the same weekday a year later. */
+  protected shiftWeeks = 52;
 
   constructor() { this.load(); }
 
@@ -123,12 +144,18 @@ export class AdminListPage {
     this.busy.set(true);
     this.errors.set([]);
     try {
-      const { id } = await this.api.createSlot(this.name.trim(), this.withSample);
+      const { id } = await this.api.createSlot(this.name.trim(), this.withSample && !this.copyFrom, this.copyFrom, this.copyFrom ? this.shiftWeeks ?? 0 : 0);
       await this.router.navigate(['/admin/s', id]);
     } catch (e) {
       this.errors.set(this.i18n.errors(e));
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Suggests the template's name, so only the year needs changing. */
+  protected templateChosen(id: string | null): void {
+    const source = this.slots()?.find(s => s.id === id);
+    if (source && !this.name.trim()) this.name = source.name;
   }
 }

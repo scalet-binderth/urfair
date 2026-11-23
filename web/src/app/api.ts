@@ -162,8 +162,9 @@ export class Api {
 
   // ---------- organisation ----------
   adminSlots() { return this.call(this.http.get<SlotSummary[]>('/api/admin/slots', this.admin())); }
-  createSlot(name: string, withSampleData: boolean) {
-    return this.call(this.http.post<{ id: string }>('/api/admin/slots', { name, withSampleData }, this.admin()));
+  /** With copyFrom the new vote takes over settings, activities and dates of that vote, shifted by shiftWeeks. */
+  createSlot(name: string, withSampleData: boolean, copyFrom: string | null = null, shiftWeeks = 0) {
+    return this.call(this.http.post<{ id: string }>('/api/admin/slots', { name, withSampleData, copyFrom, shiftWeeks }, this.admin()));
   }
   adminSlot(id: string) { return this.call(this.http.get<Slot>(`/api/admin/slots/${id}`, this.admin())); }
   updateSlot(id: string, body: SlotUpdate) { return this.call(this.http.put(`/api/admin/slots/${id}`, body, this.admin())); }
