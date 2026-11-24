@@ -280,7 +280,7 @@ original allocation so organisers can see and restore it; a log records every ch
   |---|---|---|
   | Pfarrgemeinde only | everything | import and edit if it is their own Pfarrgemeinde |
   | Junia shared | everything | import and edit, only rows of their own Pfarrgemeinde |
-  | Junia, read only | everything | proposal: only rows of their own Pfarrgemeinde; activities and rules not |
+  | Junia, read only | everything | only rows of their own Pfarrgemeinde (decided 24 November 2026); activities and rules not |
 
   Rows for another Pfarrgemeinde are rejected with their row number. Step 2 builds the import with the Pfarrgemeinde
   column but without permission checks; step 3 adds them without changing the import.
@@ -289,6 +289,6 @@ original allocation so organisers can see and restore it; a log records every ch
 
 - Who is the contact for hosting and data protection in the parish and diocese?
 - ~~May one person be admin of several parishes?~~ Yes (an account can have several Pfarrgemeinden).
-- May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes? (proposal: yes, only rows of their own Pfarrgemeinde)
+- ~~May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes?~~ Yes, only rows of their own Pfarrgemeinde.
 - Pilot with 20–30 confirmands or the whole year group right away?
 - ~~"Together with friends": pairs or small groups, how many, how strongly may it influence the allocation?~~ Decided, see requirement notes.
