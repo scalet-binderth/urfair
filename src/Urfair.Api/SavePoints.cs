@@ -83,9 +83,10 @@ public static class SavePoints
     public static void MapSavePoints(this RouteGroupBuilder admin)
     {
         // Who would gain or lose which seat when going back to the state after a log entry.
-        admin.MapGet("/slots/{id:guid}/allocation/restore/{logId:guid}", async (Guid id, Guid logId, AppDbContext db) =>
+        admin.MapGet("/slots/{id:guid}/allocation/restore/{logId:guid}", async (Guid id, Guid logId, AppDbContext db, HttpContext http) =>
         {
             if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
+            var sees = await Access.SeesPersonAsync(http, db, id);
             var (error, entry, changes) = await PlanAsync(db, slot, logId);
             if (error is not null) return error;
             var activities = await Database.LoadActivitiesAsync(db, id);
@@ -97,7 +98,7 @@ public static class SavePoints
                 mails = changes.Count(c => c.SeatsChanged && !c.Ballot.IsSample && reachable.Contains(c.Ballot.Name.ToLower()));
             }
             return Results.Ok(new RestorePreviewDto(Database.Utc(entry!.At),
-                shown.Select(c => new RestoreChangeDto(c.Ballot.Name, c.Ballot.IsSample,
+                shown.Select(c => new RestoreChangeDto(sees(c.Ballot.Name) ? c.Ballot.Name : Access.HiddenName, c.Ballot.IsSample,
                     AllocationEndpoints.SeatText(activities, c.Old.Select(a => a.SessionId)),
                     AllocationEndpoints.SeatText(activities, c.New.Select(a => a.SessionId)),
                     c.KeptGivenBack.Count > 0 ? AllocationEndpoints.SeatText(activities, c.KeptGivenBack) : null)).ToList(),
@@ -130,7 +131,7 @@ public static class SavePoints
                 changed.Count(c => c.SeatsChanged).ToString());
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
-            return Results.Ok(await AllocationEndpoints.AllocateAsync(db, slot));
+            return Results.Ok(await AllocationEndpoints.ForAccountAsync(db, slot, http));
         });
     }
 

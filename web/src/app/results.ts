@@ -131,7 +131,7 @@ interface Card {
                   <b>{{ f.title }}</b> · {{ f.when }} · {{ i18n.t('results.freeCount', { n: f.free }) }}
                   @for (o of f.open; track o.id) {
                     <div class="muted small">
-                      {{ i18n.t(o.givesUp ? 'results.offerOpenSwap' : 'results.offerOpen', { person: o.person, date: i18n.date(o.expiresAt), seat: o.givesUp ?? '' }) }}
+                      {{ i18n.t(o.givesUp ? 'results.offerOpenSwap' : 'results.offerOpen', { person: who(o.person), date: i18n.date(o.expiresAt), seat: o.givesUp ?? '' }) }}
                     </div>
                   }
                   @if (f.tooLate) {
@@ -288,7 +288,7 @@ interface Card {
                             <ul class="small">
                               @for (c of pv.changes; track $index) {
                                 <li>
-                                  {{ c.name }}: {{ c.before || '–' }} → {{ c.after || '–' }}
+                                  {{ who(c.name) }}: {{ c.before || '–' }} → {{ c.after || '–' }}
                                   @if (c.keptGivenBack) { <span class="muted">({{ i18n.t('restore.keptGivenBack', { seats: c.keptGivenBack }) }})</span> }
                                 </li>
                               }
@@ -703,6 +703,9 @@ export class ResultsPage implements OnInit {
         a.satisfaction - b.satisfaction,
     );
   });
+  /** People of other Pfarrgemeinden come without a name (only for accounts limited to some Pfarrgemeinden). */
+  protected who(name: string): string { return name || this.i18n.t('results.otherParish'); }
+
   protected needReplacement = computed(() => (this.data()?.participants ?? []).filter((p) => p.needsReplacement).length);
   protected visible = computed(() =>
     this.showAll() || this.query() ? this.filtered() : this.filtered().slice(0, 40),
@@ -771,7 +774,7 @@ export class ResultsPage implements OnInit {
   /** "Clara (gives up Fußballturnier), Ben (lacks a seat)" for the preview of a free seat. */
   protected nextText(next: OfferPreview['next']): string {
     return next
-      .map((n) => `${n.person} (${n.givesUp ? this.i18n.t('results.nextSwap', { seat: n.givesUp }) : this.i18n.t(n.need ? 'results.nextNeed' : 'results.nextTick')})`)
+      .map((n) => `${this.who(n.person)} (${n.givesUp ? this.i18n.t('results.nextSwap', { seat: n.givesUp }) : this.i18n.t(n.need ? 'results.nextNeed' : 'results.nextTick')})`)
       .join(', ');
   }
 

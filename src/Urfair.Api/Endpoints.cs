@@ -67,7 +67,7 @@ public static class Endpoints
         // Reloads the own previously submitted ballot so it can be changed.
         api.MapPost("/slots/{id:guid}/ballots/lookup", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } who) return Results.Unauthorized();
             var name = who.ToLower();
             var ballot = await db.Ballots.AsNoTracking()
                 .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name)
@@ -85,9 +85,11 @@ public static class Endpoints
         });
 
         // FairSlots this person is listed in (drafts stay hidden). Identified by personal link, in demo mode also by name.
+        // With a link: its own vote, plus votes open to all that do not list the name (see ResolveNameAsync).
         api.MapPost("/my-slots", async (LookupRequest req, AppDbContext db, HttpContext http, IConfiguration cfg) =>
         {
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
+            var own = ParticipantEndpoints.HasLink(http) ? (await ParticipantEndpoints.LinkedAsync(http))!.FairSlotId : (Guid?)null;
             var name = who.ToLower();
             var days = Retention.Days(cfg);
             var slots = await db.FairSlots
@@ -99,7 +101,7 @@ public static class Endpoints
                     Listed = s.Participants.Any(p => p.Name.ToLower() == name), s.Excluded,
                 })
                 .ToListAsync();
-            return Results.Ok(slots.Where(x => x.Listed || Database.OpenFor(x.Excluded, who))
+            return Results.Ok(slots.Where(x => own is { } o ? x.Dto.Id == o || !x.Listed && Database.OpenFor(x.Excluded, who) : x.Listed || Database.OpenFor(x.Excluded, who))
                 .Select(x => x.Dto with { DeleteOn = Retention.DeleteOn(x.EndedAt, days) }));
         });
 
@@ -107,7 +109,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/my-result", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (!Phases.ShowsResult(slot.Phase)) return Errors("notPublished");
             var result = await AllocationEndpoints.AllocateAsync(db, slot);
@@ -119,7 +121,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/my-mails", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http, IConfiguration cfg) =>
         {
             if (!Database.IsDemo(cfg)) return Results.NotFound();
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (!await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             var email = (await Database.ListedAsync(db, id, name))?.Email;
             if (email is null) return Results.Ok(Array.Empty<MyMailDto>());
@@ -133,7 +135,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/my-status", async (Guid id, LookupRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (!ShowsStatus(slot))
                 return Results.Ok(new MyStatusDto(await db.Ballots.AnyAsync(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower()), [], []));
@@ -145,7 +147,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/waitlist", async (Guid id, WaitlistRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             var closed = slot.Phase == Phase.Closed && slot.FrozenAt is not null;
             if (!(closed || slot.Phase == Phase.Published || slot.Phase == Phase.Open && slot.ShowInterim)) return Errors("waitlistClosed");
@@ -177,7 +179,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/give-back", async (Guid id, GiveBackRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase is not (Phase.Published or Phase.Closed) || slot.FrozenAt is null) return Errors("giveBackClosed");
             var ballot = await MyBallotAsync(db, id, name);
@@ -228,7 +230,7 @@ public static class Endpoints
         api.MapPost("/slots/{id:guid}/take-seat", async (Guid id, TakeSeatRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             if (slot.Phase != Phase.Published || slot.FrozenAt is null) return Errors("giveBackClosed");
             var ballot = await MyBallotAsync(db, id, name);
@@ -250,7 +252,7 @@ public static class Endpoints
             OfferAnswerRequest req, AppDbContext db, HttpContext http) =>
         {
             var slot = await db.FairSlots.FindAsync(id);
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (slot is null || !await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
             var url = Mailing.BaseUrl(http.Request);
             var error = answer == "accept"
@@ -279,7 +281,7 @@ public static class Endpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             if (slot.Phase != Phase.Open || Phases.DeadlinePassed(slot)) return Errors("registrationClosed");
-            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
+            if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name, id) is not { } name) return Results.Unauthorized();
             if (!await Database.CanTakePartAsync(db, id, name)) return Errors("notListed");
 
             var activities = await Database.LoadActivitiesAsync(db, id);

@@ -287,21 +287,37 @@ public static class ParticipantEndpoints
 
     /// <summary>
     /// The participant's name for a request: from the personal link (headers), or in demo mode from the request body.
+    /// A link belongs to the vote it was made for: in another vote (<paramref name="slotId"/>) it only counts if that vote
+    /// does not list the name itself, i.e. a vote open to all; a person listed there uses the link of that vote.
     /// Null means the request is not allowed.
     /// </summary>
-    public static async Task<string?> ResolveNameAsync(HttpContext http, string? bodyName)
+    public static async Task<string?> ResolveNameAsync(HttpContext http, string? bodyName, Guid? slotId = null)
     {
-        var token = http.Request.Headers["X-Participant"].ToString();
-        if (token.Length > 0)
+        if (HasLink(http))
         {
-            var services = http.RequestServices;
-            DateOnly? birth = DateOnly.TryParse(http.Request.Headers["X-Participant-Check"].ToString(), out var d) ? d : null;
-            DateOnly? baptism = DateOnly.TryParse(http.Request.Headers["X-Participant-Baptism"].ToString(), out var t) ? t : null;
-            var p = await Verify(services.GetRequiredService<AppDbContext>(), services.GetRequiredService<IMemoryCache>(), token, birth, baptism);
-            return p?.Name;
+            var p = await LinkedAsync(http);
+            if (p is null) return null;
+            if (slotId is { } id && p.FairSlotId != id && await Database.IsParticipantAsync(http.RequestServices.GetRequiredService<AppDbContext>(), id, p.Name))
+                return null;
+            return p.Name;
         }
         var name = (bodyName ?? "").Trim();
         return Database.IsDemo(http.RequestServices.GetRequiredService<IConfiguration>()) && name.Length > 0 ? name : null;
+    }
+
+    public static bool HasLink(HttpContext http) => http.Request.Headers["X-Participant"].ToString().Length > 0;
+
+    /// <summary>The participant of the personal link in the headers, after the date check; checked once per request.</summary>
+    public static async Task<ParticipantEntity?> LinkedAsync(HttpContext http)
+    {
+        if (http.Items.TryGetValue("linked", out var known)) return (ParticipantEntity?)known;
+        var services = http.RequestServices;
+        DateOnly? birth = DateOnly.TryParse(http.Request.Headers["X-Participant-Check"].ToString(), out var d) ? d : null;
+        DateOnly? baptism = DateOnly.TryParse(http.Request.Headers["X-Participant-Baptism"].ToString(), out var t) ? t : null;
+        var p = await Verify(services.GetRequiredService<AppDbContext>(), services.GetRequiredService<IMemoryCache>(),
+            http.Request.Headers["X-Participant"].ToString(), birth, baptism);
+        http.Items["linked"] = p;
+        return p;
     }
 
     /// <summary>Finds the participant for a token and checks the stored dates. Repeated wrong dates lock the link for a while.</summary>

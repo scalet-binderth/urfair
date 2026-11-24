@@ -43,3 +43,32 @@ public class AccessTests
         Assert.Equal(["Ben Berger", "Emma Eder"], (await ParticipantsAsync(markus, firmung)).Select(p => p.GetProperty("name").GetString()).Order());
     }
 }
+
+/// <summary>In "Junia shared" votes a Pfarrgemeinde admin sees and moves only people of their own Pfarrgemeinden (decided 24 November 2026).</summary>
+public class SharedAllocationAccessTests
+{
+    [Fact]
+    public async Task The_allocation_shows_only_own_people_but_complete_seat_counts()
+    {
+        using var app = new DemoApp();
+        var junia = await app.OrganiserAsync();
+        var holiday = await DemoApp.SlotIdAsync(junia, "Ferienprogramm"); // Junia shared
+        var markus = app.CreateClient();
+        (await markus.PostAsJsonAsync("/api/auth/demo", new { key = "markus" })).EnsureSuccessStatusCode();
+
+        static List<JsonElement> Real(JsonElement allocation) =>
+            allocation.GetProperty("participants").EnumerateArray().Where(p => !p.GetProperty("isSample").GetBoolean()).ToList();
+        var all = await junia.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{holiday}/allocation");
+        var own = await markus.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{holiday}/allocation");
+
+        Assert.Equal(["Ben Berger"], Real(own).Select(p => p.GetProperty("name").GetString()));
+        Assert.True(Real(all).Count > 1);
+        Assert.Equal(all.GetProperty("sessionLoad").GetRawText(), own.GetProperty("sessionLoad").GetRawText());
+
+        var clara = Real(all).Single(p => p.GetProperty("name").GetString() == "Clara Czerny").GetProperty("ballotId").GetString();
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await markus.PutAsJsonAsync($"/api/admin/slots/{holiday}/allocation/{clara}", new { seats = Array.Empty<object>() })).StatusCode);
+        var log = await markus.GetFromJsonAsync<JsonElement>($"/api/admin/slots/{holiday}/allocation/log");
+        Assert.DoesNotContain(log.EnumerateArray(), l => l.GetProperty("person").GetString() == "Clara Czerny");
+    }
+}
