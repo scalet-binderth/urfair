@@ -3,8 +3,8 @@ using Urfair.Core;
 namespace Urfair.Api.Data;
 
 /// <summary>
-/// Lifecycle of a FairSlot: draft ? registration (Open) ? allocation, first internal (Allocation), then visible
-/// to participants (Published) ? lists final (Closed) ? read only, deletion period starts (Ended).
+/// Lifecycle of a FairSlot: draft → registration (Open) → allocation, first internal (Allocation), then visible
+/// to participants (Published) → lists final (Closed) → read only, deletion period starts (Ended).
 /// From Allocation on the allocation is frozen. Open ends at the deadline and Ended starts after the last date, both on their own.
 /// </summary>
 public enum Phase { Draft, Open, Allocation, Published, Closed, Ended }

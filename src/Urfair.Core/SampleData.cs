@@ -12,7 +12,7 @@ public static class SampleData
         new("blue", "Blaue Projekte", PerParticipant: 1, MinActivities: 2, Color: "blue"),
     ];
 
-    public static readonly Rules FirmungRules = new(PointBudget: 100, MinActivities: 5, MaxPerActivity: 40, PerParticipant: 3, Groups: Groups);
+    public static readonly Rules ConfirmationRules = new(PointBudget: 100, MinActivities: 5, MaxPerActivity: 40, PerParticipant: 3, Groups: Groups);
 
     /// <summary>Invented split for the demo: social and faith-themed projects form the blue group.</summary>
     private static readonly HashSet<string> BlueProjects = ["gehoerlos", "peace", "brot", "geisterfahrer", "magdaman", "espoto", "altenheim"];
@@ -39,9 +39,9 @@ public static class SampleData
         ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner", "theresa.ebner@example.org"),
     };
 
-    public const string FirmungParish = Parishes.Junia;
-    public const string FirmungOrganiser = "Firmteam Urfahr";
-    public const string FirmungOrganiserEmail = "firmteam@example.org";
+    public const string ConfirmationParish = Parishes.Junia;
+    public const string ConfirmationOrganiser = "Firmteam Urfahr";
+    public const string ConfirmationOrganiserEmail = "firmteam@example.org";
 
     public static IReadOnlyList<Activity> Activities()
     {
@@ -108,7 +108,7 @@ public static class SampleData
             var gender = rnd.NextDouble() < 0.5 ? "w" : "m";
             var names = gender == "w" ? FemaleNames : MaleNames;
             var name = $"{names[rnd.Next(names.Length)]} {"ABDEFGHKLMNPRSTWZ"[rnd.Next(17)]}.";
-            var pool = activities.Where(a => a.RestrictedTo is null || a.RestrictedTo == gender).ToList();
+            var pool = activities.Where(a => a.OpenTo(gender)).ToList();
             var kMin = Math.Max(r.MinActivities, (int)Math.Ceiling(units / (double)maxUnits));
             var k = Math.Min(pool.Count, kMin + rnd.Next(3));
             // Weighted sampling without replacement (Efraimidis–Spirakis)

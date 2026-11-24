@@ -74,12 +74,11 @@ interface SessionForm { id: string | null; start: string; end: string; location:
   styles: `
     .editor { border: 1px solid var(--accent); border-radius: var(--r); padding: 14px; background: var(--surface) }
     .grow { flex: 1 1 260px }
-    select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px }
-    textarea { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; resize: vertical }
+    textarea { resize: vertical }
     .session { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: end; padding-bottom: 10px; border-bottom: 1px dashed var(--line) }
     .session .loc { flex: 1 1 180px }
     .session .cap { width: 130px }
-    .btn.small { padding: 8px 12px }
+    .btn.small { padding: 8px 12px; font-size: inherit }
   `,
 })
 export class ActivityEditor implements OnInit {

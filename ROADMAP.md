@@ -207,10 +207,10 @@ and English; keep both in sync.
 | 3 ✓ | done, see above | |
 | 4 ✓ | done, see above | |
 | 5 ✓ | done, see above | |
-| → | **Pilot with 20–30 confirmands** on a real instance | |
 | 6 ✓ | done, see above | |
 | 7 ✓ | done, see above | |
 | 8 ✓ | done, see above (also for activities, participant list and rules) | |
+| → | **Pilot with 20–30 confirmands** on a real instance (the only open step) | |
 
 In parallel, start early: hosting (diocese server or EU provider), data protection with the data protection
 officer, the real texts of the legal notice and privacy policy (pages and automatic deletion are done).
@@ -262,7 +262,7 @@ original allocation so organisers can see and restore it; a log records every ch
 - **More than required:** done in step 7 (participants offer "up to N" more, the organisers set the maximum; extra
   seats only after the basic round).
 - **Interim status:** invites tactics; decided: off while registering, shown during allocation (see "Process model").
-- **Cancellations and moving up:** decided, see "Process model"; e-mails come in step 6.
+- **Cancellations and moving up:** done (see "Process model"), with e-mails since step 6.
 - **Required staffing:** done in step 7 as "every date with a seat count is a post to fill"; missing people are
   shown while voting. A separate minimum below the seat count per date can follow if a real vote needs it.
 - **Together with friends (decided 22 November 2026, done):** switchable per vote (off / pairs / groups up to 5).
@@ -282,8 +282,7 @@ original allocation so organisers can see and restore it; a log records every ch
   | Junia shared | everything | import and edit, only rows of their own Pfarrgemeinde |
   | Junia, read only | everything | only rows of their own Pfarrgemeinde (decided 24 November 2026); activities and rules not |
 
-  Rows for another Pfarrgemeinde are rejected with their row number. Step 2 builds the import with the Pfarrgemeinde
-  column but without permission checks; step 3 adds them without changing the import.
+  Rows for another Pfarrgemeinde are rejected with their row number. The import was built in step 2, the permission checks in step 3.
 
 ## Open questions
 

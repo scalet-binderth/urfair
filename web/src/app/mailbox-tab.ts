@@ -86,9 +86,6 @@ import { Toast } from './toast';
   styles: `
     .between { justify-content: space-between; align-items: start }
     pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0 0; overflow-wrap: anywhere }
-    .btn.small { padding: 6px 12px; font-size: 14px }
-    .bad { color: var(--accent) }
-    .good { color: var(--good) }
   `,
 })
 export class MailboxTab implements OnInit {
@@ -154,6 +151,7 @@ export class MailboxTab implements OnInit {
 
   protected async retry(m: Mail): Promise<void> {
     this.busy.set(true);
+    this.errors.set([]);
     try {
       await this.api.retryMail(this.slotId(), m.id);
       this.toast.show(this.i18n.t('mail.retried'));
@@ -185,11 +183,8 @@ export class MailboxTab implements OnInit {
     return match ? match[0] : null;
   }
 
-  protected async copy(m: Mail): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(`${m.subject}\n\n${m.body}`);
-      this.toast.show(this.i18n.t('mail.copied'));
-    } catch { /* clipboard blocked */ }
+  protected copy(m: Mail): Promise<void> {
+    return this.toast.copy(`${m.subject}\n\n${m.body}`, this.i18n.t('mail.copied'));
   }
 }
 

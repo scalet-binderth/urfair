@@ -62,7 +62,7 @@ import { Toast } from './toast';
                   </td>
                   <td class="num nowrap">
                     @if (confirmDelete() === a.id) {
-                      <button class="btn danger small" type="button" (click)="remove(a.id)">{{ i18n.t('common.delete') }}</button>
+                      <button class="btn danger small" type="button" [disabled]="busy()" (click)="remove(a.id)">{{ i18n.t('common.delete') }}</button>
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
                       <button class="btn ghost small" type="button" (click)="edit(a)">{{ i18n.t('common.edit') }}</button>
@@ -106,16 +106,12 @@ import { Toast } from './toast';
   styles: `
     .grow { flex: 1 1 240px }
     .parishes { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 12px; display: grid; gap: 4px; margin: 0 }
-    .btn.small { padding: 6px 12px; font-size: 14px }
-    .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
     .nowrap { white-space: nowrap }
-    .warn { color: var(--warn); font-weight: 500 }
+    .warn { font-weight: 500 }
     tr.asks td { background: color-mix(in srgb, var(--warn) 8%, transparent) }
     .mail { border-top: 1px solid var(--line); padding-top: 8px }
     .mail summary { cursor: pointer }
     .mail pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; overflow-wrap: anywhere }
-    .bad { color: var(--accent) }
-    .good { color: var(--good) }
   `,
 })
 export class AccountsPage implements OnInit {
@@ -189,11 +185,8 @@ export class AccountsPage implements OnInit {
     });
   }
 
-  protected async copyMail(m: Mail): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(`${m.subject}\n\n${m.body}`);
-      this.toast.show(this.i18n.t('mail.copied'));
-    } catch { /* clipboard blocked */ }
+  protected copyMail(m: Mail): Promise<void> {
+    return this.toast.copy(`${m.subject}\n\n${m.body}`, this.i18n.t('mail.copied'));
   }
 
   /** The link went into a mail: the app sends it, otherwise it is copied so the admin can pass it on. */
@@ -211,14 +204,8 @@ export class AccountsPage implements OnInit {
   }
 
   /** Copies the one-time link to set the password; the organiser passes it on personally. */
-  protected async copy(token: string): Promise<void> {
-    const link = `${location.origin}/account/${token}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      this.toast.show(this.i18n.t('accounts.linkCopied'));
-    } catch {
-      this.toast.show(link);
-    }
+  protected copy(token: string): Promise<void> {
+    return this.toast.copy(`${location.origin}/account/${token}`, this.i18n.t('accounts.linkCopied'));
   }
 
   private async run(action: () => Promise<void>): Promise<void> {

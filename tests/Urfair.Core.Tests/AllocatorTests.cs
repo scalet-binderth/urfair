@@ -171,7 +171,7 @@ public class AllocatorTests
     [InlineData(4711)]
     public void Groups_give_everyone_two_green_and_one_blue(int seed)
     {
-        var rules = SampleData.FirmungRules;
+        var rules = SampleData.ConfirmationRules;
         Assert.Empty(Validation.Check(rules));
         var ballots = SampleData.Participants(160, rules, Activities, seed);
         Assert.All(ballots, b => Assert.Empty(Validation.Check(b, rules, Activities)));
@@ -188,12 +188,12 @@ public class AllocatorTests
     [Fact]
     public void Group_rules_and_ballots_are_checked()
     {
-        var wrongSum = SampleData.FirmungRules with { PerParticipant = 4, MinActivities = 5 };
+        var wrongSum = SampleData.ConfirmationRules with { PerParticipant = 4, MinActivities = 5 };
         Assert.Contains("groupQuotaSum", Validation.Check(wrongSum).Select(e => e.Code));
         // Only green projects: the blue minimum is missing.
         var b = new Ballot("x", "Test", new Dictionary<string, int> { ["kino"] = 40, ["nacht"] = 30, ["hochseil"] = 10, ["radl"] = 10, ["misterx"] = 10 }, new HashSet<string>());
-        Assert.Contains("tooFewInGroup", Validation.Check(b, SampleData.FirmungRules, Activities).Select(e => e.Code));
-        Assert.Equal(SampleData.FirmungRules, SampleData.FirmungRules with { Groups = SampleData.Groups.ToList() });
+        Assert.Contains("tooFewInGroup", Validation.Check(b, SampleData.ConfirmationRules, Activities).Select(e => e.Code));
+        Assert.Equal(SampleData.ConfirmationRules, SampleData.ConfirmationRules with { Groups = SampleData.Groups.ToList() });
     }
 
     [Fact]

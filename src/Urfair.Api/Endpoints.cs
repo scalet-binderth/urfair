@@ -13,7 +13,7 @@ public record SlotSummaryDto(Guid Id, string Name, Phase Phase, DateTime? Regist
 /// <summary>A mail as the participant would receive it (demo mailbox).</summary>
 public record MyMailDto(string Subject, string Body, DateTime CreatedAt);
 /// <param name="Excluded">Only for organisers: names a vote open to everyone leaves out.</param>
-public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool AdminProtected, bool OpenToAll, string? Parish, string? Organiser,
+public record SlotDto(Guid Id, string Name, Phase Phase, DateTime? RegistrationDeadline, Rules Rules, int BallotCount, int SampleCount, bool OpenToAll, string? Parish, string? Organiser,
     Visibility Visibility, bool ShowInterim = false, bool? CanEdit = null, string? OrganiserEmail = null, DateOnly? DeleteOn = null, IReadOnlyList<string>? Excluded = null,
     bool AutoFill = true);
 /// <param name="Extra">"More than required": up to this many seats more (at most the vote's maximum).</param>
@@ -47,11 +47,11 @@ public static class Endpoints
     {
         var api = app.MapGroup("/api");
 
-        // Tells the start page whether the organisation area needs an access key.
+        // Tells the start page about the instance: demo mode, mail sending, Pfarrgemeinden, version.
         api.MapGet("/info", (IConfiguration cfg, HttpRequest http) =>
         {
             Mailing.BaseUrl(http); // remembered for links in mails made without a request
-            return new { adminProtected = !string.IsNullOrEmpty(cfg["Admin:Key"]), demo = Database.IsDemo(cfg), mailSending = Mailing.Enabled, parishes = Parishes.All,
+            return new { demo = Database.IsDemo(cfg), mailSending = Mailing.Enabled, parishes = Parishes.All,
                 version = Operations.Version };
         });
         api.MapOperations();
@@ -69,7 +69,7 @@ public static class Endpoints
         {
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } who) return Results.Unauthorized();
             var name = who.ToLower();
-            var ballot = await db.Ballots.Include(b => b.Points).AsNoTracking()
+            var ballot = await db.Ballots.AsNoTracking()
                 .Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name)
                 .OrderByDescending(b => b.SubmittedAt).FirstOrDefaultAsync();
             return ballot is null
@@ -121,13 +121,12 @@ public static class Endpoints
             if (!Database.IsDemo(cfg)) return Results.NotFound();
             if (await ParticipantEndpoints.ResolveNameAsync(http, req.Name) is not { } name) return Results.Unauthorized();
             if (!await Database.CanTakePartAsync(db, id, name)) return Results.NotFound();
-            var email = await db.Participants.Where(p => p.FairSlotId == id && p.Name.ToLower() == name.ToLower() && p.Email != null)
-                .Select(p => p.Email).FirstOrDefaultAsync();
+            var email = (await Database.ListedAsync(db, id, name))?.Email;
             if (email is null) return Results.Ok(Array.Empty<MyMailDto>());
             return Results.Ok((await db.Mails.AsNoTracking().Where(m => m.FairSlotId == id).ToListAsync())
                 .Where(m => m.To.Equals(email, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new MyMailDto(m.Subject, m.Body, DateTime.SpecifyKind(m.CreatedAt, DateTimeKind.Utc))));
+                .Select(m => new MyMailDto(m.Subject, m.Body, Database.Utc(m.CreatedAt))));
         });
 
         // What the person would get if registration closed now (only if the organisers show it), later the published allocation.
@@ -291,7 +290,7 @@ public static class Endpoints
             var errors = Validation.Check(new Ballot("new", name, points, unavailable, Extra: req.Extra, Friends: friends), rules, activities);
             if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
             if (friends is not null && await db.Ballots.CountAsync(b => b.FairSlotId == id && !b.IsSample && b.Friends == friends && b.Name.ToLower() != name.ToLower()) >= rules.Friends)
-                return Results.BadRequest(new ErrorsDto([new ValidationError("friendsFull", new Dictionary<string, object> { ["max"] = rules.Friends })]));
+                return Errors("friendsFull", "max", rules.Friends);
 
             // A new ballot of the same person replaces the previous one.
             var existing = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample && b.Name.ToLower() == name.ToLower()).ToListAsync();
@@ -318,7 +317,7 @@ public static class Endpoints
         var s = await db.FairSlots.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (s is null) return null;
         var ballots = await db.Ballots.CountAsync(b => b.FairSlotId == id);
-        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, !string.IsNullOrEmpty(cfg["Admin:Key"]), s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim,
+        return new SlotDto(s.Id, s.Name, s.Phase, s.RegistrationDeadline, s.ToRules(), ballots, s.SampleCount, s.OpenToAll, s.Parish, s.Organiser, s.Visibility, s.ShowInterim,
             DeleteOn: Retention.DeleteOn(s.EndedAt, Retention.Days(cfg)), AutoFill: s.AutoFill);
     }
 
@@ -438,4 +437,8 @@ public static class Endpoints
     private static bool ShowsStatus(FairSlotEntity slot) => slot.Phase == Phase.Open && slot.ShowInterim || Phases.ShowsResult(slot.Phase);
 
     public static IResult Errors(string code) => Results.BadRequest(new ErrorsDto([new ValidationError(code)]));
+
+    /// <summary>One error with one parameter, e.g. ("textTooLong", "max", 120).</summary>
+    public static IResult Errors(string code, string key, object value) =>
+        Results.BadRequest(new ErrorsDto([new ValidationError(code, new Dictionary<string, object> { [key] = value })]));
 }

@@ -38,7 +38,6 @@ import { SessionService } from './session';
       <p class="muted">{{ i18n.t('common.loading') }}</p>
     }
   `,
-  styles: `.narrow { max-width: 520px }`,
 })
 export class LinkPage implements OnInit {
   /** Bound from the route parameter :token. */

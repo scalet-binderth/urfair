@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, LeaderLists, ListActivity } from './api';
+import { saveBlob, toCsv } from './csv';
 import { I18n } from './i18n';
 import { LeaderChanges } from './leader-changes';
 import { Toast } from './toast';
@@ -95,8 +96,6 @@ interface LeaderGroup { leader: string | null; email: string | null; activities:
     </div>
   `,
   styles: `
-    select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px; max-width: 100% }
-    .warn { color: var(--warn) }
     .group { display: grid; gap: 12px }
     .group-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 8px }
     .group-head h2 { margin: 0 }
@@ -204,12 +203,7 @@ export class ListsTab implements OnInit {
             if (this.withEmail()) row.push(p.email ?? '');
             rows.push(row);
           }
-    const csv = rows.map(r => r.map(cell).join(';')).join('\r\n');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
-    link.download = `${this.fileName()}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    saveBlob(new Blob([toCsv(rows, true)], { type: 'text/csv;charset=utf-8' }), `${this.fileName()}.csv`);
   }
 
   private fileName(): string {
@@ -217,10 +211,4 @@ export class ListsTab implements OnInit {
       : this.leader() ? this.leader()! : this.slotName();
     return (this.i18n.t('admin.tab.lists') + ' ' + one).replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').toLowerCase();
   }
-}
-
-/** A CSV cell for Excel: quoted when needed; text that Excel would run as a formula is prefixed with an apostrophe. */
-function cell(v: string): string {
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-  return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }

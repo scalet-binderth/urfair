@@ -40,26 +40,7 @@ public sealed class Allocator
 
         for (var round = 1; round <= perParticipant; round++)
         {
-            var pending = ballots.Where(b => a._assignments[b.Id].Count < round).ToList();
-            var withoutBid = new List<Ballot>();
-            while (pending.Count > 0)
-            {
-                var bids = new List<(Ballot Ballot, Activity Activity, int Points)>();
-                foreach (var b in pending)
-                {
-                    var act = ranking[b.Id].FirstOrDefault(x => a.Available(b, x).Any());
-                    if (act is null) withoutBid.Add(b);
-                    else bids.Add((b, act, b.PointsFor(act.Id)));
-                }
-                var next = new List<Ballot>();
-                foreach (var bid in bids.OrderByDescending(x => x.Points).ThenBy(x => lottery[x.Ballot.Id]))
-                {
-                    var s = a.Available(bid.Ballot, bid.Activity).OrderByDescending(a.Free).ThenBy(x => x.Start).FirstOrDefault();
-                    if (s is null) next.Add(bid.Ballot);
-                    else a.Assign(bid.Ballot, s);
-                }
-                pending = next;
-            }
+            var withoutBid = a.Bid(ballots.Where(b => a._assignments[b.Id].Count < round).ToList(), ranking, lottery, extra: false);
             foreach (var b in withoutBid.OrderBy(b => lottery[b.Id])) a.AssignFallback(b);
         }
         a.ImproveBySwapping();
@@ -146,19 +127,7 @@ public sealed class Allocator
         var moves = new List<MoveUp>();
         for (var step = 0; step < 100_000; step++)
         {
-            (Ballot Ballot, Session Session, Assignment? GiveUp, bool Need, int Points)? best = null;
-            foreach (var s in sessions.Where(s => Free(s) > 0))
-            foreach (var b in _ballots)
-            {
-                var (possible, giveUp) = Exchange(b, s, perParticipant);
-                if (!possible) continue;
-                var need = giveUp is null && b.WantsReplacement(GroupKey(s.ActivityId));
-                if (!need && !b.Ticked(s.ActivityId)) continue;
-                var points = b.PointsFor(s.ActivityId);
-                if (best is { } x && (x.Need, x.Points, -lottery[x.Ballot.Id]).CompareTo((need, points, -lottery[b.Id])) >= 0) continue;
-                best = (b, s, giveUp, need, points);
-            }
-            if (best is not { } m) break;
+            if (Next(sessions.Where(s => Free(s) > 0), _ballots, perParticipant, lottery) is not { } m) break;
             if (m.GiveUp is { } old)
             {
                 _assignments[m.Ballot.Id].Remove(old);
@@ -174,11 +143,17 @@ public sealed class Allocator
     /// Who is next for a free seat in this session, in the order of <see cref="FillFreeSeats"/> (need before tick, more
     /// points, then the lottery), leaving out <paramref name="skip"/>. Null if nobody fits.
     /// </summary>
-    public MoveUp? NextFor(Session s, int perParticipant, int seed, Func<Ballot, bool> skip)
+    public MoveUp? NextFor(Session s, int perParticipant, int seed, Func<Ballot, bool> skip) =>
+        Next([s], _ballots.Where(b => !skip(b)), perParticipant, Lottery(seed)) is { } m
+            ? new MoveUp(m.Ballot.Id, s, m.GiveUp?.Session, m.Need) : null;
+
+    /// <summary>The best move into one of the sessions: need before tick, more points, then the lottery.</summary>
+    private (Ballot Ballot, Session Session, Assignment? GiveUp, bool Need)? Next(
+        IEnumerable<Session> sessions, IEnumerable<Ballot> ballots, int perParticipant, Dictionary<string, double> lottery)
     {
-        var lottery = Lottery(seed);
-        (Ballot Ballot, Assignment? GiveUp, bool Need, int Points)? best = null;
-        foreach (var b in _ballots.Where(b => !skip(b)))
+        (Ballot Ballot, Session Session, Assignment? GiveUp, bool Need, int Points)? best = null;
+        foreach (var s in sessions)
+        foreach (var b in ballots)
         {
             var (possible, giveUp) = Exchange(b, s, perParticipant);
             if (!possible) continue;
@@ -186,9 +161,9 @@ public sealed class Allocator
             if (!need && !b.Ticked(s.ActivityId)) continue;
             var points = b.PointsFor(s.ActivityId);
             if (best is { } x && (x.Need, x.Points, -lottery[x.Ballot.Id]).CompareTo((need, points, -lottery[b.Id])) >= 0) continue;
-            best = (b, giveUp, need, points);
+            best = (b, s, giveUp, need, points);
         }
-        return best is { } m ? new MoveUp(m.Ballot.Id, s, m.GiveUp?.Session, m.Need) : null;
+        return best is { } m ? (m.Ballot, m.Session, m.GiveUp, m.Need) : null;
     }
 
     /// <summary>Whether the person could move into this session (ignoring free seats), and which seat of theirs would go for it.</summary>
@@ -230,7 +205,7 @@ public sealed class Allocator
 
     /// <summary>Free sessions a person missing a seat in that group may take (also without points), not given back, no clash.</summary>
     public IEnumerable<Session> OpenSeats(Ballot b, int perParticipant) =>
-        _activities.Where(a => a.RestrictedTo is null || b.Gender is null || a.RestrictedTo == b.Gender)
+        _activities.Where(a => a.OpenTo(b.Gender))
             .SelectMany(a => a.Sessions)
             .Where(s => Free(s) > 0 && SameGroup(b, s.ActivityId).Count < Quota(s.ActivityId, perParticipant) && Fits(b, s));
 
@@ -351,7 +326,7 @@ public sealed class Allocator
     private bool AssignFallback(Ballot b)
     {
         var s = _activities
-            .Where(x => x.RestrictedTo is null || b.Gender is null || x.RestrictedTo == b.Gender)
+            .Where(x => x.OpenTo(b.Gender))
             .SelectMany(x => Available(b, x))
             .OrderBy(Utilisation).ThenBy(x => x.Start)
             .FirstOrDefault();
@@ -369,23 +344,35 @@ public sealed class Allocator
     {
         var rounds = _ballots.Select(b => b.Extra).DefaultIfEmpty(0).Max();
         for (var round = 1; round <= rounds; round++)
+            Bid(_ballots.Where(b => b.Extra >= round && _assignments[b.Id].Count - perParticipant == round - 1).ToList(), ranking, lottery, extra: true);
+    }
+
+    /// <summary>
+    /// One seat for each pending person: everyone bids on their best activity with a free date, more points first, ties
+    /// by lottery; whoever lost to a full date bids again. Returns the people left without any possible bid.
+    /// </summary>
+    private List<Ballot> Bid(List<Ballot> pending, Dictionary<string, List<Activity>> ranking, Dictionary<string, double> lottery, bool extra)
+    {
+        var withoutBid = new List<Ballot>();
+        while (pending.Count > 0)
         {
-            var pending = _ballots.Where(b => b.Extra >= round && _assignments[b.Id].Count - perParticipant == round - 1).ToList();
-            while (pending.Count > 0)
+            var bids = new List<(Ballot Ballot, Activity Activity, int Points)>();
+            foreach (var b in pending)
             {
-                var bids = new List<(Ballot Ballot, Activity Activity, int Points)>();
-                foreach (var b in pending)
-                    if (ranking[b.Id].FirstOrDefault(x => Available(b, x, extra: true).Any()) is { } act) bids.Add((b, act, b.PointsFor(act.Id)));
-                var next = new List<Ballot>();
-                foreach (var bid in bids.OrderByDescending(x => x.Points).ThenBy(x => lottery[x.Ballot.Id]))
-                {
-                    var s = Available(bid.Ballot, bid.Activity, extra: true).OrderByDescending(Free).ThenBy(x => x.Start).FirstOrDefault();
-                    if (s is null) next.Add(bid.Ballot);
-                    else Assign(bid.Ballot, s);
-                }
-                pending = next;
+                var act = ranking[b.Id].FirstOrDefault(x => Available(b, x, extra: extra).Any());
+                if (act is null) withoutBid.Add(b);
+                else bids.Add((b, act, b.PointsFor(act.Id)));
             }
+            var next = new List<Ballot>();
+            foreach (var bid in bids.OrderByDescending(x => x.Points).ThenBy(x => lottery[x.Ballot.Id]))
+            {
+                var s = Available(bid.Ballot, bid.Activity, extra: extra).OrderByDescending(Free).ThenBy(x => x.Start).FirstOrDefault();
+                if (s is null) next.Add(bid.Ballot);
+                else Assign(bid.Ballot, s);
+            }
+            pending = next;
         }
+        return withoutBid;
     }
 
     /// <summary>Applies improvements that leave nobody worse off.</summary>

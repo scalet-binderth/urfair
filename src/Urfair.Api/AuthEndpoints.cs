@@ -8,7 +8,7 @@ using Urfair.Core;
 
 namespace Urfair.Api;
 
-public record AccountDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes, bool IsDemo);
+public record AccountDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes);
 public record AccountListDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes, bool HasPassword, string? SetupToken,
     DateTime? ResetRequestedAt = null);
 public record LoginRequest(string? Email, string? Password);
@@ -187,13 +187,13 @@ public static class AuthEndpoints
         admin.MapGet("/accounts", async (AppDbContext db) =>
             (await db.Accounts.AsNoTracking().Where(a => !a.IsDemo).OrderBy(a => a.Name).ToListAsync())
                 .Select(a => new AccountListDto(a.Id, a.Email, a.Name, a.IsJuniaAdmin, a.Parishes, a.PasswordHash is not null,
-                    a.SetupTokenExpires > DateTime.UtcNow ? a.SetupToken : null, a.ResetRequestedAt is { } r ? Utc(r) : null)));
+                    a.SetupTokenExpires > DateTime.UtcNow ? a.SetupToken : null, a.ResetRequestedAt is { } r ? Database.Utc(r) : null)));
 
         // The account mails (access links, password requests), newest first: whether they went out, or to copy them by hand.
         admin.MapGet("/accounts/mails", async (AppDbContext db) =>
             (await db.Mails.AsNoTracking().Where(m => m.FairSlotId == null).ToListAsync())
                 .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Utc(sent) : null, m.Error, m.ReplyTo)));
+                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Database.Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Database.Utc(sent) : null, m.Error, m.ReplyTo)));
 
         admin.MapPost("/accounts/mails/{mailId:guid}/retry", async (Guid mailId, AppDbContext db) =>
         {
@@ -278,7 +278,6 @@ public static class AuthEndpoints
             }, by.Email);
     }
 
-    private static DateTime Utc(DateTime t) => DateTime.SpecifyKind(t, DateTimeKind.Utc);
 
     /// <summary>Creates the demo accounts if missing (demo mode).</summary>
     public static async Task SeedDemoAccountsAsync(AppDbContext db)
@@ -289,7 +288,7 @@ public static class AuthEndpoints
         await db.SaveChangesAsync();
     }
 
-    public static AccountDto ToDto(AccountEntity a) => new(a.Id, a.Email, a.Name, a.IsJuniaAdmin, a.Parishes, a.IsDemo);
+    public static AccountDto ToDto(AccountEntity a) => new(a.Id, a.Email, a.Name, a.IsJuniaAdmin, a.Parishes);
 
     private static Task SignInAsync(HttpContext http, AccountEntity a) =>
         http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(new ClaimsIdentity(
@@ -310,8 +309,8 @@ public static class AuthEndpoints
         email = (emailText ?? "").Trim().ToLowerInvariant();
         name = (nameText ?? "").Trim();
         if (name.Length == 0) return Endpoints.Errors("nameRequired");
-        if (name.Length > Validation.MaxShortText) return Endpoints.Errors("textTooLong");
-        return ParticipantCsv.IsEmail(email) ? null : Endpoints.Errors("emailInvalid");
+        if (name.Length > Validation.MaxShortText) return Endpoints.Errors("textTooLong", "max", Validation.MaxShortText);
+        return Validation.IsEmail(email) ? null : Endpoints.Errors("emailInvalid");
     }
 
     private static IResult? CheckParishes(AccountRequest req, out List<string> parishes)
@@ -320,7 +319,7 @@ public static class AuthEndpoints
         foreach (var p in req.Parishes ?? [])
         {
             if (Parishes.Match(p) is not { } official)
-                return Results.BadRequest(new ErrorsDto([new("parishUnknown", new Dictionary<string, object> { ["value"] = p })]));
+                return Endpoints.Errors("parishUnknown", "value", p);
             if (!parishes.Contains(official)) parishes.Add(official);
         }
         return req.IsJuniaAdmin || parishes.Count > 0 ? null : Endpoints.Errors("parishRequired");
@@ -329,5 +328,5 @@ public static class AuthEndpoints
     private static IResult? CheckPassword(string? password) =>
         (password ?? "").Length >= Passwords.MinLength
             ? null
-            : Results.BadRequest(new ErrorsDto([new("passwordTooShort", new Dictionary<string, object> { ["min"] = Passwords.MinLength })]));
+            : Endpoints.Errors("passwordTooShort", "min", Passwords.MinLength);
 }

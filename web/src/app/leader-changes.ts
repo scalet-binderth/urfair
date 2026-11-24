@@ -43,7 +43,6 @@ import { Toast } from './toast';
     .leader ul { margin: 0; padding-left: 18px; display: grid; gap: 2px }
     .add { color: var(--good) }
     .rem { color: var(--warn) }
-    .btn.small { padding: 6px 12px; font-size: 14px }
   `,
 })
 export class LeaderChanges implements OnInit {

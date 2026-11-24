@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output, signal, viewChild, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, OfferPreview, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
+import { toCsv } from './csv';
 import { I18n } from './i18n';
 import { LeaderChanges } from './leader-changes';
 import { Toast } from './toast';
@@ -347,15 +348,6 @@ interface Card {
       margin: 0;
       max-width: 75ch;
     }
-    .btn.small {
-      padding: 6px 12px;
-      font-size: 14px;
-    }
-    .btn.danger {
-      background: var(--warn);
-      border-color: var(--warn);
-      color: var(--surface);
-    }
     .slot.over b {
       color: var(--warn);
     }
@@ -441,13 +433,6 @@ interface Card {
       padding: 8px 10px;
       border-radius: 8px;
       background: var(--warn-soft);
-    }
-    .sr {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0 0 0 0);
     }
     .lead {
       margin-bottom: 16px;
@@ -566,9 +551,6 @@ interface Card {
     }
     .chip.fb b {
       color: var(--warn);
-    }
-    tr.me {
-      background: var(--accent-soft);
     }
     .sat {
       display: flex;
@@ -800,11 +782,10 @@ export class ResultsPage implements OnInit {
     try {
       await this.api.fillSeat(this.slotId(), sessionId);
       this.toast.show(this.i18n.t('results.fillStarted'));
-      await this.loadLog();
     } catch (e) {
       this.error.set(this.i18n.errors(e).join(' '));
-      await this.loadLog();
     } finally {
+      await this.loadLog();
       this.busy.set(false);
     }
   }
@@ -944,17 +925,17 @@ export class ResultsPage implements OnInit {
   }
 
   protected async copy(): Promise<void> {
-    const rows = ['Name;Activity;Date;Location;Points;Fallback'];
+    const t = (k: string) => this.i18n.t(k);
+    const rows: (string | number)[][] = [
+      [t('results.col.name'), t('lists.activity'), t('lists.date'), t('lists.location'), t('results.csv.points'), t('results.csv.fallback')],
+    ];
     for (const p of this.data()?.participants ?? []) {
       for (const x of p.assignments) {
-        rows.push(
-          [p.name, x.title, this.i18n.when(x), x.location, x.points, x.isFallback ? 'yes' : 'no']
-            .map((v) => String(v).replace(/;/g, ','))
-            .join(';'),
-        );
+        rows.push([p.name, x.title, this.i18n.when(x), x.location, x.points, t(x.isFallback ? 'common.yes' : 'common.no')]);
       }
     }
-    const text = rows.join('\n');
+    const text = toCsv(rows);
+    // A blocked clipboard shows the text in a field to copy by hand (too long for a toast).
     try {
       await navigator.clipboard.writeText(text);
       this.toast.show(this.i18n.t('results.copied'));

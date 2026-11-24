@@ -3,13 +3,13 @@ namespace Urfair.Core;
 /// <summary>Additional invented FairSlots and demo people for presentations.</summary>
 public static class DemoData
 {
-    public sealed record Person(string Key, string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
+    public sealed record Person(string Name, string Email, DateOnly BirthDate, string Parish, DateOnly? BaptismDate = null);
 
     /// <summary>A: no FairSlot, B: two in registration, one published and one closed, C and D: the same.</summary>
-    public static readonly Person A = new("A", "Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
-    public static readonly Person B = new("B", "Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
-    public static readonly Person C = new("C", "Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
-    public static readonly Person D = new("D", "David Doppler", "david.doppler@example.org", new(2012, 1, 9), "Pfarrgemeinde Urfahr-Christkönig");
+    public static readonly Person A = new("Anna Ammer", "anna.ammer@example.org", new(2012, 3, 14), "Pfarrgemeinde Urfahr-St. Josef");
+    public static readonly Person B = new("Ben Berger", "ben.berger@example.org", new(2012, 7, 2), "Pfarrgemeinde Urfahr-St. Markus", new(2012, 9, 16));
+    public static readonly Person C = new("Clara Czerny", "clara.czerny@example.org", new(2011, 11, 23), "Pfarrgemeinde Urfahr-Hl. Geist", new(2012, 4, 8));
+    public static readonly Person D = new("David Doppler", "david.doppler@example.org", new(2012, 1, 9), "Pfarrgemeinde Urfahr-Christkönig");
     public static readonly IReadOnlyList<Person> People = [A, B, C, D];
 
     /// <summary>Demo person A stays without any vote, even for votes open to all (shows the "nothing assigned" case).</summary>
@@ -133,11 +133,5 @@ public static class DemoData
         }).ToList();
 
     private static List<Activity> Build(string prefix, params (string Title, int Popularity, (string Start, string End, string Location, int Capacity) Session)[] items) =>
-        items.Select((x, i) =>
-        {
-            var id = $"{prefix}{i}";
-            return new Activity(id, x.Title,
-                [new Session($"{id}#0", id, DateTime.Parse(x.Session.Start), DateTime.Parse(x.Session.End), x.Session.Location, x.Session.Capacity)],
-                null, x.Popularity);
-        }).ToList();
+        BuildMulti(prefix, items.Select(x => (x.Title, x.Popularity, new[] { x.Session })).ToArray());
 }

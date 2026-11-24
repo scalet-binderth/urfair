@@ -96,23 +96,9 @@ import { Toast } from './toast';
       font-weight: 500;
       font-size: 14px;
     }
-    .steps .n {
-      display: inline-grid;
-      place-items: center;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      font-size: 12px;
-    }
     .steps a.on {
       background: var(--accent-soft);
       color: var(--ink);
-    }
-    .steps a.on .n {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--accent-ink);
     }
     .lang {
       margin-left: 6px;
