@@ -20,9 +20,11 @@ system assigns the seats:
 
 | Path | Content |
 |---|---|
-| `src/Urfair.Core` | Allocation algorithm, validation, sample data (no dependencies) |
+| `src/Urfair.Core` | Allocation algorithm, validation, CSV import/export, sample data (no dependencies) |
 | `src/Urfair.Api` | ASP.NET Core minimal API + EF Core; also serves the built web app |
-| `tests/Urfair.Core.Tests` | xUnit tests for the allocation rules |
+| `tests/Urfair.Core.Tests` | xUnit tests for the allocation rules, CSV import and validation |
+| `tests/Urfair.Api.Tests` | xUnit tests of the API (temporary SQLite file): permissions, workflows, mails |
+| `samples` | Example CSV lists for the import (activities, participants) |
 | `web` | Angular app (German/English): start page, voting, organisation area |
 | `index.html` | Redirect from the former GitHub Pages demo to the hosted app (the first prototype is in the git history) |
 
@@ -170,11 +172,12 @@ Tests: `dotnet test Urfair.slnx`
 | Setting | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL URL (`postgres://user:pass@host/db`). If set, PostgreSQL is used instead of SQLite. |
+| `Database__Provider` | `Sqlite` or `Postgres` to force a provider (default: Postgres if a URL is set). |
 | `ConnectionStrings__Default` | Alternative connection string (SQLite by default). |
 | `Admin__Key` | Real instance only: creates the very first Junia admin account (start page, while no account exists); afterwards only for the emergency access ("Notfall-Zugang": new one-time link for an existing Junia admin). Keep it secret. |
 | `Demo__Enabled` | `true` (default): demo people, sample data and reset buttons. Set `false` for a real instance. |
-| `App__BaseUrl` | Public address used in links in e-mails (e.g. `https://urfair-prod.onrender.com`). Default: the request host (remembered for mails made in the background). Recommended on a real instance. |
-| `Mail__Host` | SMTP server. If set (and `Demo__Enabled=false`), the app sends its e-mails itself; in demo mode they always stay in the demo mailbox. |
+| `App__BaseUrl` | Public address used in links in e-mails (e.g. `https://urfair-prod.onrender.com`). Default: the request host (remembered for mails made in the background). Required for sending e-mails (`Mail__Host`). |
+| `Mail__Host` | SMTP server. If set (with `App__BaseUrl` and `Demo__Enabled=false`), the app sends its e-mails itself; in demo mode they always stay in the demo mailbox. |
 | `Mail__Port` | SMTP port, default `587` (STARTTLS). Implicit TLS on port 465 is not supported. |
 | `Mail__User`, `Mail__Password` | SMTP login (optional). Keep the password secret. |
 | `Mail__From`, `Mail__FromName` | Sender address (default `Mail__User`) and name (default `Urfair`). |

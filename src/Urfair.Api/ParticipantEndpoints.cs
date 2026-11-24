@@ -188,7 +188,7 @@ public static class ParticipantEndpoints
                 .Where(p => access.InScope(p.Parish) && !voted.Contains(p.Name.ToLowerInvariant())).ToList();
             foreach (var p in due)
             {
-                Mailing.Add(db, slot, Reminder(slot, p, baseUrl));
+                Reminder(db, slot, p, baseUrl);
                 p.InvitedAt ??= DateTime.UtcNow;
             }
             await db.SaveChangesAsync();
@@ -218,7 +218,7 @@ public static class ParticipantEndpoints
             return (await db.Mails.Where(m => m.FairSlotId == id).ToListAsync())
                 .Where(inScope)
                 .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Utc(sent) : null, m.Error, m.ReplyTo,
+                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Database.Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Database.Utc(sent) : null, m.Error, m.ReplyTo,
                     From(m)));
         });
 
@@ -257,7 +257,6 @@ public static class ParticipantEndpoints
     }
 
     /// <summary>Mail times are stored in UTC; the database returns them without a kind, so the browser would read them as local time.</summary>
-    private static DateTime Utc(DateTime t) => DateTime.SpecifyKind(t, DateTimeKind.Utc);
 
     /// <summary>Accounts limited to Pfarrgemeinden see only mails to their participants (not those to leaders).</summary>
     private static async Task<Func<MailEntity, bool>> InScopeAsync(AppDbContext db, Guid slotId, SlotAccess access)
@@ -334,14 +333,14 @@ public static class ParticipantEndpoints
     private static IResult? Check(ParticipantRequest req, out ParticipantCsv.Person person)
     {
         var name = (req.Name ?? "").Trim();
-        var email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email.Trim();
+        var email = Validation.Clean(req.Email);
         var parish = string.IsNullOrWhiteSpace(req.Parish) ? null : Parishes.Match(req.Parish);
         person = new(name, email, req.BirthDate, parish, req.BaptismDate);
         if (name.Length == 0) return Endpoints.Errors("nameRequired");
-        if (name.Length > Validation.MaxShortText) return Results.BadRequest(new ErrorsDto([new("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText })]));
-        if (email is not null && !ParticipantCsv.IsEmail(email)) return Endpoints.Errors("emailInvalid");
+        if (name.Length > Validation.MaxShortText) return Endpoints.Errors("textTooLong", "max", Validation.MaxShortText);
+        if (email is not null && !Validation.IsEmail(email)) return Endpoints.Errors("emailInvalid");
         if (!string.IsNullOrWhiteSpace(req.Parish) && parish is null)
-            return Results.BadRequest(new ErrorsDto([new("parishUnknown", new Dictionary<string, object> { ["value"] = req.Parish.Trim() })]));
+            return Endpoints.Errors("parishUnknown", "value", req.Parish.Trim());
         return null;
     }
 
@@ -352,7 +351,7 @@ public static class ParticipantEndpoints
             .Where(p => access.InScope(p.Parish)).ToList();
         foreach (var p in due)
         {
-            Mailing.Add(db, slot, Invitation(slot, p, baseUrl));
+            Invitation(db, slot, p, baseUrl);
             p.InvitedAt = DateTime.UtcNow;
         }
         return due.Count;
@@ -368,54 +367,33 @@ public static class ParticipantEndpoints
         foreach (var p in due)
         {
             var seats = allocation.Assignments.GetValueOrDefault(byName[p.Name.ToLowerInvariant()].Id.ToString(), []).Select(x => x.Session.Id);
-            Mailing.Add(db, slot, Result(slot, p, AllocationEndpoints.SeatText(activities, seats), baseUrl));
+            Result(db, slot, p, AllocationEndpoints.SeatText(activities, seats), baseUrl);
         }
         return due.Count;
     }
 
-    private static MailEntity Reminder(FairSlotEntity slot, ParticipantEntity p, string baseUrl)
+    private static void Reminder(AppDbContext db, FairSlotEntity slot, ParticipantEntity p, string baseUrl) =>
+        Mailing.ToParticipant(db, slot, p, $"Erinnerung: {slot.Name}",
+            $"für „{slot.Name}“ haben wir von dir noch keine Wahl bekommen. Du verteilst Punkte auf das, was dir wichtig ist; " +
+            "wann du abstimmst, macht keinen Unterschied, nur vor dem Anmeldeschluss muss es sein.\n" + DeadlineLine(slot),
+            "Dein persönlicher Link", baseUrl);
+
+    private static void Invitation(AppDbContext db, FairSlotEntity slot, ParticipantEntity p, string baseUrl)
     {
-        var body = new StringBuilder()
-            .Append($"Hallo {p.Name},\n\n")
-            .Append($"für „{slot.Name}“ haben wir von dir noch keine Wahl bekommen. Du verteilst Punkte auf das, was dir wichtig ist; ")
-            .Append("wann du abstimmst, macht keinen Unterschied, nur vor dem Anmeldeschluss muss es sein.\n\n")
-            .Append($"Dein persönlicher Link:\n{baseUrl}/p/{p.Token}\n\n");
-        if (slot.RegistrationDeadline is { } d) body.Append($"Anmeldeschluss: {d:dd.MM.yyyy, HH:mm} Uhr\n");
-        body.Append("\nBitte gib den Link nicht weiter.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
-        return new MailEntity
-        {
-            FairSlotId = slot.Id, ParticipantId = p.Id, To = p.Email!,
-            Subject = $"Erinnerung: {slot.Name}", Body = body.ToString(),
-        };
+        var check = p.BirthDate is null && p.BaptismDate is null ? ""
+            : $"Zur Sicherheit wirst du nach deinem {(p.BirthDate is null ? "Taufdatum" : p.BaptismDate is null ? "Geburtsdatum" : "Geburts- und Taufdatum")} gefragt.\n";
+        Mailing.ToParticipant(db, slot, p, $"Deine Anmeldung: {slot.Name}",
+            $"bei „{slot.Name}“ kannst du jetzt deine Veranstaltungen wählen. Du verteilst Punkte auf das, was dir wichtig ist; " +
+            "zugeteilt wird erst nach dem Anmeldeschluss, wann du abstimmst, macht keinen Unterschied.\n" + DeadlineLine(slot) + check,
+            "Dein persönlicher Link", baseUrl);
     }
 
-    private static MailEntity Invitation(FairSlotEntity slot, ParticipantEntity p, string baseUrl)
-    {
-        var body = new StringBuilder()
-            .Append($"Hallo {p.Name},\n\n")
-            .Append($"bei „{slot.Name}“ kannst du jetzt deine Veranstaltungen wählen. Du verteilst Punkte auf das, was dir wichtig ist; ")
-            .Append("zugeteilt wird erst nach dem Anmeldeschluss, wann du abstimmst, macht keinen Unterschied.\n\n")
-            .Append($"Dein persönlicher Link:\n{baseUrl}/p/{p.Token}\n\n");
-        if (p.BirthDate is not null || p.BaptismDate is not null)
-            body.Append($"Zur Sicherheit wirst du nach deinem {(p.BirthDate is null ? "Taufdatum" : p.BaptismDate is null ? "Geburtsdatum" : "Geburts- und Taufdatum")} gefragt.\n");
-        if (slot.RegistrationDeadline is { } d) body.Append($"Anmeldeschluss: {d:dd.MM.yyyy, HH:mm} Uhr\n");
-        body.Append("\nBitte gib den Link nicht weiter.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
-        return new MailEntity
-        {
-            FairSlotId = slot.Id, ParticipantId = p.Id, To = p.Email!,
-            Subject = $"Deine Anmeldung: {slot.Name}", Body = body.ToString(),
-        };
-    }
+    private static string DeadlineLine(FairSlotEntity slot) =>
+        slot.RegistrationDeadline is { } d ? $"Anmeldeschluss: {Mailing.Deadline(d)}\n" : "";
 
-    private static MailEntity Result(FairSlotEntity slot, ParticipantEntity p, string seats, string baseUrl)
-    {
-        var body = new StringBuilder()
-            .Append($"Hallo {p.Name},\n\n")
-            .Append($"die Zuteilung für „{slot.Name}“ steht. {(seats.Length > 0 ? $"Deine Plätze: {seats}." : "Leider hast du noch keinen Platz bekommen.")}\n\n")
-            .Append("Unter deinem persönlichen Link siehst du alle Termine. Dort kannst du auch einen Platz zurückgeben, den du nicht mehr willst, ")
-            .Append("oder dich vormerken, falls woanders etwas frei wird:\n")
-            .Append($"{baseUrl}/p/{p.Token}\n")
-            .Append("\nBitte gib den Link nicht weiter.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
-        return new MailEntity { ParticipantId = p.Id, To = p.Email!, Subject = $"Deine Zuteilung: {slot.Name}", Body = body.ToString() };
-    }
+    private static void Result(AppDbContext db, FairSlotEntity slot, ParticipantEntity p, string seats, string baseUrl) =>
+        Mailing.ToParticipant(db, slot, p, $"Deine Zuteilung: {slot.Name}",
+            $"die Zuteilung für „{slot.Name}“ steht. {(seats.Length > 0 ? $"Deine Plätze: {seats}." : "Leider hast du noch keinen Platz bekommen.")}\n",
+            "Unter deinem persönlichen Link siehst du alle Termine. Dort kannst du auch einen Platz zurückgeben, den du nicht mehr willst, " +
+            "oder dich vormerken, falls woanders etwas frei wird", baseUrl);
 }

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, Api, Group, Leader } from './api';
+import { decodeCsv, saveBlob } from './csv';
 import { I18n } from './i18n';
 
 /** Import activities from an Excel/CSV list: download the current list as template, upload, preview, take over. */
@@ -70,7 +71,6 @@ import { I18n } from './i18n';
   styles: `
     .file { position: relative; overflow: hidden }
     .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer }
-    .warn { color: var(--warn) }
     .leaders h3 { margin: 0 }
     .leader { align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 8px }
     .leader .who { flex: 1 1 240px; min-width: 0 }
@@ -105,12 +105,7 @@ export class ActivityImport {
 
   protected async download(): Promise<void> {
     try {
-      const blob = await this.api.exportActivities(this.slotId());
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'veranstaltungen.csv';
-      link.click();
-      URL.revokeObjectURL(link.href);
+      saveBlob(await this.api.exportActivities(this.slotId()), this.i18n.t('import.fileName'));
     } catch (e) {
       this.errors.set(this.i18n.errors(e));
     }
@@ -122,7 +117,7 @@ export class ActivityImport {
     input.value = ''; // allow choosing the same file again after editing it
     if (!file) return;
     this.fileName.set(file.name);
-    this.csv = decode(await file.arrayBuffer());
+    this.csv = decodeCsv(await file.arrayBuffer());
     await this.send(false);
   }
 
@@ -161,9 +156,4 @@ export class ActivityImport {
       this.busy.set(false);
     }
   }
-}
-
-/** Excel saves "CSV UTF-8" or, as plain "CSV", Windows-1252; try UTF-8 first. */
-function decode(buffer: ArrayBuffer): string {
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer); } catch { return new TextDecoder('windows-1252').decode(buffer); }
 }

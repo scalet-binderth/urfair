@@ -1,3 +1,5 @@
+using System.Net.Mail;
+
 namespace Urfair.Core;
 
 /// <summary>Rule checks. Errors carry codes (not texts) so the UI can show them in any language.</summary>
@@ -8,10 +10,17 @@ public static class Validation
     public const int MaxExtraSeats = 10;
     public const int MaxFriends = 5;
 
-    /// <summary>A friend code: 4 to 20 letters or digits, compared without case.</summary>
+    /// <summary>A friend code as compared: trimmed, without case (null if empty).</summary>
     public static string? FriendCode(string? code) =>
         string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
 
+    /// <summary>Trimmed text, null if empty.</summary>
+    public static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    public static bool IsEmail(string text) =>
+        text.Length <= 200 && MailAddress.TryCreate(text, out var a) && a.Address == text && a.Host.Contains('.');
+
+    /// <summary>A friend code may have 4 to 20 letters or digits.</summary>
     private static bool ValidFriendCode(string code) => code.Length is >= 4 and <= 20 && code.All(char.IsAsciiLetterOrDigit);
 
     private static ValidationError E(string code, params (string Key, object Value)[] args) =>
@@ -67,7 +76,7 @@ public static class Validation
         if (a.Description is { Length: > MaxDescription }) errors.Add(E("descriptionTooLong", ("max", MaxDescription)));
         if (a.Parish is { Length: > MaxShortText } || a.Leader is { Length: > MaxShortText }) errors.Add(E("textTooLong", ("max", MaxShortText)));
         if (a.Parish is not null && !Parishes.All.Contains(a.Parish)) errors.Add(E("parishUnknown", ("value", a.Parish)));
-        if (a.LeaderEmail is not null && !ParticipantCsv.IsEmail(a.LeaderEmail)) errors.Add(E("emailInvalid"));
+        if (a.LeaderEmail is not null && !IsEmail(a.LeaderEmail)) errors.Add(E("emailInvalid"));
         if (a.Sessions.Count == 0) errors.Add(E("sessionRequired"));
         foreach (var s in a.Sessions)
         {

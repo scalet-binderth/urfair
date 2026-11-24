@@ -10,49 +10,49 @@ namespace Urfair.Api;
 /// </summary>
 public static class SlotCopy
 {
-	public const int MaxShiftWeeks = 104;
+    public const int MaxShiftWeeks = 104;
 
-	public static async Task<FairSlotEntity> CopyAsync(AppDbContext db, FairSlotEntity source, string name, int shiftWeeks)
-	{
-		var shift = TimeSpan.FromDays(7 * shiftWeeks);
-		var copy = new FairSlotEntity
-		{
-			Name = name,
-			RegistrationDeadline = source.RegistrationDeadline + shift,
-			Seed = source.Seed,
-			OpenToAll = source.OpenToAll,
-			Excluded = source.Excluded.ToList(),
-			ShowInterim = source.ShowInterim,
-			AutoFill = source.AutoFill,
-			Parish = source.Parish,
-			Organiser = source.Organiser,
-			OrganiserEmail = source.OrganiserEmail,
-			Visibility = source.Visibility,
-		};
-		copy.Apply(source.ToRules());
-		var activities = await db.Activities.Include(a => a.Sessions).AsNoTracking()
-			.Where(a => a.FairSlotId == source.Id).OrderBy(a => a.SortOrder).ToListAsync();
-		foreach (var a in activities)
-			copy.Activities.Add(new ActivityEntity
-			{
-				Title = a.Title,
-				RestrictedTo = a.RestrictedTo,
-				Popularity = a.Popularity,
-				GroupId = a.GroupId,
-				Description = a.Description,
-				Parish = a.Parish,
-				Leader = a.Leader,
-				LeaderEmail = a.LeaderEmail,
-				SortOrder = a.SortOrder,
-				Sessions = a.Sessions.Select(s => new SessionEntity
-				{
-					Start = s.Start + shift,
-					End = s.End + shift,
-					Location = s.Location,
-					Capacity = s.Capacity,
-					Flexible = s.Flexible,
-				}).ToList(),
-			});
-		return copy;
-	}
+    public static async Task<FairSlotEntity> CopyAsync(AppDbContext db, FairSlotEntity source, string name, int shiftWeeks)
+    {
+        var shift = TimeSpan.FromDays(7 * shiftWeeks);
+        var copy = new FairSlotEntity
+        {
+            Name = name,
+            RegistrationDeadline = source.RegistrationDeadline + shift,
+            Seed = source.Seed,
+            OpenToAll = source.OpenToAll,
+            Excluded = source.Excluded.ToList(),
+            ShowInterim = source.ShowInterim,
+            AutoFill = source.AutoFill,
+            Parish = source.Parish,
+            Organiser = source.Organiser,
+            OrganiserEmail = source.OrganiserEmail,
+            Visibility = source.Visibility,
+        };
+        copy.Apply(source.ToRules());
+        var activities = await db.Activities.Include(a => a.Sessions).AsNoTracking()
+            .Where(a => a.FairSlotId == source.Id).OrderBy(a => a.SortOrder).ToListAsync();
+        foreach (var a in activities)
+            copy.Activities.Add(new ActivityEntity
+            {
+                Title = a.Title,
+                RestrictedTo = a.RestrictedTo,
+                Popularity = a.Popularity,
+                GroupId = a.GroupId,
+                Description = a.Description,
+                Parish = a.Parish,
+                Leader = a.Leader,
+                LeaderEmail = a.LeaderEmail,
+                SortOrder = a.SortOrder,
+                Sessions = a.Sessions.Select(s => new SessionEntity
+                {
+                    Start = s.Start + shift,
+                    End = s.End + shift,
+                    Location = s.Location,
+                    Capacity = s.Capacity,
+                    Flexible = s.Flexible,
+                }).ToList(),
+            });
+        return copy;
+    }
 }

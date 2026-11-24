@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api, ListedParticipant, ParticipantInput, SlotSummary } from './api';
+import { decodeCsv, saveBlob } from './csv';
 import { I18n } from './i18n';
 import { AppInfo } from './info';
 import { Toast } from './toast';
@@ -40,7 +41,7 @@ import { Toast } from './toast';
           <h2>{{ i18n.t('participants.count', { n: inParish().length, v: votedCount() }) }}</h2>
           <div class="row">
             @if (parishesInList().length > 1) {
-              <select [(ngModel)]="parishFilter" (ngModelChange)="filter.set($event)" [attr.aria-label]="i18n.t('participants.filter')">
+              <select [ngModel]="filter()" (ngModelChange)="filter.set($event)" [attr.aria-label]="i18n.t('participants.filter')">
                 <option value="">{{ i18n.t('participants.allParishes') }}</option>
                 @for (p of parishesInList(); track p) { <option [value]="p">{{ p }}</option> }
               </select>
@@ -115,7 +116,7 @@ import { Toast } from './toast';
                   </td>
                   <td class="num nowrap">
                     @if (confirmDelete() === p.id) {
-                      <button class="btn danger small" type="button" (click)="remove(p.id)">{{ i18n.t('common.delete') }}</button>
+                      <button class="btn danger small" type="button" [disabled]="busy()" (click)="remove(p.id)">{{ i18n.t('common.delete') }}</button>
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
                       <button class="btn ghost small" type="button" (click)="edit(p)">{{ i18n.t('common.edit') }}</button>
@@ -135,9 +136,6 @@ import { Toast } from './toast';
     .form { align-items: end }
     .between { justify-content: space-between; align-items: center }
     .center { align-items: center }
-    select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px; max-width: 100% }
-    .btn.small { padding: 6px 12px; font-size: 14px }
-    .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
     .file { position: relative; overflow: hidden }
     .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer }
     .import { border: 1px dashed var(--line); border-radius: var(--r); padding: 12px }
@@ -156,7 +154,6 @@ export class ParticipantsTab implements OnInit {
 
   protected list = signal<ListedParticipant[]>([]);
   protected filter = signal('');
-  protected parishFilter = '';
   protected notVotedOnly = signal(false);
   protected inParish = computed(() => this.list().filter(p => !this.filter() || p.parish === this.filter()));
   protected filtered = computed(() => this.inParish().filter(p => !this.notVotedOnly() || !p.hasVoted));
@@ -221,27 +218,16 @@ export class ParticipantsTab implements OnInit {
   protected async copyMails(): Promise<void> {
     const mails = [...new Set(this.filtered().map(p => p.email).filter((m): m is string => !!m))];
     if (!mails.length) { this.toast.show(this.i18n.t('participants.noMails')); return; }
-    try {
-      await navigator.clipboard.writeText(mails.join('; '));
-      this.toast.show(this.i18n.t('participants.mailsCopied', { n: mails.length }));
-    } catch { /* clipboard blocked */ }
+    await this.toast.copy(mails.join('; '), this.i18n.t('participants.mailsCopied', { n: mails.length }));
   }
 
-  protected async copyLink(p: ListedParticipant): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(`${location.origin}/p/${p.token}`);
-      this.toast.show(this.i18n.t('admin.linkCopied'));
-    } catch { /* clipboard blocked */ }
+  protected copyLink(p: ListedParticipant): Promise<void> {
+    return this.toast.copy(`${location.origin}/p/${p.token}`, this.i18n.t('admin.linkCopied'));
   }
 
   protected async download(): Promise<void> {
     try {
-      const blob = await this.api.exportParticipants(this.slotId());
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'teilnehmende.csv';
-      link.click();
-      URL.revokeObjectURL(link.href);
+      saveBlob(await this.api.exportParticipants(this.slotId()), this.i18n.t('participants.fileName'));
     } catch (e) { this.importErrors.set(this.i18n.errors(e)); }
   }
 
@@ -250,8 +236,7 @@ export class ParticipantsTab implements OnInit {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    const buffer = await file.arrayBuffer();
-    try { this.csv = new TextDecoder('utf-8', { fatal: true }).decode(buffer); } catch { this.csv = new TextDecoder('windows-1252').decode(buffer); }
+    this.csv = decodeCsv(await file.arrayBuffer());
     await this.send(false);
   }
 

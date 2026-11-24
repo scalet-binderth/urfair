@@ -114,7 +114,6 @@ import { SessionService } from './session';
     .person:hover { border-color: var(--accent) }
     .linkish { justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline }
     .recover { border-top: 1px solid var(--line); padding-top: 12px }
-    .good { color: var(--good) }
     .person b { grid-row: span 2; color: var(--accent) }
     .try { margin: -2px 0 4px 30px }
     .try summary { cursor: pointer; color: var(--accent) }

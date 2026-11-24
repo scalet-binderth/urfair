@@ -40,18 +40,12 @@ public static class ActivityCsv
     public static Result Parse(string text, IReadOnlyList<ActivityGroup> groups)
     {
         var errors = new List<ValidationError>();
-        var rows = ReadRows(text.TrimStart('﻿'));
+        var rows = Csv.ReadRows(text);
         if (rows.Count == 0) return new([], [E("csvEmpty", 0)]);
 
-        var header = rows[0].Select(Normalise).Select(h => Columns.GetValueOrDefault(h)).ToList();
+        var Cell = Csv.Header(rows[0], Columns, out var header);
         var missing = new[] { "title", "start" }.Where(c => !header.Contains(c)).ToList();
         if (missing.Count > 0) return new([], [E("csvColumnsMissing", 1, ("columns", string.Join(", ", missing)))]);
-
-        string Cell(List<string> row, string column)
-        {
-            var i = header.IndexOf(column);
-            return i >= 0 && i < row.Count ? row[i].Trim() : "";
-        }
 
         // Activities in order of first appearance; the first row of a title carries its description, group and restriction.
         var drafts = new List<(int Row, string Title, string? Description, string? GroupId, string? RestrictedTo, string? Parish, string? Leader, string? LeaderEmail, List<Session> Sessions)>();
@@ -72,10 +66,10 @@ public static class ActivityCsv
                 if (groupName.Length > 0 && group is null) errors.Add(E("csvGroupUnknown", line, ("value", groupName)));
                 var restriction = Restriction(Cell(row, "restriction"));
                 if (restriction == "?") { errors.Add(E("csvRestrictionInvalid", line, ("value", Cell(row, "restriction")))); restriction = null; }
-                var description = Cell(row, "description");
-                draft = (line, title, description.Length == 0 ? null : description, group?.Id, restriction,
-                    Parishes.Match(Cell(row, "parish")), OrNull(Cell(row, "leader")), OrNull(Cell(row, "leaderemail")), []);
-                if (Cell(row, "parish") is { Length: > 0 } p && Parishes.Match(p) is null) errors.Add(E("csvParishUnknown", line, ("value", p)));
+                var parishText = Cell(row, "parish");
+                var parish = Parishes.Match(parishText);
+                if (parishText.Length > 0 && parish is null) errors.Add(E("csvParishUnknown", line, ("value", parishText)));
+                draft = (line, title, OrNull(Cell(row, "description")), group?.Id, restriction, parish, OrNull(Cell(row, "leader")), OrNull(Cell(row, "leaderemail")), []);
                 drafts.Add(draft);
             }
 
@@ -103,7 +97,8 @@ public static class ActivityCsv
         foreach (var (d, i) in drafts.Select((d, i) => (d, i)))
         {
             var id = $"import{i}";
-            var activity = new Activity(id, d.Title, d.Sessions.Select(s => s with { ActivityId = id }).ToList(), d.RestrictedTo, 5, d.GroupId, d.Description, d.Parish, d.Leader, d.LeaderEmail);
+            var activity = new Activity(id, d.Title, d.Sessions.Select(s => s with { ActivityId = id }).ToList(), d.RestrictedTo, GroupId: d.GroupId,
+                Description: d.Description, Parish: d.Parish, Leader: d.Leader, LeaderEmail: d.LeaderEmail);
             // Activity rules (end after start, seats ≥ 1 …), reported with the activity's first row.
             errors.AddRange(Validation.Check(activity).Select(e => e with { Args = WithRow(e.Args, d.Row) }));
             activities.Add(activity);
@@ -114,7 +109,7 @@ public static class ActivityCsv
     /// <summary>Writes activities in the same format (one row per date, separator ;) so a list can be edited in Excel and imported again.</summary>
     public static string Write(IReadOnlyList<Activity> activities, IReadOnlyList<ActivityGroup> groups)
     {
-        var sb = new StringBuilder("Titel;Beschreibung;Gruppe;Pfarre;Leitung;Leitung E-Mail;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung\r\n");
+        var sb = new StringBuilder(Csv.Line(["Titel", "Beschreibung", "Gruppe", "Pfarre", "Leitung", "Leitung E-Mail", "Teilnahme", "Beginn", "Ende", "Ort", "Plätze", "Nach Vereinbarung"]));
         foreach (var a in activities)
         foreach (var (s, i) in a.Sessions.Select((s, i) => (s, i)))
         {
@@ -127,16 +122,12 @@ public static class ActivityCsv
                 s.Flexible ? s.Start.ToString("dd.MM.yyyy") : s.Start.ToString("dd.MM.yyyy HH:mm"), end, s.Location,
                 s.Capacity?.ToString(CultureInfo.InvariantCulture) ?? "", s.Flexible ? "ja" : "",
             ];
-            sb.Append(string.Join(';', cells.Select(Quote))).Append("\r\n");
+            sb.Append(Csv.Line(cells));
         }
         return sb.ToString();
     }
 
-    internal static string Quote(string value) =>
-        value.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"") + "\"" : value;
-
-    private static ValidationError E(string code, int row, params (string Key, object Value)[] args) =>
-        new(code, args.Append(("row", row)).ToDictionary(a => a.Key, a => a.Value));
+    private static ValidationError E(string code, int row, params (string Key, object Value)[] args) => Csv.Error(code, row, args);
 
     private static IReadOnlyDictionary<string, object> WithRow(IReadOnlyDictionary<string, object>? args, int row)
     {
@@ -144,9 +135,6 @@ public static class ActivityCsv
         copy["row"] = row;
         return copy;
     }
-
-    internal static string Normalise(string header) =>
-        new(header.Trim().ToLowerInvariant().Where(char.IsLetter).ToArray());
 
     private static string? OrNull(string value) => value.Length == 0 ? null : value;
 
@@ -172,37 +160,5 @@ public static class ActivityCsv
             return true;
         }
         return false;
-    }
-
-    /// <summary>Splits CSV text into rows and cells; handles quotes, doubled quotes and line breaks inside quotes.</summary>
-    internal static List<List<string>> ReadRows(string text)
-    {
-        var firstLine = text.Split('\n')[0];
-        var separator = new[] { ';', ',', '\t' }.MaxBy(c => firstLine.Count(x => x == c));
-        var rows = new List<List<string>>();
-        var row = new List<string>();
-        var cell = new StringBuilder();
-        var quoted = false;
-        for (var i = 0; i < text.Length; i++)
-        {
-            var c = text[i];
-            if (quoted)
-            {
-                if (c == '"' && i + 1 < text.Length && text[i + 1] == '"') { cell.Append('"'); i++; }
-                else if (c == '"') quoted = false;
-                else cell.Append(c);
-            }
-            else if (c == '"') quoted = true;
-            else if (c == separator) { row.Add(cell.ToString()); cell.Clear(); }
-            else if (c == '\n' || c == '\r')
-            {
-                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
-                row.Add(cell.ToString()); cell.Clear();
-                rows.Add(row); row = [];
-            }
-            else cell.Append(c);
-        }
-        if (cell.Length > 0 || row.Count > 0) { row.Add(cell.ToString()); rows.Add(row); }
-        return rows;
     }
 }

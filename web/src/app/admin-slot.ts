@@ -127,19 +127,21 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
               <p class="muted small">{{ i18n.t('admin.rulesNote') }}</p>
               @if (canEdit()) { <div><button class="btn" type="button" [disabled]="busy()" (click)="saveSettings()">{{ i18n.t('common.save') }}</button></div> }
             </div>
-            <div class="card stack">
-              <h2>{{ i18n.t('admin.deleteSlot') }}</h2>
-              <p class="muted small">{{ i18n.t('admin.deleteSlotWarn') }}</p>
-              @if (confirmDeleteSlot()) {
-                <div class="row">
-                  <span>{{ i18n.t('common.reallyDelete') }}</span>
-                  <button class="btn danger" type="button" (click)="deleteSlot()">{{ i18n.t('common.delete') }}</button>
-                  <button class="btn ghost" type="button" (click)="confirmDeleteSlot.set(false)">{{ i18n.t('common.cancel') }}</button>
-                </div>
-              } @else {
-                <div><button class="btn ghost" type="button" (click)="confirmDeleteSlot.set(true)">{{ i18n.t('admin.deleteSlot') }}</button></div>
-              }
-            </div>
+            @if (canEdit()) {
+              <div class="card stack">
+                <h2>{{ i18n.t('admin.deleteSlot') }}</h2>
+                <p class="muted small">{{ i18n.t('admin.deleteSlotWarn') }}</p>
+                @if (confirmDeleteSlot()) {
+                  <div class="row">
+                    <span>{{ i18n.t('common.reallyDelete') }}</span>
+                    <button class="btn danger" type="button" [disabled]="busy()" (click)="deleteSlot()">{{ i18n.t('common.delete') }}</button>
+                    <button class="btn ghost" type="button" (click)="confirmDeleteSlot.set(false)">{{ i18n.t('common.cancel') }}</button>
+                  </div>
+                } @else {
+                  <div><button class="btn ghost" type="button" (click)="confirmDeleteSlot.set(true)">{{ i18n.t('admin.deleteSlot') }}</button></div>
+                }
+              </div>
+            }
           </div>
         }
 
@@ -172,7 +174,7 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
                   <div class="row actions">
                     @if (confirmDelete() === a.id) {
                       <span class="small">{{ i18n.t('common.reallyDelete') }}</span>
-                      <button class="btn danger small" type="button" (click)="deleteActivity(a.id)">{{ i18n.t('common.delete') }}</button>
+                      <button class="btn danger small" type="button" [disabled]="busy()" (click)="deleteActivity(a.id)">{{ i18n.t('common.delete') }}</button>
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
                       <button class="btn ghost small" type="button" [hidden]="!changeable()" (click)="editing.set(a.id)">{{ i18n.t('common.edit') }}</button>
@@ -187,7 +189,7 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
           </div>
         }
 
-        @case ('leaders') { <app-leaders [slotId]="s.id" [canEdit]="changeable()" (changed)="load()" /> }
+        @case ('leaders') { <app-leaders [slotId]="s.id" [canEdit]="changeable()" (changed)="leaderChanged()" /> }
         @case ('participants') { <app-participants [slotId]="s.id" [demo]="info.demo()" /> }
         @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" [sending]="info.mailSending()" [phase]="s.phase" /> }
 
@@ -223,7 +225,7 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
           </div>
         }
 
-        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" (undone)="load()" /> }
+        @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" (undone)="load(true)" /> }
         @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" [canEdit]="changeable()" /> }
 
         @case ('demo') {
@@ -260,12 +262,10 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
     .link { align-items: center; gap: 8px }
     .link a { overflow-wrap: anywhere }
     .readonly { border-color: var(--warn); color: var(--warn) }
-    .warn { color: var(--warn) }
     .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px }
     .tabs button { padding: 9px 14px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; color: var(--muted); font-weight: 500 }
     .tabs button.on { color: var(--ink); border-bottom-color: var(--accent) }
     .grow { flex: 1 1 260px }
-    select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font-size: 15px }
     .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px }
     .rules input { max-width: 120px }
     .group-row { align-items: end }
@@ -275,8 +275,6 @@ type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'de
     .act .info { min-width: 0; flex: 1 1 300px }
     .act ul { list-style: none; margin: 4px 0 0; padding: 0; font-size: 13px; color: var(--muted); display: grid; gap: 2px }
     .actions { align-items: center }
-    .btn.small { padding: 6px 12px; font-size: 14px }
-    .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
     .ratio { display: flex; align-items: center; gap: 8px; min-width: 150px }
     .ratio .meter { flex: 1; height: 8px }
     [data-level=ok] { background: var(--good) }
@@ -327,19 +325,23 @@ export class AdminSlotPage implements OnInit {
   protected sampleCount = 0;
   protected removeReal = false;
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void { this.load(true); }
 
-  protected async load(): Promise<void> {
+  /** Reloads the vote and its activities; fillForm also resets the settings form (first load, after saving, after an undo),
+   *  so other reloads keep unsaved settings edits. */
+  protected async load(fillForm = false): Promise<void> {
     this.errors.set([]);
     try {
       const [slot, activities] = await Promise.all([this.api.adminSlot(this.slotId()), this.api.adminActivities(this.slotId())]);
       this.slot.set(slot);
       this.activities.set(activities);
-      this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, excluded: (slot.excluded ?? []).join('\n'), showInterim: slot.showInterim, autoFill: slot.autoFill ?? true,
-        parish: slot.parish ?? '', organiser: slot.organiser ?? '', organiserEmail: slot.organiserEmail ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
-      this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
       this.sampleCount = slot.sampleCount;
-      if (slot.openToAll) await this.loadOtherSlots();
+      if (fillForm) {
+        this.form = { name: slot.name, phase: slot.phase, deadline: toLocalInput(slot.registrationDeadline), openToAll: slot.openToAll, excluded: (slot.excluded ?? []).join('\n'), showInterim: slot.showInterim, autoFill: slot.autoFill ?? true,
+          parish: slot.parish ?? '', organiser: slot.organiser ?? '', organiserEmail: slot.organiserEmail ?? '', visibility: slot.visibility, rules: { ...slot.rules } };
+        this.formGroups = (slot.rules.groups ?? []).map(g => ({ ...g }));
+        if (slot.openToAll) await this.loadOtherSlots();
+      }
       if (this.tab() === 'demand') this.demand.set(await this.api.demand(this.slotId()));
     } catch (e) {
       this.handle(e);
@@ -358,7 +360,7 @@ export class AdminSlotPage implements OnInit {
   protected participantUrl(): string { return `${location.origin}/s/${this.slotId()}`; }
 
   protected async copyLink(): Promise<void> {
-    try { await navigator.clipboard.writeText(this.participantUrl()); this.toast.show(this.i18n.t('admin.linkCopied')); } catch { /* link is visible and selectable */ }
+    await this.toast.copy(this.participantUrl(), this.i18n.t('admin.linkCopied'));
   }
 
   protected groupSum(): number { return this.formGroups.reduce((sum, g) => sum + Number(g.perParticipant || 0), 0); }
@@ -402,7 +404,7 @@ export class AdminSlotPage implements OnInit {
           perParticipant: this.formGroups.length ? this.groupSum() : this.form.rules.perParticipant, groups: this.formGroups.map(g => ({ ...g, perParticipant: Number(g.perParticipant), minActivities: Number(g.minActivities) })) },
       });
       this.toast.show(this.i18n.t('common.saved'));
-      await this.load();
+      await this.load(true);
     });
   }
 
@@ -412,6 +414,13 @@ export class AdminSlotPage implements OnInit {
       this.toast.show(this.i18n.t('common.deleted'));
       await this.router.navigate(['/admin']);
     });
+  }
+
+  /** Editing the organiser on the leaders tab changes the organiser fields of the settings; the rest of the form stays. */
+  protected async leaderChanged(): Promise<void> {
+    await this.load();
+    const slot = this.slot();
+    if (slot) { this.form.organiser = slot.organiser ?? ''; this.form.organiserEmail = slot.organiserEmail ?? ''; }
   }
 
   protected async afterImport(): Promise<void> {
@@ -461,6 +470,6 @@ export class AdminSlotPage implements OnInit {
 
   private handle(e: unknown): void {
     if (e instanceof ApiFailure && e.errors[0]?.code === 'unauthorized') { this.session.refresh().then(() => this.router.navigate(['/'])); return; }
-    else this.errors.set(this.i18n.errors(e));
+    this.errors.set(this.i18n.errors(e));
   }
 }

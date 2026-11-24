@@ -12,7 +12,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'legal.imprint': 'Impressum', 'legal.privacy': 'Datenschutz', 'legal.back': 'Zur Startseite',
     'legal.germanOnly': 'Die Rechtstexte gibt es nur auf Deutsch.', 'legal.template': 'Vorlage: Die Pfarre als Betreiberin muss die Angaben in [Klammern] ergänzen und den Text mit der Datenschutz-Ansprechperson abstimmen (Einstellung Legal__Imprint bzw. Legal__Privacy).',
     'app.demo': 'Testversion. Alle Anmeldungen außer deiner eigenen sind erfundene Beispieldaten.',
-    'nav.vote': 'Wählen', 'nav.admin': 'Organisation',
+    'nav.admin': 'Organisation',
     'lang.switch': 'English',
     'common.loading': 'Wird geladen …',
     'common.loadError': 'Die Daten konnten nicht geladen werden. Bitte später erneut versuchen.',
@@ -21,11 +21,11 @@ const texts: Record<Lang, Record<string, string>> = {
     'common.save': 'Speichern', 'common.cancel': 'Abbrechen', 'common.delete': 'Löschen', 'common.edit': 'Bearbeiten',
     'common.saved': 'Gespeichert.', 'common.deleted': 'Gelöscht.', 'common.reallyDelete': 'Wirklich löschen?',
     'common.deadline': 'Anmeldeschluss: {date}',
+    'common.yes': 'ja', 'common.no': 'nein',
 
     'phase.Draft': 'Entwurf', 'phase.Open': 'Anmeldung', 'phase.Allocation': 'Zuteilung (intern)', 'phase.Published': 'Zuteilung (sichtbar)',
     'phase.Closed': 'Abgeschlossen', 'phase.Ended': 'Beendet',
 
-    'home.title': 'Wähle deine Veranstaltungen',
     'home.lead': 'Statt „wer zuerst klickt“ verteilst du Punkte auf das, was dir wichtig ist. Zugeteilt wird erst nach dem Anmeldeschluss, fair für alle.',
     'home.empty': 'Für dich ist derzeit keine Anmeldung freigeschaltet. Wenn du glaubst, dass das ein Fehler ist, wende dich an das Organisationsteam.',
     'home.open': 'Offene Anmeldungen', 'home.done': 'Anmeldung geschlossen',
@@ -71,7 +71,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'start.participantGo': 'Weiter',
     'start.admin': 'Ich organisiere',
     'start.adminText': 'Wahlen anlegen, Veranstaltungen und Termine pflegen, Nachfrage ansehen und zuteilen.',
-    'start.adminDemo': 'In der Testversion ist kein Zugangsschlüssel nötig.',
     'start.adminGo': 'Zur Organisation',
     'start.plan': 'Umsetzungsplan',
     'start.planText': 'Was die Demo schon kann, was bis zum echten Einsatz in der Pfarre Urfahr-St. Junia fehlt, und in welcher Reihenfolge.',
@@ -147,7 +146,7 @@ const texts: Record<Lang, Record<string, string>> = {
 
     'admin.title': 'Organisation',
     'admin.lead': 'Hier legt ihr Wahlen an, pflegt Veranstaltungen und Termine und startet die Zuteilung.',
-    'admin.key': 'Zugangsschlüssel für die Organisation', 'admin.keyNeeded': 'Für diesen Bereich ist ein Zugangsschlüssel nötig.',
+    'admin.key': 'Zugangsschlüssel für die Organisation',
     'admin.new': 'Neue Wahl', 'admin.newName': 'Name, z. B. „Ferienprogramm Sommer 2027“',
     'admin.withSample': 'Mit Beispieldaten (Firmvorbereitung Urfahr) füllen', 'admin.create': 'Anlegen',
     'admin.template': 'Vorlage', 'admin.templateNone': 'Keine (leere Wahl)', 'admin.shiftWeeks': 'Termine verschieben um Wochen',
@@ -182,7 +181,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.friendsHint': 'Teilnehmende können einen gemeinsamen Code eintragen. Die berechnete Zuteilung bringt jede Gruppe möglichst in einen gemeinsamen Termin einer Veranstaltung, die alle bepunktet haben; Unbeteiligte verlieren dafür keine Punkte. Beim Nachrücken kann eine Gruppe wieder getrennt werden. Wird die Gruppengröße verkleinert, werden zu große Gruppen aufgelöst.',
     'admin.deleteSlot': 'Wahl löschen', 'admin.deleteSlotWarn': 'Alle Veranstaltungen und Anmeldungen dieser Wahl gehen verloren.',
     'admin.addActivity': 'Veranstaltung hinzufügen', 'admin.noActivities': 'Noch keine Veranstaltungen. Leg die erste an.',
-    'admin.sessions': '{n} Termine',
     'admin.ballotCount': '{n} Anmeldungen, davon {s} Beispiel-Teilnehmende.',
     'admin.sampleCount': 'Anzahl Beispiel-Teilnehmende', 'admin.removeReal': 'Echte Anmeldungen ebenfalls löschen',
     'admin.reset': 'Beispieldaten neu erzeugen', 'admin.resetDone': 'Beispieldaten neu erzeugt.',
@@ -202,7 +200,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'editor.capacity': 'Plätze', 'editor.capacityHint': 'leer = unbegrenzt', 'editor.flexible': 'Termin nach Vereinbarung',
     'editor.addSession': 'Termin hinzufügen', 'editor.removeSession': 'Termin entfernen',
 
-    'results.title': 'Ergebnis der Zuteilung',
     'results.lead': '{n} Teilnehmende, je {k} Veranstaltungen. Zum Vergleich: dieselben Wünsche nach „Wer zuerst kommt“ (alle klicken zur Öffnung, Reihenfolge zufällig).',
     'results.topChoice': 'bekamen ihre Nr.-1-Veranstaltung', 'results.avg': 'Ø Zufriedenheit (erreichte Punkte)',
     'results.worst': 'Zufriedenheit der schlechtesten 10 %', 'results.fallback': 'Teilnehmende mit Ersatzveranstaltung',
@@ -217,6 +214,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'results.people': 'Teilnehmende', 'results.search': 'Suchen',
     'results.copy': 'Liste kopieren (CSV)', 'results.copied': 'Liste in die Zwischenablage kopiert.',
     'results.copyFallback': 'Text markiert. Mit Strg+C kopieren.',
+    'results.csv.points': 'Punkte', 'results.csv.fallback': 'Ersatz',
     'results.col.name': 'Name', 'results.col.assigned': 'Zugeteilt (Punkte)', 'results.col.satisfaction': 'Zufriedenheit',
     'results.real': 'echt', 'results.fallbackChip': 'Ersatz', 'results.showAll': 'Alle {n} anzeigen', 'results.flexible': 'flexibel',
     'results.empty': 'Noch keine Anmeldungen oder Veranstaltungen.',
@@ -357,6 +355,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'import.open': 'Aus Excel/CSV importieren', 'import.title': 'Veranstaltungen aus Excel/CSV importieren',
     'import.lead': 'Lade die Liste als Vorlage herunter, bearbeite sie in Excel (eine Zeile pro Termin; gleicher Titel = gleiche Veranstaltung) und speichere sie als „CSV UTF-8“ oder „CSV“. Danach hier hochladen, Vorschau prüfen und übernehmen.',
     'import.template': 'Liste/Vorlage herunterladen', 'import.choose': 'CSV-Datei wählen …',
+    'import.fileName': 'veranstaltungen.csv', 'participants.fileName': 'teilnehmende.csv',
     'import.found': '{n} Veranstaltungen mit {s} Terminen erkannt.', 'import.replace': 'Bestehende Veranstaltungen ersetzen (sonst werden sie ergänzt)',
     'import.replaceWarn': 'Achtung: Alle bisherigen Veranstaltungen werden gelöscht, abgegebene Stimmen verlieren ihre Punkte.',
     'import.commit': '{n} Veranstaltungen übernehmen', 'import.done': 'Veranstaltungen importiert.',
@@ -490,7 +489,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'legal.imprint': 'Legal notice', 'legal.privacy': 'Privacy', 'legal.back': 'Back to the start page',
     'legal.germanOnly': 'The legal texts are only available in German.', 'legal.template': 'Template: the parish running this instance must fill in the parts in [brackets] and agree the text with its data protection contact (setting Legal__Imprint or Legal__Privacy).',
     'app.demo': 'Test version. All registrations except your own are invented sample data.',
-    'nav.vote': 'Vote', 'nav.admin': 'Organisation',
+    'nav.admin': 'Organisation',
     'lang.switch': 'Deutsch',
     'common.loading': 'Loading …',
     'common.loadError': 'The data could not be loaded. Please try again later.',
@@ -499,11 +498,11 @@ const texts: Record<Lang, Record<string, string>> = {
     'common.save': 'Save', 'common.cancel': 'Cancel', 'common.delete': 'Delete', 'common.edit': 'Edit',
     'common.saved': 'Saved.', 'common.deleted': 'Deleted.', 'common.reallyDelete': 'Really delete?',
     'common.deadline': 'Registration closes: {date}',
+    'common.yes': 'yes', 'common.no': 'no',
 
     'phase.Draft': 'Draft', 'phase.Open': 'Registration', 'phase.Allocation': 'Allocation (internal)', 'phase.Published': 'Allocation (visible)',
     'phase.Closed': 'Closed', 'phase.Ended': 'Ended',
 
-    'home.title': 'Choose your activities',
     'home.lead': 'Instead of “whoever clicks first”, you spread points over what matters to you. Seats are assigned after registration closes, fairly for everyone.',
     'home.empty': 'No registration is open for you at the moment. If you think this is a mistake, please contact the organisers.',
     'home.open': 'Open registrations', 'home.done': 'Registration closed',
@@ -549,7 +548,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'start.participantGo': 'Continue',
     'start.admin': 'I am organising',
     'start.adminText': 'Create votes, maintain activities and dates, check demand and run the allocation.',
-    'start.adminDemo': 'No access key is needed in the test version.',
     'start.adminGo': 'Go to organisation',
     'start.plan': 'Roadmap',
     'start.planText': 'What the demo can do, what is missing for real use in the Pfarre Urfahr-St. Junia, and in which order.',
@@ -625,7 +623,7 @@ const texts: Record<Lang, Record<string, string>> = {
 
     'admin.title': 'Organisation',
     'admin.lead': 'Create votes, maintain activities and dates, and run the allocation.',
-    'admin.key': 'Organisation access key', 'admin.keyNeeded': 'An access key is required for this area.',
+    'admin.key': 'Organisation access key',
     'admin.new': 'New vote', 'admin.newName': 'Name, e.g. “Summer holiday programme 2027”',
     'admin.withSample': 'Fill with sample data (confirmation preparation Urfahr)', 'admin.create': 'Create',
     'admin.template': 'Template', 'admin.templateNone': 'None (empty vote)', 'admin.shiftWeeks': 'Move dates by weeks',
@@ -659,7 +657,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'admin.friendsHint': 'Participants can enter a shared code. The calculated allocation puts each group into a shared date of an activity they all gave points to where possible; nobody else loses points for it. Moving up may separate a group again. If the group size is lowered, groups that are too large are dissolved.',
     'admin.deleteSlot': 'Delete vote', 'admin.deleteSlotWarn': 'All activities and registrations of this vote will be lost.',
     'admin.addActivity': 'Add activity', 'admin.noActivities': 'No activities yet. Create the first one.',
-    'admin.sessions': '{n} dates',
     'admin.ballotCount': '{n} registrations, {s} of them sample participants.',
     'admin.sampleCount': 'Number of sample participants', 'admin.removeReal': 'Also delete real registrations',
     'admin.reset': 'Regenerate sample data', 'admin.resetDone': 'Sample data regenerated.',
@@ -679,7 +676,6 @@ const texts: Record<Lang, Record<string, string>> = {
     'editor.capacity': 'Seats', 'editor.capacityHint': 'empty = unlimited', 'editor.flexible': 'Date by arrangement',
     'editor.addSession': 'Add date', 'editor.removeSession': 'Remove date',
 
-    'results.title': 'Allocation result',
     'results.lead': '{n} participants, {k} activities each. For comparison: the same wishes under “first come, first served” (everyone clicks at opening, random order).',
     'results.topChoice': 'got their no. 1 activity', 'results.avg': 'Average satisfaction (points achieved)',
     'results.worst': 'Satisfaction of the worst 10 %', 'results.fallback': 'Participants with a fallback activity',
@@ -694,6 +690,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'results.people': 'Participants', 'results.search': 'Search',
     'results.copy': 'Copy list (CSV)', 'results.copied': 'List copied to the clipboard.',
     'results.copyFallback': 'Text selected. Press Ctrl+C to copy.',
+    'results.csv.points': 'Points', 'results.csv.fallback': 'Fallback',
     'results.col.name': 'Name', 'results.col.assigned': 'Assigned (points)', 'results.col.satisfaction': 'Satisfaction',
     'results.real': 'real', 'results.fallbackChip': 'fallback', 'results.showAll': 'Show all {n}', 'results.flexible': 'flexible',
     'results.empty': 'No registrations or activities yet.',
@@ -835,6 +832,7 @@ const texts: Record<Lang, Record<string, string>> = {
     'import.open': 'Import from Excel/CSV', 'import.title': 'Import activities from Excel/CSV',
     'import.lead': 'Download the list as a template, edit it in Excel (one row per date; same title = same activity) and save it as “CSV UTF-8” or “CSV”. Then upload it here, check the preview and take it over.',
     'import.template': 'Download list/template', 'import.choose': 'Choose CSV file …',
+    'import.fileName': 'activities.csv', 'participants.fileName': 'participants.csv',
     'import.found': '{n} activities with {s} dates found.', 'import.replace': 'Replace existing activities (otherwise they are added)',
     'import.replaceWarn': 'Careful: all current activities are deleted and submitted votes lose their points.',
     'import.commit': 'Take over {n} activities', 'import.done': 'Activities imported.',
@@ -966,6 +964,8 @@ const texts: Record<Lang, Record<string, string>> = {
 @Injectable({ providedIn: 'root' })
 export class I18n {
   readonly lang = signal<Lang>(I18n.initial());
+
+  constructor() { document.documentElement.lang = this.lang(); }
 
   private static initial(): Lang {
     try { return localStorage.getItem('lang') === 'en' ? 'en' : 'de'; } catch { return 'de'; }

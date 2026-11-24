@@ -53,7 +53,7 @@ public static class AdminEndpoints
             var name = (req.Name ?? "").Trim();
             if (name.Length == 0) return Endpoints.Errors("nameRequired");
             if (req.ShiftWeeks is < 0 or > SlotCopy.MaxShiftWeeks)
-                return Results.BadRequest(new ErrorsDto([new ValidationError("shiftWeeks", new Dictionary<string, object> { ["max"] = SlotCopy.MaxShiftWeeks })]));
+                return Endpoints.Errors("shiftWeeks", "max", SlotCopy.MaxShiftWeeks);
             var account = Access.Account(http);
             FairSlotEntity slot;
             if (req.CopyFrom is { } sourceId)
@@ -72,7 +72,7 @@ public static class AdminEndpoints
                     : (account.Parishes.FirstOrDefault(), Visibility.ParishOnly);
             if (db.Entry(slot).State == EntityState.Detached) db.FairSlots.Add(slot);
             // Mails to the organiser, and to leaders of activities without a leader, go to the creator until changed.
-            if (slot.OrganiserEmail is null && ParticipantCsv.IsEmail(account.Email)) slot.OrganiserEmail = account.Email;
+            if (slot.OrganiserEmail is null && Validation.IsEmail(account.Email)) slot.OrganiserEmail = account.Email;
             await db.SaveChangesAsync();
             return Results.Ok(new { slot.Id });
         });
@@ -108,10 +108,10 @@ public static class AdminEndpoints
             if (!account.IsJuniaAdmin && (ParishOf(req.Parish) != slot.Parish || req.Visibility != slot.Visibility) &&
                 (req.Visibility == Visibility.JuniaReadOnly || ParishOf(req.Parish) is not { } p || !account.Parishes.Contains(p)))
                 errors.Add(new ValidationError("visibilityNotAllowed"));
-            if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
+            if (Validation.Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
-            if (Clean(req.OrganiserEmail) is not { } organiserEmail) errors.Add(new ValidationError("organiserEmailRequired"));
-            else if (!ParticipantCsv.IsEmail(organiserEmail)) errors.Add(new ValidationError("emailInvalid"));
+            if (Validation.Clean(req.OrganiserEmail) is not { } organiserEmail) errors.Add(new ValidationError("organiserEmailRequired"));
+            else if (!Validation.IsEmail(organiserEmail)) errors.Add(new ValidationError("emailInvalid"));
             // Without a list (older clients) the exclusions stay as they are.
             var excluded = req.Excluded is null ? slot.Excluded
                 : req.Excluded.Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -142,7 +142,7 @@ public static class AdminEndpoints
             slot.Excluded = excluded;
             slot.AutoFill = req.AutoFill;
             slot.EndedAt = slot.Phase == Phase.Ended ? slot.EndedAt ?? Phases.Now() : null;
-            (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Clean(req.Organiser), Clean(req.OrganiserEmail), req.Visibility);
+            (slot.Parish, slot.Organiser, slot.OrganiserEmail, slot.Visibility) = (ParishOf(req.Parish), Validation.Clean(req.Organiser), Validation.Clean(req.OrganiserEmail), req.Visibility);
             slot.Apply(rules);
             // Fewer extra seats allowed: offers above the new maximum are cut down.
             foreach (var b in await db.Ballots.Where(b => b.FairSlotId == id && b.Extra > rules.MaxExtra).ToListAsync())
@@ -225,7 +225,7 @@ public static class AdminEndpoints
             await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activityRemoved", entity.Title, null, null,
                 Undo.Json(new(await Undo.ActivitiesAsync(db, entity.FairSlotId, [activityId]), [])));
             // Remove the points ballots gave to this activity.
-            foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == entity.FairSlotId).ToListAsync())
+            foreach (var b in await db.Ballots.Where(b => b.FairSlotId == entity.FairSlotId).ToListAsync())
                 b.Points.RemoveAll(p => p.ActivityId == activityId);
             db.Activities.Remove(entity);
             await db.SaveChangesAsync();
@@ -251,13 +251,12 @@ public static class AdminEndpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             var result = ActivityCsv.Parse(req.Csv ?? "", slot.ToRules().GroupList);
-            var (activities, leaders) = await Leaders.ForImportAsync(db, slot, result.Activities, req.LeaderEmails, Clean(req.OrganiserEmail));
+            var (activities, leaders) = await Leaders.ForImportAsync(db, slot, result.Activities, req.LeaderEmails, Validation.Clean(req.OrganiserEmail));
             if (!req.Commit || result.Errors.Count > 0 || result.Activities.Count == 0)
                 return Results.Ok(new ImportPreviewDto(activities.Select(Endpoints.ToAdminDto).ToList(), result.Errors, false, leaders));
             if (req.Replace && slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
-            if (leaders.FirstOrDefault(l => l.Email is null || !ParticipantCsv.IsEmail(l.Email)) is { } missing)
-                return Results.BadRequest(new ErrorsDto([new ValidationError(missing.Email is null ? "leaderEmailMissing" : "emailInvalid",
-                    new Dictionary<string, object> { ["name"] = missing.Name ?? "" })]));
+            if (leaders.FirstOrDefault(l => l.Email is null || !Validation.IsEmail(l.Email)) is { } missing)
+                return Endpoints.Errors(missing.Email is null ? "leaderEmailMissing" : "emailInvalid", "name", missing.Name ?? "");
             if (leaders.FirstOrDefault(l => l.IsOrganiser) is { } organiser) slot.OrganiserEmail = organiser.Email;
 
             var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
@@ -266,7 +265,7 @@ public static class AdminEndpoints
             {
                 // Replacing removes the old activities and the points ballots gave to them.
                 db.Activities.RemoveRange(await db.Activities.Where(a => a.FairSlotId == id).ToListAsync());
-                foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == id).ToListAsync()) b.Points.Clear();
+                foreach (var b in await db.Ballots.Where(b => b.FairSlotId == id).ToListAsync()) b.Points.Clear();
                 order = 0;
             }
             var added = activities.Select(a => Database.ToEntity(a, id, order++)).ToList();
@@ -319,10 +318,9 @@ public static class AdminEndpoints
         admin.MapParticipantAdmin();
     }
 
-    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     /// <summary>Official parish name for a full or short form; unknown text is kept so validation can report it.</summary>
-    private static string? ParishOf(string? text) => Parishes.Match(text) ?? Clean(text);
+    private static string? ParishOf(string? text) => Parishes.Match(text) ?? Validation.Clean(text);
 
     /// <summary>Copies a request onto an activity entity (sessions are matched by id). Returns an error result if invalid.</summary>
     private static IResult? Apply(ActivityEntity entity, ActivityRequest req, FairSlotEntity slot)
@@ -330,17 +328,17 @@ public static class AdminEndpoints
         var restricted = string.IsNullOrWhiteSpace(req.RestrictedTo) ? null : req.RestrictedTo;
         var sessions = (req.Sessions ?? []).Select(s =>
             new Session(s.Id ?? "", entity.Id, s.Start, s.Flexible ? null : s.End, (s.Location ?? "").Trim(), s.Capacity, s.Flexible)).ToList();
-        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Clean(req.Leader), LeaderEmail: Clean(req.LeaderEmail)));
-        errors.AddRange(Leaders.Check(Clean(req.Leader), Clean(req.LeaderEmail), slot));
+        var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Validation.Clean(req.Leader), LeaderEmail: Validation.Clean(req.LeaderEmail)));
+        errors.AddRange(Leaders.Check(Validation.Clean(req.Leader), Validation.Clean(req.LeaderEmail), slot));
         if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
         entity.Title = req.Title!.Trim();
         entity.RestrictedTo = restricted;
         entity.GroupId = string.IsNullOrWhiteSpace(req.GroupId) ? null : req.GroupId;
-        entity.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
+        entity.Description = Validation.Clean(req.Description);
         entity.Parish = ParishOf(req.Parish);
-        entity.Leader = Clean(req.Leader);
-        entity.LeaderEmail = Clean(req.LeaderEmail);
+        entity.Leader = Validation.Clean(req.Leader);
+        entity.LeaderEmail = Validation.Clean(req.LeaderEmail);
         var keep = new List<SessionEntity>();
         foreach (var s in sessions)
         {

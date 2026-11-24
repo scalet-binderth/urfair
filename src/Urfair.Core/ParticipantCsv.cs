@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Net.Mail;
 using System.Text;
 
 namespace Urfair.Core;
@@ -29,18 +28,12 @@ public static class ParticipantCsv
     public static Result Parse(string text)
     {
         var errors = new List<ValidationError>();
-        var rows = ActivityCsv.ReadRows(text.TrimStart('﻿'));
+        var rows = Csv.ReadRows(text);
         if (rows.Count == 0) return new([], [E("csvEmpty", 0)]);
 
-        var header = rows[0].Select(ActivityCsv.Normalise).Select(h => Columns.GetValueOrDefault(h)).ToList();
+        var Cell = Csv.Header(rows[0], Columns, out var header);
         if (!header.Contains("name") && !(header.Contains("first") && header.Contains("last")))
             return new([], [E("csvColumnsMissing", 1, ("columns", "Name / Vorname, Nachname"))]);
-
-        string Cell(List<string> row, string column)
-        {
-            var i = header.IndexOf(column);
-            return i >= 0 && i < row.Count ? row[i].Trim() : "";
-        }
 
         var people = new List<Person>();
         for (var r = 1; r < rows.Count; r++)
@@ -52,18 +45,16 @@ public static class ParticipantCsv
             var name = Cell(row, "name");
             if (name.Length == 0) name = $"{Cell(row, "first")} {Cell(row, "last")}".Trim();
             if (name.Length == 0) { errors.Add(E("csvNameMissing", line)); continue; }
-            if (name.Length > 120) { errors.Add(E("textTooLong", line, ("max", 120))); continue; }
+            if (name.Length > Validation.MaxShortText) { errors.Add(E("textTooLong", line, ("max", Validation.MaxShortText))); continue; }
             if (people.Any(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) { errors.Add(E("csvDuplicate", line, ("value", name))); continue; }
 
             var email = Cell(row, "email");
-            if (email.Length > 0 && !IsEmail(email)) { errors.Add(E("csvEmailInvalid", line, ("value", email))); continue; }
+            if (email.Length > 0 && !Validation.IsEmail(email)) { errors.Add(E("csvEmailInvalid", line, ("value", email))); continue; }
 
-            if (!TryDate(Cell(row, "birth"), out var birth) || !TryDate(Cell(row, "baptism"), out var baptism))
-            {
-                var bad = TryDate(Cell(row, "birth"), out _) ? Cell(row, "baptism") : Cell(row, "birth");
-                errors.Add(E("csvDateInvalid", line, ("value", bad)));
-                continue;
-            }
+            var birthText = Cell(row, "birth");
+            if (!TryDate(birthText, out var birth)) { errors.Add(E("csvDateInvalid", line, ("value", birthText))); continue; }
+            var baptismText = Cell(row, "baptism");
+            if (!TryDate(baptismText, out var baptism)) { errors.Add(E("csvDateInvalid", line, ("value", baptismText))); continue; }
 
             var parishText = Cell(row, "parish");
             var parish = Parishes.Match(parishText);
@@ -87,15 +78,11 @@ public static class ParticipantCsv
     /// <summary>Same format back (separator ;), e.g. as a template or to edit the list in Excel.</summary>
     public static string Write(IEnumerable<Person> people)
     {
-        var sb = new StringBuilder("Name;E-Mail;Geburtsdatum;Taufdatum;Pfarrgemeinde\r\n");
+        var sb = new StringBuilder(Csv.Line(["Name", "E-Mail", "Geburtsdatum", "Taufdatum", "Pfarrgemeinde"]));
         foreach (var p in people)
-            sb.Append(string.Join(';', new[] { p.Name, p.Email ?? "", p.BirthDate?.ToString("dd.MM.yyyy") ?? "", p.BaptismDate?.ToString("dd.MM.yyyy") ?? "", p.Parish ?? "" }.Select(ActivityCsv.Quote))).Append("\r\n");
+            sb.Append(Csv.Line([p.Name, p.Email ?? "", p.BirthDate?.ToString("dd.MM.yyyy") ?? "", p.BaptismDate?.ToString("dd.MM.yyyy") ?? "", p.Parish ?? ""]));
         return sb.ToString();
     }
 
-    public static bool IsEmail(string text) =>
-        text.Length <= 200 && MailAddress.TryCreate(text, out var a) && a.Address == text && a.Host.Contains('.');
-
-    private static ValidationError E(string code, int row, params (string Key, object Value)[] args) =>
-        new(code, args.Append(("row", row)).ToDictionary(a => a.Key, a => a.Value));
+    private static ValidationError E(string code, int row, params (string Key, object Value)[] args) => Csv.Error(code, row, args);
 }

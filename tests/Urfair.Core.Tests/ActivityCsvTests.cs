@@ -27,6 +27,30 @@ public class ActivityCsvTests
     }
 
     [Fact]
+    public void Column_names_may_carry_a_hint_in_brackets()
+    {
+        const string csv = "Titel;Teilnahme (m/w);Beginn;Plätze (leer = unbegrenzt);Nach Vereinbarung (ja)\r\n" +
+                           "Mädchenabend;w;10.05.2027;12;ja\r\n";
+        var a = ActivityCsv.Parse(csv, []).Activities.Single();
+        Assert.Equal("w", a.RestrictedTo);
+        Assert.Equal(12, a.Seats);
+        Assert.True(a.Sessions[0].Flexible);
+    }
+
+    [Fact]
+    public void Cells_that_look_like_formulas_are_written_harmless_and_read_back_unchanged()
+    {
+        var a = new Activity("a", "=HYPERLINK(\"x\")", [new Session("s", "a", new DateTime(2027, 5, 10, 17, 0, 0), null, "@Ort", 5)], Description: "- Liste");
+        var csv = ActivityCsv.Write([a], []);
+        Assert.Contains("'=HYPERLINK", csv);
+        Assert.Contains(";'@Ort;", csv);
+        var back = ActivityCsv.Parse(csv, []).Activities.Single();
+        Assert.Equal(a.Title, back.Title);
+        Assert.Equal("- Liste", back.Description);
+        Assert.Equal("@Ort", back.Sessions[0].Location);
+    }
+
+    [Fact]
     public void Reports_problems_with_row_numbers()
     {
         const string csv = "Title,Start,End,Seats,Group\nKino,soon,,10,\n,10.5.2027 17:00,,,\nX,10.5.2027 17:00,16:00,5,Rot\n";

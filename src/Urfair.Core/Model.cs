@@ -30,6 +30,9 @@ public sealed record Activity(
     string? LeaderEmail = null)
 {
     public int? Seats => Sessions.Any(s => s.Capacity is null) ? null : Sessions.Sum(s => s.Capacity!.Value);
+
+    /// <summary>Whether a person of this gender (null = unknown) may take part.</summary>
+    public bool OpenTo(string? gender) => RestrictedTo is null || gender is null || RestrictedTo == gender;
 }
 
 /// <summary>
@@ -87,15 +90,13 @@ public record Rules(
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyList<ActivityGroup> GroupList => Groups ?? [];
 
-    public ActivityGroup? GroupOf(Activity a) => a.GroupId is null ? null : GroupList.FirstOrDefault(g => g.Id == a.GroupId);
-
     // Compare groups by content so that "rules changed" detection works.
     public virtual bool Equals(Rules? other) =>
         other is not null && (PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, MaxExtra, RequiredStaffing, Friends) ==
         (other.PointBudget, other.MinActivities, other.MaxPerActivity, other.PerParticipant, other.Step, other.MaxExtra, other.RequiredStaffing, other.Friends) &&
         GroupList.SequenceEqual(other.GroupList);
 
-    public override int GetHashCode() => HashCode.Combine(PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, GroupList.Count, MaxExtra, RequiredStaffing);
+    public override int GetHashCode() => HashCode.Combine(PointBudget, MinActivities, MaxPerActivity, PerParticipant, Step, GroupList.Count, MaxExtra, HashCode.Combine(RequiredStaffing, Friends));
 }
 
 public sealed class Assignment(string ballotId, Session session, int points)

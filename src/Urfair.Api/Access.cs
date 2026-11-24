@@ -60,7 +60,8 @@ public static class Access
         if (account is null) return Results.Unauthorized();
         http.Items[AccountKey] = account;
 
-        var path = http.Request.Path.Value ?? "";
+        // The matched route pattern, not the request path: routing ignores letter case, so "/api/admin/Accounts" must not slip through.
+        var path = (http.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "";
         if (path.StartsWith("/api/admin/accounts") || path == "/api/admin/reset-all")
             return account.IsJuniaAdmin ? await next(ctx) : Results.Forbid();
 
@@ -77,8 +78,8 @@ public static class Access
         if (participantArea && access.Scope is { Count: 0 }) return Results.Forbid();
         // Ended is read only; only the settings (e.g. back to Closed) and deleting stay possible.
         if (change && slot.Phase == Phase.Ended && !HttpMethods.IsDelete(http.Request.Method)
-            && !(HttpMethods.IsPut(http.Request.Method) && path.TrimEnd('/').Equals($"/api/admin/slots/{slot.Id}", StringComparison.OrdinalIgnoreCase)))
-            return Results.BadRequest(new ErrorsDto([new ValidationError("slotEnded")]));
+            && !(HttpMethods.IsPut(http.Request.Method) && path == "/api/admin/slots/{id:guid}"))
+            return Endpoints.Errors("slotEnded");
         return await next(ctx);
     }
 

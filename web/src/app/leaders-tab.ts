@@ -47,11 +47,9 @@ import { Toast } from './toast';
     </div>
   `,
   styles: `
-    .warn { color: var(--warn) }
     td { vertical-align: top }
     td input { width: 100%; min-width: 160px }
     .actions { white-space: nowrap; text-align: right }
-    .btn.small { padding: 6px 12px; font-size: 14px }
   `,
 })
 export class LeadersTab implements OnInit {

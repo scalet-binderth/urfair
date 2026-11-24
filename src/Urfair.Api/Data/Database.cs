@@ -8,6 +8,9 @@ namespace Urfair.Api.Data;
 
 public static class Database
 {
+    /// <summary>Times stored as UTC come back from the database without a kind; marks them as UTC for JSON.</summary>
+    public static DateTime Utc(DateTime t) => DateTime.SpecifyKind(t, DateTimeKind.Utc);
+
     /// <summary>
     /// Demo mode (default on): demo people, sample data and reset buttons. A real instance sets
     /// Demo__Enabled=false; the same code then runs without any demo content.
@@ -122,7 +125,7 @@ public static class Database
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         var today = DateOnly.FromDateTime(Phases.Now());
         var firmung = await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
-            SampleData.FirmungRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, organiserEmail: SampleData.FirmungOrganiserEmail, visibility: Visibility.JuniaReadOnly);
+            SampleData.ConfirmationRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.ConfirmationParish, organiser: SampleData.ConfirmationOrganiser, organiserEmail: SampleData.ConfirmationOrganiserEmail, visibility: Visibility.JuniaReadOnly);
         // B and C entered the same friend code: they wish to share an activity.
         foreach (var x in await db.Ballots.Where(x => x.FairSlotId == firmung.Id && (x.Name == b || x.Name == c)).ToListAsync()) x.Friends = DemoData.FriendCode;
         await SeedMailsAsync(db, firmung, baseUrl);
@@ -172,8 +175,8 @@ public static class Database
 
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
-        CreateSlotAsync(db, name, phase, DeadlineIn(14), SampleData.FirmungRules, SampleData.Activities().MovedTo(DateOnly.FromDateTime(Phases.Now()).AddDays(17)),
-            sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, organiserEmail: SampleData.FirmungOrganiserEmail);
+        CreateSlotAsync(db, name, phase, DeadlineIn(14), SampleData.ConfirmationRules, SampleData.Activities().MovedTo(DateOnly.FromDateTime(Phases.Now()).AddDays(17)),
+            sampleCount, [], parish: SampleData.ConfirmationParish, organiser: SampleData.ConfirmationOrganiser, organiserEmail: SampleData.ConfirmationOrganiserEmail);
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     /// <param name="choices">Fixed points (activity title → points) for some of <paramref name="withBallots"/>; the others get generated ones.</param>
@@ -245,7 +248,7 @@ public static class Database
         var activities = await db.Activities.Include(a => a.Sessions).Where(a => a.FairSlotId == slot.Id).ToListAsync();
         var activityOf = activities.SelectMany(a => a.Sessions).ToDictionary(s => s.Id, s => s.ActivityId);
         var wanted = titles.Select(t => activities.Single(a => a.Title == t).Sessions.Single().Id).ToList();
-        var ballots = await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == slot.Id).ToListAsync();
+        var ballots = await db.Ballots.Where(b => b.FairSlotId == slot.Id).ToListAsync();
         var me = ballots.Single(b => b.Name == person);
         var seats = await db.Assignments.Where(a => a.FairSlotId == slot.Id).ToListAsync();
         bool Holds(BallotEntity b, string activityId) => seats.Any(a => a.BallotId == b.Id && activityOf[a.SessionId] == activityId);
@@ -283,7 +286,7 @@ public static class Database
     {
         var rnd = new Random(slot.Seed + 2);
         var (allocation, _, _) = await AllocationEndpoints.CurrentAsync(db, slot);
-        foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == slot.Id && b.IsSample).ToListAsync())
+        foreach (var b in await db.Ballots.Where(b => b.FairSlotId == slot.Id && b.IsSample).ToListAsync())
         {
             if (rnd.Next(3) == 0) continue;
             var lowest = allocation.Assignments[b.Id.ToString()].Select(x => x.Points).DefaultIfEmpty(0).Min();
@@ -329,6 +332,13 @@ public static class Database
     {
         var n = name.Trim().ToLower();
         return db.Participants.AnyAsync(p => p.FairSlotId == slotId && p.Name.ToLower() == n);
+    }
+
+    /// <summary>The person (by name) on the participant list of a FairSlot, if they have an e-mail address: who gets mails.</summary>
+    public static Task<ParticipantEntity?> ListedAsync(AppDbContext db, Guid slotId, string name)
+    {
+        var n = name.Trim().ToLower();
+        return db.Participants.FirstOrDefaultAsync(p => p.FairSlotId == slotId && p.Email != null && p.Name.ToLower() == n);
     }
 
     private static async Task WipeAsync(AppDbContext db)
@@ -380,5 +390,5 @@ public static class Database
         .Select(a => a.ToModel()).ToList();
 
     public static async Task<List<BallotEntity>> LoadBallotsAsync(AppDbContext db, Guid slotId) =>
-        await db.Ballots.Include(b => b.Points).AsNoTracking().Where(b => b.FairSlotId == slotId).ToListAsync();
+        await db.Ballots.AsNoTracking().Where(b => b.FairSlotId == slotId).ToListAsync();
 }

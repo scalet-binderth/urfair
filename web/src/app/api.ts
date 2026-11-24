@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable, firstValueFrom } from 'rxjs';
 
 export type Phase = 'Draft' | 'Open' | 'Allocation' | 'Published' | 'Closed' | 'Ended';
@@ -12,7 +12,7 @@ export const GROUP_COLORS = ['green', 'blue', 'orange', 'purple', 'red', 'grey']
 export interface Rules { pointBudget: number; minActivities: number; maxPerActivity: number; perParticipant: number; step: number; groups: Group[] | null; maxExtra?: number; requiredStaffing?: boolean; friends?: number; }
 export interface PreviousBallot { points: Record<string, number>; unavailableSessions: string[]; extra?: number; friends?: string | null; friendNames?: string[]; }
 export interface SlotSummary { id: string; name: string; phase: Phase; registrationDeadline: string | null; activityCount: number; ballotCount: number; parish?: string | null; visibility?: Visibility; canEdit?: boolean; deleteOn?: string | null; }
-export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; adminProtected: boolean; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; deleteOn?: string | null; excluded?: string[] | null; autoFill?: boolean; }
+export interface Slot { id: string; name: string; phase: Phase; registrationDeadline: string | null; rules: Rules; ballotCount: number; sampleCount: number; openToAll: boolean; parish: string | null; organiser: string | null; visibility: Visibility; showInterim: boolean; canEdit?: boolean | null; organiserEmail?: string | null; deleteOn?: string | null; excluded?: string[] | null; autoFill?: boolean; }
 /** missing: required staffing, people still missing on this date (participant view). */
 export interface Session { id: string; start: string; end: string | null; location: string; capacity: number | null; flexible: boolean; missing?: number | null; }
 export interface Activity { id: string; title: string; restrictedTo: string | null; seats: number | null; sessions: Session[]; groupId: string | null; description: string | null; parish: string | null; leader: string | null; leaderEmail?: string | null; }
@@ -21,7 +21,7 @@ export interface ActivityInput { title: string; restrictedTo: string | null; ses
 export interface SlotUpdate { name: string; phase: Phase; registrationDeadline: string | null; openToAll: boolean; parish: string | null; organiser: string | null; organiserEmail: string | null; visibility: Visibility; showInterim: boolean; rules: Rules; excluded: string[]; autoFill: boolean; }
 export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
-export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
+export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; }
 export interface AccountInput { email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; }
 export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; resetRequestedAt: string | null; }
 export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; baptismDate: string | null; parish: string | null; }
@@ -57,7 +57,7 @@ export interface Participant {
 }
 export interface Suggestion { sessionId: string; activityId: string; title: string; start: string; flexible: boolean; points: number; kind: 'otherDate' | 'pointed' | 'free' | 'overbook'; }
 /** A free seat offered to one person when closed. */
-export interface Offer { id: string; sessionId: string; person: string; status: 'open' | 'accepted' | 'declined' | 'expired' | 'withdrawn'; givesUp: string | null; expiresAt: string; createdAt: string; answeredAt: string | null; }
+export interface Offer { id: string; sessionId: string; person: string; status: 'open' | 'accepted' | 'declined' | 'expired' | 'withdrawn'; givesUp: string | null; expiresAt: string; createdAt: string; }
 /** Who would be asked next for a free seat of a date (Closed). */
 export interface OfferPreview { sessionId: string; next: { person: string; givesUp: string | null; need: boolean }[]; }
 export interface MyOffer { id: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; givesUp: string | null; expiresAt: string; }
@@ -73,7 +73,7 @@ export interface GiveUpOption { activityId: string; title: string; points: numbe
 export interface OpenSeat { sessionId: string; activityId: string; title: string; start: string; end: string | null; flexible: boolean; location: string; points: number; }
 export interface Missing { groupId: string | null; count: number; open: OpenSeat[]; }
 export interface MyStatus { voted: boolean; activities: MyActivityStatus[]; full: string[]; missing: Missing[] | null; offer?: MyOffer | null; }
-export interface Allocation { seed: number; perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; wasVisible?: boolean; }
+export interface Allocation { perParticipant: number; pointBased: Metrics; firstComeFirstServed: Metrics; sessionLoad: Record<string, number | undefined>; participants: Participant[]; frozenAt: string | null; wasVisible?: boolean; }
 export interface Seat { sessionId: string; locked: boolean; }
 export interface ListPerson { name: string; parish: string | null; email: string | null; birthDate: string | null; baptismDate: string | null; }
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
@@ -127,7 +127,7 @@ export class Api {
   retryAccountMail(mailId: string) { return this.call(this.http.post<void>(`/api/admin/accounts/mails/${mailId}/retry`, {})); }
 
   // ---------- general ----------
-  info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[]; version?: string }>('/api/info')); }
+  info() { return this.call(this.http.get<{ demo: boolean; mailSending: boolean; parishes: string[]; version?: string }>('/api/info')); }
   /** Legal notice and privacy policy of this instance; null: not set, the page shows its template. */
   legal() { return this.call(this.http.get<{ imprint: string | null; privacy: string | null; retentionDays: number }>('/api/legal')); }
 
@@ -184,76 +184,73 @@ export class Api {
   }
 
   // ---------- organisation ----------
-  adminSlots() { return this.call(this.http.get<SlotSummary[]>('/api/admin/slots', this.admin())); }
+  adminSlots() { return this.call(this.http.get<SlotSummary[]>('/api/admin/slots')); }
   /** With copyFrom the new vote takes over settings, activities and dates of that vote, shifted by shiftWeeks. */
   createSlot(name: string, withSampleData: boolean, copyFrom: string | null = null, shiftWeeks = 0) {
-    return this.call(this.http.post<{ id: string }>('/api/admin/slots', { name, withSampleData, copyFrom, shiftWeeks }, this.admin()));
+    return this.call(this.http.post<{ id: string }>('/api/admin/slots', { name, withSampleData, copyFrom, shiftWeeks }));
   }
-  adminSlot(id: string) { return this.call(this.http.get<Slot>(`/api/admin/slots/${id}`, this.admin())); }
-  updateSlot(id: string, body: SlotUpdate) { return this.call(this.http.put(`/api/admin/slots/${id}`, body, this.admin())); }
-  deleteSlot(id: string) { return this.call(this.http.delete(`/api/admin/slots/${id}`, this.admin())); }
-  adminActivities(id: string) { return this.call(this.http.get<Activity[]>(`/api/admin/slots/${id}/activities`, this.admin())); }
+  adminSlot(id: string) { return this.call(this.http.get<Slot>(`/api/admin/slots/${id}`)); }
+  updateSlot(id: string, body: SlotUpdate) { return this.call(this.http.put(`/api/admin/slots/${id}`, body)); }
+  deleteSlot(id: string) { return this.call(this.http.delete(`/api/admin/slots/${id}`)); }
+  adminActivities(id: string) { return this.call(this.http.get<Activity[]>(`/api/admin/slots/${id}/activities`)); }
   addActivity(slotId: string, body: ActivityInput) {
-    return this.call(this.http.post<{ id: string }>(`/api/admin/slots/${slotId}/activities`, body, this.admin()));
+    return this.call(this.http.post<{ id: string }>(`/api/admin/slots/${slotId}/activities`, body));
   }
-  updateActivity(id: string, body: ActivityInput) { return this.call(this.http.put(`/api/admin/activities/${id}`, body, this.admin())); }
-  deleteActivity(id: string) { return this.call(this.http.delete(`/api/admin/activities/${id}`, this.admin())); }
-  demand(id: string) { return this.call(this.http.get<Demand[]>(`/api/admin/slots/${id}/demand`, this.admin())); }
+  updateActivity(id: string, body: ActivityInput) { return this.call(this.http.put(`/api/admin/activities/${id}`, body)); }
+  deleteActivity(id: string) { return this.call(this.http.delete(`/api/admin/activities/${id}`)); }
+  demand(id: string) { return this.call(this.http.get<Demand[]>(`/api/admin/slots/${id}/demand`)); }
   resetDemo(id: string, body: { sampleCount: number; newSeed: boolean; removeRealBallots: boolean }) {
-    return this.call(this.http.post(`/api/admin/slots/${id}/reset-demo`, body, this.admin()));
+    return this.call(this.http.post(`/api/admin/slots/${id}/reset-demo`, body));
   }
-  participants(id: string) { return this.call(this.http.get<ListedParticipant[]>(`/api/admin/slots/${id}/participants`, this.admin())); }
-  addParticipant(id: string, body: ParticipantInput) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, body, this.admin())); }
-  updateParticipant(participantId: string, body: ParticipantInput) { return this.call(this.http.put(`/api/admin/participants/${participantId}`, body, this.admin())); }
-  exportParticipants(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/participants.csv`, { ...this.admin(), responseType: 'blob' })); }
+  participants(id: string) { return this.call(this.http.get<ListedParticipant[]>(`/api/admin/slots/${id}/participants`)); }
+  addParticipant(id: string, body: ParticipantInput) { return this.call(this.http.post(`/api/admin/slots/${id}/participants`, body)); }
+  updateParticipant(participantId: string, body: ParticipantInput) { return this.call(this.http.put(`/api/admin/participants/${participantId}`, body)); }
+  exportParticipants(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/participants.csv`, { responseType: 'blob' })); }
   importParticipants(id: string, body: { csv: string; commit: boolean }) {
-    return this.call(this.http.post<{ people: ParticipantInput[]; errors: ApiError[]; new: number; updated: number; saved: boolean }>(`/api/admin/slots/${id}/participants/import`, body, this.admin()));
+    return this.call(this.http.post<{ people: ParticipantInput[]; errors: ApiError[]; new: number; updated: number; saved: boolean }>(`/api/admin/slots/${id}/participants/import`, body));
   }
   /** People of another vote: preview (commit false) or add them; names already listed are skipped. */
   copyParticipants(id: string, body: { from: string; commit: boolean }) {
-    return this.call(this.http.post<{ new: number; known: number; saved: boolean }>(`/api/admin/slots/${id}/participants/copy`, body, this.admin()));
+    return this.call(this.http.post<{ new: number; known: number; saved: boolean }>(`/api/admin/slots/${id}/participants/copy`, body));
   }
-  createInvitations(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/invitations`, {}, this.admin())); }
-  mails(id: string) { return this.call(this.http.get<Mail[]>(`/api/admin/slots/${id}/mails`, this.admin())); }
-  mailboxes(id: string) { return this.call(this.http.get<Mailbox[]>(`/api/admin/slots/${id}/mailboxes`, this.admin())); }
-  removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
-  exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { ...this.admin(), responseType: 'blob' })); }
+  createInvitations(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/invitations`, {})); }
+  mails(id: string) { return this.call(this.http.get<Mail[]>(`/api/admin/slots/${id}/mails`)); }
+  mailboxes(id: string) { return this.call(this.http.get<Mailbox[]>(`/api/admin/slots/${id}/mailboxes`)); }
+  removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`)); }
+  exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { responseType: 'blob' })); }
   importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean; leaderEmails?: Record<string, string>; organiserEmail?: string | null }) {
-    return this.call(this.http.post<{ activities: Activity[]; errors: ApiError[]; saved: boolean; leaders: Leader[] | null }>(`/api/admin/slots/${id}/import`, body, this.admin()));
+    return this.call(this.http.post<{ activities: Activity[]; errors: ApiError[]; saved: boolean; leaders: Leader[] | null }>(`/api/admin/slots/${id}/import`, body));
   }
-  leaders(id: string) { return this.call(this.http.get<Leader[]>(`/api/admin/slots/${id}/leaders`, this.admin())); }
+  leaders(id: string) { return this.call(this.http.get<Leader[]>(`/api/admin/slots/${id}/leaders`)); }
   updateLeader(id: string, body: { oldName: string | null; isOrganiser: boolean; name: string | null; email: string | null }) {
-    return this.call(this.http.put<Leader[]>(`/api/admin/slots/${id}/leaders`, body, this.admin()));
+    return this.call(this.http.put<Leader[]>(`/api/admin/slots/${id}/leaders`, body));
   }
-  leaderChanges(id: string) { return this.call(this.http.get<LeaderChange[]>(`/api/admin/slots/${id}/leader-changes`, this.admin())); }
+  leaderChanges(id: string) { return this.call(this.http.get<LeaderChange[]>(`/api/admin/slots/${id}/leader-changes`)); }
   sendLeaderChanges(id: string, emails: string[] | null) {
-    return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/leader-changes/send`, { emails }, this.admin()));
+    return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/leader-changes/send`, { emails }));
   }
-  resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
-  allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }
-  recalculateAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/recalculate`, {}, this.admin())); }
+  resetAll() { return this.call(this.http.post('/api/admin/reset-all', {})); }
+  allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`)); }
+  recalculateAllocation(id: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/recalculate`, {})); }
   setSeats(id: string, ballotId: string, seats: Seat[]) {
-    return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }, this.admin()));
+    return this.call(this.http.put<Allocation>(`/api/admin/slots/${id}/allocation/${ballotId}`, { seats }));
   }
-  allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`, this.admin())); }
+  allocationLog(id: string) { return this.call(this.http.get<LogEntry[]>(`/api/admin/slots/${id}/allocation/log`)); }
   restorePreview(id: string, logId: string) {
-    return this.call(this.http.get<RestorePreview>(`/api/admin/slots/${id}/allocation/restore/${logId}`, this.admin()));
+    return this.call(this.http.get<RestorePreview>(`/api/admin/slots/${id}/allocation/restore/${logId}`));
   }
-  restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {}, this.admin())); }
-  undo(id: string, logId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/log/${logId}/undo`, {}, this.admin())); }
-  offers(id: string) { return this.call(this.http.get<Offer[]>(`/api/admin/slots/${id}/offers`, this.admin())); }
-  offerPreview(id: string) { return this.call(this.http.get<OfferPreview[]>(`/api/admin/slots/${id}/offers/next`, this.admin())); }
-  fillSeat(id: string, sessionId: string) { return this.call(this.http.post(`/api/admin/slots/${id}/offers`, { sessionId }, this.admin())); }
-  leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`, this.admin())); }
+  restore(id: string, logId: string) { return this.call(this.http.post<Allocation>(`/api/admin/slots/${id}/allocation/restore/${logId}`, {})); }
+  undo(id: string, logId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/log/${logId}/undo`, {})); }
+  offers(id: string) { return this.call(this.http.get<Offer[]>(`/api/admin/slots/${id}/offers`)); }
+  offerPreview(id: string) { return this.call(this.http.get<OfferPreview[]>(`/api/admin/slots/${id}/offers/next`)); }
+  fillSeat(id: string, sessionId: string) { return this.call(this.http.post(`/api/admin/slots/${id}/offers`, { sessionId })); }
+  leaderLists(id: string) { return this.call(this.http.get<LeaderLists>(`/api/admin/slots/${id}/allocation/lists`)); }
   leaderMails(id: string, body: { activityIds: string[]; withEmail: boolean; withBirthDate: boolean; withBaptismDate: boolean }) {
-    return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body, this.admin()));
+    return this.call(this.http.post<{ created: number; withoutEmail: number }>(`/api/admin/slots/${id}/allocation/leader-mails`, body));
   }
-  createReminders(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/reminders`, {}, this.admin())); }
-  createResultMails(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/result-mails`, {}, this.admin())); }
-  retryMail(id: string, mailId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/mails/${mailId}/retry`, {}, this.admin())); }
-
-  /** Organiser requests rely on the sign-in cookie; kept as a hook for request options. */
-  private admin() { return {}; }
+  createReminders(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/reminders`, {})); }
+  createResultMails(id: string) { return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/result-mails`, {})); }
+  retryMail(id: string, mailId: string) { return this.call(this.http.post<void>(`/api/admin/slots/${id}/mails/${mailId}/retry`, {})); }
 
   private async call<T>(request: Observable<T>): Promise<T> {
     try {
