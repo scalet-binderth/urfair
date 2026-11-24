@@ -79,6 +79,11 @@ export interface ListPerson { name: string; parish: string | null; email: string
 export interface ListSession { id: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; people: ListPerson[]; }
 export interface ListActivity { id: string; title: string; leader: string | null; leaderEmail: string | null; groupId: string | null; sessions: ListSession[]; }
 export interface LeaderLists { frozen: boolean; activities: ListActivity[]; }
+/** isOrganiser: the vote's organiser, leading every activity without a leader; emails: more than one address found (older data). */
+export interface Leader { name: string | null; email: string | null; isOrganiser: boolean; activities: { id: string; title: string }[]; emails: string[]; }
+export interface LeaderSessionChange { activityId: string; title: string; sessionId: string; start: string; end: string | null; flexible: boolean; location: string; capacity: number | null; added: string[]; removed: string[]; count: number; }
+/** A leader who does not know about changes to their lists yet. */
+export interface LeaderChange { email: string; name: string | null; sessions: LeaderSessionChange[]; }
 export interface LogEntry {
   id: string; at: string; actor: string; person: string | null; before: string | null; after: string | null;
   /** A save point exists: the allocation can go back to the state after this entry. */
@@ -88,7 +93,7 @@ export interface LogEntry {
   kind: 'frozen' | 'recalculated' | 'unfrozen' | 'seats' | 'phase' | 'movedUp' | 'givenBack' | 'cancelled' | 'tookSeat' | 'settings' | 'activity'
     | 'activityAdded' | 'activityRemoved' | 'activitiesImported' | 'activitiesReplaced' | 'listed' | 'unlisted' | 'participantChanged' | 'renamed'
     | 'participantsImported' | 'participantsCopied' | 'restored' | 'offered' | 'offerAccepted' | 'offerDeclined' | 'offerExpired' | 'offerWithdrawn' | 'offerNone'
-    | 'undone';
+    | 'undone' | 'leader';
 }
 export interface RestoreChange { name: string; isSample: boolean; before: string; after: string; keptGivenBack: string | null; }
 export interface RestorePreview { at: string; changes: RestoreChange[]; mails: number; movesUp: boolean; }
@@ -213,8 +218,16 @@ export class Api {
   mailboxes(id: string) { return this.call(this.http.get<Mailbox[]>(`/api/admin/slots/${id}/mailboxes`, this.admin())); }
   removeParticipant(participantId: string) { return this.call(this.http.delete(`/api/admin/participants/${participantId}`, this.admin())); }
   exportActivities(id: string) { return this.call(this.http.get(`/api/admin/slots/${id}/activities.csv`, { ...this.admin(), responseType: 'blob' })); }
-  importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean }) {
-    return this.call(this.http.post<{ activities: Activity[]; errors: ApiError[]; saved: boolean }>(`/api/admin/slots/${id}/import`, body, this.admin()));
+  importActivities(id: string, body: { csv: string; replace: boolean; commit: boolean; leaderEmails?: Record<string, string>; organiserEmail?: string | null }) {
+    return this.call(this.http.post<{ activities: Activity[]; errors: ApiError[]; saved: boolean; leaders: Leader[] | null }>(`/api/admin/slots/${id}/import`, body, this.admin()));
+  }
+  leaders(id: string) { return this.call(this.http.get<Leader[]>(`/api/admin/slots/${id}/leaders`, this.admin())); }
+  updateLeader(id: string, body: { oldName: string | null; isOrganiser: boolean; name: string | null; email: string | null }) {
+    return this.call(this.http.put<Leader[]>(`/api/admin/slots/${id}/leaders`, body, this.admin()));
+  }
+  leaderChanges(id: string) { return this.call(this.http.get<LeaderChange[]>(`/api/admin/slots/${id}/leader-changes`, this.admin())); }
+  sendLeaderChanges(id: string, emails: string[] | null) {
+    return this.call(this.http.post<{ created: number }>(`/api/admin/slots/${id}/leader-changes/send`, { emails }, this.admin()));
   }
   resetAll() { return this.call(this.http.post('/api/admin/reset-all', {}, this.admin())); }
   allocation(id: string) { return this.call(this.http.get<Allocation>(`/api/admin/slots/${id}/allocation`, this.admin())); }

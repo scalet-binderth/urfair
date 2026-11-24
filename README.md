@@ -89,9 +89,14 @@ system assigns the seats:
 - **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or
-  prepare as one mail per leader (needs the leader's e-mail on the activity, which participants do not see). Once a
-  leader got their lists by mail, every later change is mailed to them ("Änderung Teilnahmeliste", `LeaderNotices.cs`):
-  changes by participants at once, others after 10 quiet minutes, so a series of edits makes one mail.
+  prepare as one mail per leader (the leader's e-mail is internal; participants do not see it). Once a leader got their
+  lists by mail, later changes are collected (`LeaderNotices.cs`): "Zuteilung" and "Listen" show which leaders do not
+  know yet and what changed, and the organisers decide whom to mail ("Änderung Teilnahmeliste"); nothing goes out on
+  its own.
+- **Leaders** (tab "Leitungen", `Leaders.cs`): every leader of a vote with e-mail address and activities, editable in
+  one place (one address per leader, shared by all their activities). The organisers lead every activity without a
+  leader of its own; their row is the same as name and e-mail in the settings. E-mail addresses are required: the
+  organisers' address (defaults to the creator's) and the leader's address once an activity names a leader.
 - **Participant list**: only listed people see a vote. Demo: identified by name; later e-mail, CSV import and personal links.
 - **Organisation area** (`/admin`): create votes, edit activities and dates, participants, settings and rules, demand, allocation, sample data.
 - **Participant area** (`/slots`, `/s/{id}`): own votes, voting, own result.
@@ -152,7 +157,9 @@ their own Pfarrgemeinden in Junia-wide votes. In demo mode, three demo accounts 
 Organisers can download the activities of a vote as CSV (`;`, UTF-8), edit the list in Excel and import it again
 (preview first, then add or replace). One row per date; rows with the same title form one activity.
 Columns: `Titel;Beschreibung;Gruppe;Pfarre;Leitung;Leitung E-Mail;Teilnahme;Beginn;Ende;Ort;Plätze;Nach Vereinbarung` (English names work too;
-only `Titel` and `Beginn` are required; `Pfarre` and `Leitung` are left empty when they match the vote).
+only `Titel` and `Beginn` are required; `Pfarre` and `Leitung` are left empty when they match the vote). The preview
+lists the leaders with their e-mail (from the CSV or already known in the vote); missing addresses must be entered
+there before the import can be taken over.
 
 For UI work with live reload: run the API as above and `npx ng serve` in `web` (http://localhost:4200, `/api` is proxied).
 

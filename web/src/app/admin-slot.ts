@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ActivityEditor } from './activity-editor';
 import { ActivityImport } from './activity-import';
+import { LeadersTab } from './leaders-tab';
 import { ListsTab } from './lists-tab';
 import { MailboxTab } from './mailbox-tab';
 import { ParticipantsTab } from './participants-tab';
@@ -13,12 +14,12 @@ import { AppInfo } from './info';
 import { ResultsPage } from './results';
 import { Toast } from './toast';
 
-type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'results' | 'lists' | 'demo';
+type Tab = 'settings' | 'activities' | 'leaders' | 'participants' | 'mail' | 'demand' | 'results' | 'lists' | 'demo';
 
 /** Organisation view of one FairSlot. */
 @Component({
   selector: 'app-admin-slot',
-  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, ListsTab, MailboxTab, ParticipantsTab, ResultsPage],
+  imports: [FormsModule, RouterLink, ActivityEditor, ActivityImport, LeadersTab, ListsTab, MailboxTab, ParticipantsTab, ResultsPage],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <p class="no-print"><a routerLink="/admin">{{ i18n.t('admin.back') }}</a></p>
@@ -71,7 +72,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                     @if (form.parish && !info.parishes().includes(form.parish)) { <option [value]="form.parish">{{ form.parish }}</option> }
                   </select></div>
                 <div class="field grow"><label for="s-organiser">{{ i18n.t('admin.organiser') }}</label><input id="s-organiser" maxlength="120" [(ngModel)]="form.organiser" /></div>
-                <div class="field grow"><label for="s-organiser-email">{{ i18n.t('admin.organiserEmail') }}</label><input id="s-organiser-email" type="email" maxlength="200" [(ngModel)]="form.organiserEmail" /></div>
+                <div class="field grow"><label for="s-organiser-email">{{ i18n.t('admin.organiserEmail') }} *</label><input id="s-organiser-email" type="email" maxlength="200" required [(ngModel)]="form.organiserEmail" /></div>
               </div>
               <p class="muted small">{{ i18n.t('admin.parishHint') }} {{ i18n.t('admin.organiserEmailHint') }}</p>
               <div class="field"><label for="s-visibility">{{ i18n.t('admin.visibility') }}</label>
@@ -145,7 +146,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         @case ('activities') {
           <div class="stack">
             @if (editing() === 'new') {
-              <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" (saved)="afterSave()" (cancelled)="editing.set(null)" />
+              <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" [known]="activities()" (saved)="afterSave()" (cancelled)="editing.set(null)" />
             } @else {
               <div class="row">
                 <button class="btn" type="button" [hidden]="!changeable()" (click)="editing.set('new')">{{ i18n.t('admin.addActivity') }}</button>
@@ -155,7 +156,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
             @if (showImport()) { <app-activity-import [slotId]="s.id" [groups]="s.rules.groups ?? []" (imported)="afterImport()" /> }
             @for (a of activities(); track a.id) {
               @if (editing() === a.id) {
-                <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" [activity]="a" (saved)="afterSave()" (cancelled)="editing.set(null)" />
+                <app-activity-editor [slotId]="s.id" [groups]="s.rules.groups ?? []" [known]="activities()" [activity]="a" (saved)="afterSave()" (cancelled)="editing.set(null)" />
               } @else {
                 <div class="card act">
                   <div class="info">
@@ -186,12 +187,18 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
           </div>
         }
 
+        @case ('leaders') { <app-leaders [slotId]="s.id" [canEdit]="changeable()" (changed)="load()" /> }
         @case ('participants') { <app-participants [slotId]="s.id" [demo]="info.demo()" /> }
         @case ('mail') { <app-mailbox [slotId]="s.id" [demo]="info.demo()" [sending]="info.mailSending()" [phase]="s.phase" /> }
 
         @case ('demand') {
           <div class="card stack">
             <p class="muted small">{{ i18n.t('admin.demandNote') }}</p>
+            <p class="legend small">
+              <span><i data-level="ok"></i>{{ i18n.t('admin.demandOk') }}</span>
+              <span><i data-level="over"></i>{{ i18n.t('admin.demandOver') }}</span>
+              <span><i data-level="high"></i>{{ i18n.t('admin.demandHigh') }}</span>
+            </p>
             <div class="tbl-wrap"><table>
               <thead><tr>
                 <th>{{ i18n.t('admin.col.activity') }}</th><th class="num">{{ i18n.t('admin.col.seats') }}</th>
@@ -207,7 +214,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
                     <td class="num">{{ d.totalPoints }}</td>
                     <td class="num">{{ d.averagePoints.toFixed(1) }}</td>
                     <td>@if (d.seats) {
-                      <div class="ratio"><div class="meter"><i [class.hot]="d.interested > d.seats" [style.width.%]="ratioWidth(d)"></i></div><span class="small">{{ (d.interested / d.seats).toFixed(1) }}×</span></div>
+                      <div class="ratio"><div class="meter"><i [attr.data-level]="demandLevel(d)" [style.width.%]="ratioWidth(d)"></i></div><span class="small">{{ (d.interested / d.seats).toFixed(1) }}×</span></div>
                     } @else { <span class="muted small">–</span> }</td>
                   </tr>
                 }
@@ -217,7 +224,7 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
         }
 
         @case ('results') { <app-results [slotId]="s.id" [phase]="s.phase" [canEdit]="changeable()" [requiredStaffing]="!!s.rules.requiredStaffing" (undone)="load()" /> }
-        @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" /> }
+        @case ('lists') { <app-lists [slotId]="s.id" [slotName]="s.name" [canEdit]="changeable()" /> }
 
         @case ('demo') {
           <div class="card stack">
@@ -272,7 +279,12 @@ type Tab = 'settings' | 'activities' | 'participants' | 'mail' | 'demand' | 'res
     .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
     .ratio { display: flex; align-items: center; gap: 8px; min-width: 150px }
     .ratio .meter { flex: 1; height: 8px }
-    .ratio .meter i.hot { background: var(--warn) }
+    [data-level=ok] { background: var(--good) }
+    [data-level=over] { background: var(--warn) }
+    [data-level=high] { background: var(--accent) }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 }
+    .legend span { display: inline-flex; align-items: center; gap: 6px }
+    .legend i { display: inline-block; width: 14px; height: 8px; border-radius: 4px }
   `,
 })
 export class AdminSlotPage implements OnInit {
@@ -286,7 +298,7 @@ export class AdminSlotPage implements OnInit {
   private toast = inject(Toast);
 
   protected info = inject(AppInfo);
-  protected get tabs(): Tab[] { return (['settings', 'activities', 'participants', 'mail', 'demand', 'results', 'lists', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
+  protected get tabs(): Tab[] { return (['settings', 'activities', 'leaders', 'participants', 'mail', 'demand', 'results', 'lists', 'demo'] as Tab[]).filter(t => t !== 'demo' || (this.info.demo() && this.canEdit())); }
   protected canEdit = computed(() => this.slot()?.canEdit !== false);
   /** Ended votes are read only; only the settings stay (e.g. to go back while the last date has not passed). */
   protected changeable = computed(() => this.canEdit() && this.slot()?.phase !== 'Ended');
@@ -356,6 +368,11 @@ export class AdminSlotPage implements OnInit {
   }
 
   protected ratioWidth(d: Demand): number { return Math.min(100, (d.interested / (d.seats ?? 1) / 3) * 100); }
+  /** Green: a seat for everyone interested; orange: overbooked; red: at least twice as many interested as seats. */
+  protected demandLevel(d: Demand): 'ok' | 'over' | 'high' {
+    const ratio = d.interested / (d.seats ?? 1);
+    return ratio >= 2 ? 'high' : ratio > 1 ? 'over' : 'ok';
+  }
 
   protected async loadOtherSlots(): Promise<void> {
     if (this.otherSlots().length) return;

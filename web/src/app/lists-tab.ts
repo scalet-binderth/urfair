@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, LeaderLists, ListActivity } from './api';
 import { I18n } from './i18n';
+import { LeaderChanges } from './leader-changes';
 import { Toast } from './toast';
 
 /** One leader with their activities (leader null = none named). */
@@ -13,7 +14,7 @@ interface LeaderGroup { leader: string | null; email: string | null; activities:
  */
 @Component({
   selector: 'app-lists',
-  imports: [FormsModule],
+  imports: [FormsModule, LeaderChanges],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="stack">
@@ -45,6 +46,8 @@ interface LeaderGroup { leader: string | null; email: string | null; activities:
         <p class="muted small">{{ i18n.t('lists.mailHint') }}</p>
         @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
       </div>
+
+      @if (data()?.frozen) { <app-leader-changes [slotId]="slotId()" [canEdit]="canEdit()" /> }
 
       @for (g of shownGroups(); track g.leader) {
         <section class="group">
@@ -113,6 +116,8 @@ interface LeaderGroup { leader: string | null; email: string | null; activities:
 export class ListsTab implements OnInit {
   readonly slotId = input.required<string>();
   readonly slotName = input('');
+  readonly canEdit = input(true);
+  private changes = viewChild(LeaderChanges);
 
   protected i18n = inject(I18n);
   private api = inject(Api);
@@ -174,6 +179,7 @@ export class ListsTab implements OnInit {
       const parts = [this.i18n.t('lists.mailed', { n: r.created })];
       if (r.withoutEmail) parts.push(this.i18n.t('lists.mailedMissing', { n: r.withoutEmail }));
       this.toast.show(parts.join(' '));
+      void this.changes()?.reload();
     } catch (e) {
       this.errors.set(this.i18n.errors(e));
     } finally {

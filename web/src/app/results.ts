@@ -1,7 +1,8 @@
-import { Component, computed, inject, input, output, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
+import { Component, computed, inject, input, output, signal, viewChild, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, Allocation, Api, ApiFailure, LogEntry, Metrics, Offer, OfferPreview, Participant, Phase, RestorePreview, Seat, Suggestion } from './api';
 import { I18n } from './i18n';
+import { LeaderChanges } from './leader-changes';
 import { Toast } from './toast';
 
 interface Card {
@@ -14,7 +15,7 @@ interface Card {
 
 @Component({
   selector: 'app-results',
-  imports: [FormsModule],
+  imports: [FormsModule, LeaderChanges],
   template: `
     @if (data(); as d) {
       <p class="muted lead">{{ i18n.t('results.lead', { n: d.pointBased.count, k: d.perParticipant }) }}</p>
@@ -47,6 +48,8 @@ interface Card {
           }
         </div>
 
+        @if (d.frozenAt && canEdit()) { <app-leader-changes [slotId]="slotId()" /> }
+
         <div class="cmp">
           @for (c of cards(); track c.label) {
             <div class="card">
@@ -70,6 +73,7 @@ interface Card {
             <li>{{ i18n.t('results.how3') }}</li>
             <li>{{ i18n.t('results.how4') }}</li>
           </ol>
+          <p class="muted small">{{ i18n.t('results.satisfactionHint') }}</p>
         </div>
 
         <div class="card stack">
@@ -171,7 +175,7 @@ interface Card {
                 <tr>
                   <th>{{ i18n.t('results.col.name') }}</th>
                   <th>{{ i18n.t('results.col.assigned') }}</th>
-                  <th>{{ i18n.t('results.col.satisfaction') }}</th>
+                  <th [title]="i18n.t('results.satisfactionHint')">{{ i18n.t('results.col.satisfaction') }}</th>
                   @if (editable()) { <th><span class="sr">{{ i18n.t('common.edit') }}</span></th> }
                 </tr>
               </thead>
@@ -625,6 +629,7 @@ export class ResultsPage implements OnInit {
   protected offers = signal<Offer[]>([]);
   /** Per date with a free seat: who would be asked next. */
   protected offerPreview = signal<OfferPreview[]>([]);
+  private leaderChanges = viewChild(LeaderChanges);
 
   /** Dates with free seats while closed, with the open offers; dates less than 36 hours ahead are no longer offered. */
   protected freeSeats = computed(() => {
@@ -893,6 +898,7 @@ export class ResultsPage implements OnInit {
   }
 
   private async loadLog(): Promise<void> {
+    void this.leaderChanges()?.reload();
     try {
       this.log.set(await this.api.allocationLog(this.slotId()));
     } catch {

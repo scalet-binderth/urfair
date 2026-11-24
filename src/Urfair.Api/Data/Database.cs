@@ -122,7 +122,7 @@ public static class Database
         var (b, c, d) = (DemoData.B.Name, DemoData.C.Name, DemoData.D.Name);
         var today = DateOnly.FromDateTime(Phases.Now());
         var firmung = await CreateSlotAsync(db, "Firmvorbereitung Urfahr (Demo)", Phase.Open, DeadlineIn(14),
-            SampleData.FirmungRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, visibility: Visibility.JuniaReadOnly);
+            SampleData.FirmungRules with { Friends = 3 }, SampleData.Activities().MovedTo(today.AddDays(17)), 140, [b, c, d], withBallots: [b, c, d], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, organiserEmail: SampleData.FirmungOrganiserEmail, visibility: Visibility.JuniaReadOnly);
         // B and C entered the same friend code: they wish to share an activity.
         foreach (var x in await db.Ballots.Where(x => x.FairSlotId == firmung.Id && (x.Name == b || x.Name == c)).ToListAsync()) x.Friends = DemoData.FriendCode;
         await SeedMailsAsync(db, firmung, baseUrl);
@@ -135,9 +135,9 @@ public static class Database
             organiserEmail: "stefan.huber@example.org", choices: DemoData.HolidayChoices, seats: DemoData.HolidaySeats, ticks: DemoData.HolidayTicks);
         await SeedMailsAsync(db, holiday, baseUrl);
         await CreateSlotAsync(db, "Jungschar-Sommerlager", Phase.Draft, DeadlineIn(180),
-            DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", visibility: Visibility.ParishOnly);
+            DemoData.CampRules, DemoData.Camp().MovedTo(today.AddDays(220)), 0, [], parish: "Pfarrgemeinde Urfahr-Christkönig", organiser: "Jungschar Christkönig", organiserEmail: "jungschar.christkoenig@example.org", visibility: Visibility.ParishOnly);
         var festival = await CreateSlotAsync(db, "Pfarrfest – Mithelfen", Phase.Open, DeadlineIn(30),
-            DemoData.FestivalRules, DemoData.ParishFestival().MovedTo(today.AddDays(45)), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler", visibility: Visibility.ParishOnly, showInterim: true);
+            DemoData.FestivalRules, DemoData.ParishFestival().MovedTo(today.AddDays(45)), 0, [], withBallots: [b, c, d], openToAll: true, parish: "Pfarrgemeinde Urfahr-St. Markus", organiser: "Maria Pichler", organiserEmail: "maria.pichler@example.org", visibility: Visibility.ParishOnly, showInterim: true);
         // D would also take one shift more than required.
         (await db.Ballots.SingleAsync(x => x.FairSlotId == festival.Id && x.Name == d)).Extra = 1;
         await db.SaveChangesAsync();
@@ -148,7 +148,7 @@ public static class Database
 
     /// <summary>
     /// Demo: the mails a vote in this phase would have sent so far, dated back. Invitations three weeks before the deadline; once
-    /// allocated the results the day after and the lists for the leaders the day after that (later changes are then mailed to them).
+    /// allocated the results the day after and the lists for the leaders the day after that (later changes are then shown to the organisers, who decide whether to mail them).
     /// </summary>
     private static async Task SeedMailsAsync(AppDbContext db, FairSlotEntity slot, string baseUrl)
     {
@@ -173,7 +173,7 @@ public static class Database
     /// <summary>Creates a FairSlot from the Urfahr sample activities (used for "create with sample data").</summary>
     public static Task<FairSlotEntity> CreateDemoSlotAsync(AppDbContext db, string name, Phase phase, int sampleCount) =>
         CreateSlotAsync(db, name, phase, DeadlineIn(14), SampleData.FirmungRules, SampleData.Activities().MovedTo(DateOnly.FromDateTime(Phases.Now()).AddDays(17)),
-            sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser);
+            sampleCount, [], parish: SampleData.FirmungParish, organiser: SampleData.FirmungOrganiser, organiserEmail: SampleData.FirmungOrganiserEmail);
 
     /// <summary>Creates a FairSlot with activities, sample ballots, a participant list and optionally real ballots for some participants.</summary>
     /// <param name="choices">Fixed points (activity title → points) for some of <paramref name="withBallots"/>; the others get generated ones.</param>
