@@ -103,6 +103,7 @@ public sealed class PhaseClock(IServiceScopeFactory scopes, IConfiguration cfg, 
 				var days = Retention.Days(cfg);
 				foreach (var name in await Retention.DeleteExpiredAsync(db, days))
 					logger.LogInformation("Deleted the vote \"{Name}\" with all its data, {Days} days after it ended.", name, days);
+				await Retention.DeleteOldAccountMailsAsync(db);
 			}
 			catch (Exception e) when (e is not OperationCanceledException)
 			{

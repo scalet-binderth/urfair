@@ -1,12 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AccountInput, Api, ListedAccount } from './api';
+import { AccountInput, Api, ListedAccount, Mail } from './api';
 import { I18n } from './i18n';
 import { AppInfo } from './info';
 import { SessionService } from './session';
 import { Toast } from './toast';
 
-/** Junia admins manage organiser accounts. New accounts get a one-time link to set their password. */
+/**
+ * Junia admins manage organiser accounts. New accounts get a one-time link by mail to set their password; after
+ * "forgot password" the Junia admins are told by mail and send a new link from here.
+ */
 @Component({
   selector: 'app-accounts',
   imports: [FormsModule],
@@ -47,14 +50,15 @@ import { Toast } from './toast';
             <thead><tr><th>{{ i18n.t('accounts.name') }}</th><th>{{ i18n.t('participants.email') }}</th><th>{{ i18n.t('accounts.role') }}</th><th>{{ i18n.t('accounts.status') }}</th><th></th></tr></thead>
             <tbody>
               @for (a of accounts(); track a.id) {
-                <tr>
+                <tr [class.asks]="!!a.resetRequestedAt">
                   <td>{{ a.name }}</td>
                   <td class="small">{{ a.email }}</td>
                   <td class="small">{{ a.isJuniaAdmin ? i18n.t('accounts.juniaShort') : a.parishes.join(', ') }}</td>
                   <td class="small">
+                    @if (a.resetRequestedAt) { <div class="warn">{{ i18n.t('accounts.resetRequested', { at: i18n.date(a.resetRequestedAt) }) }}</div> }
                     @if (a.setupToken) { <button class="btn ghost small" type="button" (click)="copy(a.setupToken)">{{ i18n.t('accounts.copySetup') }}</button> }
                     @else if (!a.hasPassword) { <span class="muted">{{ i18n.t('accounts.noPassword') }}</span> }
-                    @else { <span class="phase" data-phase="Open">{{ i18n.t('accounts.active') }}</span> }
+                    @else if (!a.resetRequestedAt) { <span class="phase" data-phase="Open">{{ i18n.t('accounts.active') }}</span> }
                   </td>
                   <td class="num nowrap">
                     @if (confirmDelete() === a.id) {
@@ -62,7 +66,7 @@ import { Toast } from './toast';
                       <button class="btn ghost small" type="button" (click)="confirmDelete.set(null)">{{ i18n.t('common.cancel') }}</button>
                     } @else {
                       <button class="btn ghost small" type="button" (click)="edit(a)">{{ i18n.t('common.edit') }}</button>
-                      <button class="btn ghost small" type="button" (click)="newLink(a.id)">{{ i18n.t('accounts.newLink') }}</button>
+                      <button class="btn small" [class.ghost]="!a.resetRequestedAt" type="button" [disabled]="busy()" (click)="newLink(a.id)">{{ i18n.t('accounts.newLink') }}</button>
                       @if (a.id !== session.account()?.id) {
                         <button class="btn ghost small" type="button" (click)="confirmDelete.set(a.id)">{{ i18n.t('common.delete') }}</button>
                       }
@@ -74,6 +78,29 @@ import { Toast } from './toast';
           </table></div>
         } @else { <p class="muted">{{ i18n.t(info.demo() ? 'accounts.noneDemo' : 'accounts.none') }}</p> }
       </div>
+
+      <div class="card stack">
+        <h2>{{ i18n.t('accounts.mails') }}</h2>
+        <p class="muted small">{{ i18n.t(info.mailSending() ? 'accounts.mailsSent' : 'accounts.mailsManual') }}</p>
+        @for (m of mails(); track m.id) {
+          <details class="mail">
+            <summary>
+              <span class="small muted">{{ i18n.date(m.createdAt) }} · {{ i18n.t('mail.to') }} {{ m.to }}</span> <b>{{ m.subject }}</b>
+              @if (m.status !== 'manual') {
+                <span class="small" [class.bad]="m.status === 'failed'" [class.good]="m.status === 'sent'"> · {{ i18n.t('mail.status.' + m.status, { at: m.sentAt ? i18n.date(m.sentAt) : '' }) }}</span>
+              }
+            </summary>
+            <pre>{{ m.body }}</pre>
+            @if (m.error) { <p class="small muted">{{ m.error }}</p> }
+            <div class="row">
+              @if (m.status === 'failed' || (m.status === 'pending' && m.error)) {
+                <button class="btn ghost small" type="button" [disabled]="busy()" (click)="retry(m)">{{ i18n.t('mail.retry') }}</button>
+              }
+              <button class="btn ghost small" type="button" (click)="copyMail(m)">{{ i18n.t('mail.copy') }}</button>
+            </div>
+          </details>
+        } @empty { <p class="muted small">{{ i18n.t('accounts.noMails') }}</p> }
+      </div>
     </div>
   `,
   styles: `
@@ -82,6 +109,13 @@ import { Toast } from './toast';
     .btn.small { padding: 6px 12px; font-size: 14px }
     .btn.danger { background: var(--warn); border-color: var(--warn); color: var(--surface) }
     .nowrap { white-space: nowrap }
+    .warn { color: var(--warn); font-weight: 500 }
+    tr.asks td { background: color-mix(in srgb, var(--warn) 8%, transparent) }
+    .mail { border-top: 1px solid var(--line); padding-top: 8px }
+    .mail summary { cursor: pointer }
+    .mail pre { white-space: pre-wrap; font: inherit; font-size: 14px; margin: 8px 0; overflow-wrap: anywhere }
+    .bad { color: var(--accent) }
+    .good { color: var(--good) }
   `,
 })
 export class AccountsPage implements OnInit {
@@ -92,6 +126,7 @@ export class AccountsPage implements OnInit {
   private toast = inject(Toast);
 
   protected accounts = signal<ListedAccount[]>([]);
+  protected mails = signal<Mail[]>([]);
   protected editing = signal<string | null>(null);
   protected confirmDelete = signal<string | null>(null);
   protected errors = signal<string[]>([]);
@@ -101,7 +136,11 @@ export class AccountsPage implements OnInit {
   ngOnInit(): void { this.load(); }
 
   private async load(): Promise<void> {
-    try { this.accounts.set(await this.api.accounts()); } catch (e) { this.errors.set(this.i18n.errors(e)); }
+    try {
+      const [accounts, mails] = await Promise.all([this.api.accounts(), this.api.accountMails()]);
+      this.accounts.set(accounts);
+      this.mails.set(mails);
+    } catch (e) { this.errors.set(this.i18n.errors(e)); }
   }
 
   protected toggle(p: string): void {
@@ -127,7 +166,7 @@ export class AccountsPage implements OnInit {
         this.toast.show(this.i18n.t('common.saved'));
       } else {
         const res = await this.api.createAccount(this.form);
-        await this.copy(res.setupToken);
+        await this.handOver(res.setupToken);
       }
       this.reset();
       await this.load();
@@ -137,9 +176,30 @@ export class AccountsPage implements OnInit {
   protected async newLink(id: string): Promise<void> {
     await this.run(async () => {
       const res = await this.api.newSetupLink(id);
-      await this.copy(res.setupToken);
+      await this.handOver(res.setupToken);
       await this.load();
     });
+  }
+
+  protected async retry(m: Mail): Promise<void> {
+    await this.run(async () => {
+      await this.api.retryAccountMail(m.id);
+      this.toast.show(this.i18n.t('mail.retried'));
+      await this.load();
+    });
+  }
+
+  protected async copyMail(m: Mail): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(`${m.subject}\n\n${m.body}`);
+      this.toast.show(this.i18n.t('mail.copied'));
+    } catch { /* clipboard blocked */ }
+  }
+
+  /** The link went into a mail: the app sends it, otherwise it is copied so the admin can pass it on. */
+  private async handOver(token: string): Promise<void> {
+    if (this.info.mailSending()) this.toast.show(this.i18n.t('accounts.linkMailed'));
+    else await this.copy(token);
   }
 
   protected async remove(id: string): Promise<void> {

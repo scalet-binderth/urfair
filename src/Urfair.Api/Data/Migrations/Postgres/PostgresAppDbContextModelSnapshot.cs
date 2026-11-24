@@ -75,6 +75,9 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateTime?>("ResetRequestedAt")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<string>("SetupToken")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -407,7 +410,7 @@ namespace Urfair.Api.Data.Migrations.Postgres
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid>("FairSlotId")
+                    b.Property<Guid?>("FairSlotId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("NextAttemptAt")
@@ -725,8 +728,7 @@ namespace Urfair.Api.Data.Migrations.Postgres
                     b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
                         .WithMany()
                         .HasForeignKey("FairSlotId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Urfair.Api.Data.OriginalAssignmentEntity", b =>

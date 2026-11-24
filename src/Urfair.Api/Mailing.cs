@@ -49,6 +49,15 @@ public static class Mailing
 		db.Mails.Add(mail);
 	}
 
+	/// <summary>Adds a mail about an organiser account (no vote): access links and password requests, listed on the accounts page.</summary>
+	public static void AddAccountMail(AppDbContext db, MailEntity mail, string? replyTo = null)
+	{
+		mail.FairSlotId = null;
+		mail.ReplyTo = replyTo;
+		mail.Outbox = Enabled;
+		db.Mails.Add(mail);
+	}
+
 	/// <summary>manual (copied by hand), pending (also while retrying after an error), sent or failed (gave up).</summary>
 	public static string Status(MailEntity m) =>
 		!m.Outbox ? "manual" : m.SentAt is not null ? "sent" : m.Attempts >= MaxAttempts ? "failed" : "pending";

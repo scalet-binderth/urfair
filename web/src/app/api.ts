@@ -23,7 +23,7 @@ export type Visibility = 'JuniaShared' | 'ParishOnly' | 'JuniaReadOnly';
 export const VISIBILITIES: Visibility[] = ['ParishOnly', 'JuniaShared', 'JuniaReadOnly'];
 export interface Account { id: string; email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; isDemo: boolean; }
 export interface AccountInput { email: string; name: string; isJuniaAdmin: boolean; parishes: string[]; }
-export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; }
+export interface ListedAccount extends AccountInput { id: string; hasPassword: boolean; setupToken: string | null; resetRequestedAt: string | null; }
 export interface ParticipantInput { name: string; email: string | null; birthDate: string | null; baptismDate: string | null; parish: string | null; }
 export interface ListedParticipant extends ParticipantInput { id: string; token: string; invitedAt: string | null; hasVoted: boolean; }
 /** manual: copied by hand; pending: waiting to be sent (also after an error); sent; failed: gave up. */
@@ -116,6 +116,10 @@ export class Api {
   recover(key: string, email: string) { return this.call(this.http.post<{ setupToken: string }>('/api/auth/recover', { key, email })); }
   newSetupLink(id: string) { return this.call(this.http.post<{ setupToken: string }>(`/api/admin/accounts/${id}/setup-link`, {})); }
   deleteAccount(id: string) { return this.call(this.http.delete(`/api/admin/accounts/${id}`)); }
+  /** Forgot password: the Junia admins are told (always succeeds, whether or not the address has an account). */
+  forgotPassword(email: string) { return this.call(this.http.post<void>('/api/auth/forgot', { email })); }
+  accountMails() { return this.call(this.http.get<Mail[]>('/api/admin/accounts/mails')); }
+  retryAccountMail(mailId: string) { return this.call(this.http.post<void>(`/api/admin/accounts/mails/${mailId}/retry`, {})); }
 
   // ---------- general ----------
   info() { return this.call(this.http.get<{ adminProtected: boolean; demo: boolean; mailSending: boolean; parishes: string[]; version?: string }>('/api/info')); }

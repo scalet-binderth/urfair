@@ -183,6 +183,12 @@ and English; keep both in sync.
   results, lists for the leaders); the "Ferienprogramm" has two leaders with e-mail addresses and B ticked "Kochen mit
   Oma" after C, so a declined offer goes on to him. The "Einladungen" tab shows the whole mail traffic or one mailbox
   (organisers, leaders, participants) with inbox and sent, and who each mail is from
+- **Access links by mail, forgot password.** A new account gets its one-time link (7 days) by mail; "Passwort
+  vergessen?" on the start page tells all Junia admins by mail (same answer whether the address exists or not, one
+  mail per hour and account) and marks the account under "Konten", where "Link schicken" mails a new one-time link;
+  the old password stays valid until a new one is set. Account mails have no vote (`Mails.FairSlotId` may be empty,
+  column `Accounts.ResetRequestedAt`), are listed under "Konten" (to copy without a mail server) and are deleted after
+  30 days or with the account
 
 ## Next steps (each ends with a demo that can be shown)
 

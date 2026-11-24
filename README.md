@@ -139,7 +139,10 @@ Outside demo mode participants can only sign in with their link.
 
 Organisers sign in with e-mail and password (cookie; keys stored in the database so sign-ins survive restarts).
 Junia admins manage accounts under "Konten": a new account is assigned to Junia (may do everything) or to one or more
-Pfarrgemeinden and gets a one-time link (7 days) to set its password; the link is passed on personally.
+Pfarrgemeinden and gets a one-time link (7 days) by mail to set its password. "Passwort vergessen?" on the start page
+tells all Junia admins by mail; the account is marked under "Konten" and "Link schicken" mails a new one-time link (the
+old password stays valid until then). Without a mail server the account mails are listed under "Konten" to copy; they
+are deleted after 30 days.
 Every vote has a visibility: *Pfarrgemeinde intern*, *Junia gemeinsam* or *Junia, nur lesen*. The server checks every
 request of the organisation area (`src/Urfair.Api/Access.cs`); Pfarrgemeinde admins only see and edit participants of
 their own Pfarrgemeinden in Junia-wide votes. In demo mode, three demo accounts sign in with a button.

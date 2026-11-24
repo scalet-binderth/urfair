@@ -9,22 +9,28 @@ using Urfair.Core;
 namespace Urfair.Api;
 
 public record AccountDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes, bool IsDemo);
-public record AccountListDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes, bool HasPassword, string? SetupToken);
+public record AccountListDto(Guid Id, string Email, string Name, bool IsJuniaAdmin, IReadOnlyList<string> Parishes, bool HasPassword, string? SetupToken,
+    DateTime? ResetRequestedAt = null);
 public record LoginRequest(string? Email, string? Password);
 public record SetupRequest(string? Key, string? Email, string? Name, string? Password);
 public record PasswordRequest(string? Password);
 public record AccountRequest(string? Email, string? Name, bool IsJuniaAdmin, List<string>? Parishes);
 public record DemoLoginRequest(string? Key);
 public record RecoverRequest(string? Key, string? Email);
+public record ForgotRequest(string? Email);
 
 /// <summary>
-/// Organiser accounts: sign-in with e-mail and password (cookie), one-time links to set a password,
-/// the very first Junia admin via Admin:Key, and button sign-in for demo accounts.
+/// Organiser accounts: sign-in with e-mail and password (cookie), one-time links to set a password (mailed to the person),
+/// "forgot password" (the Junia admins are told and send a new link), the very first Junia admin via Admin:Key,
+/// and button sign-in for demo accounts.
 /// </summary>
 public static class AuthEndpoints
 {
     private const int MaxFailedLogins = 10;
     private static readonly TimeSpan SetupLinkLifetime = TimeSpan.FromDays(7);
+    /// <summary>A repeated "forgot password" within this time does not mail the Junia admins again.</summary>
+    private static readonly TimeSpan ResetRequestQuiet = TimeSpan.FromHours(1);
+    private const int MaxForgotRequests = 20;
 
     /// <summary>Demo accounts (demo mode only): key, e-mail, name, Junia admin, Pfarrgemeinden.</summary>
     public static readonly (string Key, string Email, string Name, bool Junia, string[] Parishes)[] DemoAccounts =
@@ -132,6 +138,33 @@ public static class AuthEndpoints
             return Results.Ok(new { a.SetupToken });
         });
 
+        // Forgot password: the Junia admins get a mail and send a new one-time link from the accounts page.
+        // Always the same answer, so nobody learns which addresses have an account.
+        auth.MapPost("/forgot", async (ForgotRequest req, HttpContext http, AppDbContext db, IConfiguration cfg, IMemoryCache cache) =>
+        {
+            var requests = cache.Get<int>("forgot");
+            if (requests >= MaxForgotRequests) return Results.NoContent();
+            cache.Set("forgot", requests + 1, TimeSpan.FromMinutes(15));
+            var email = (req.Email ?? "").Trim().ToLowerInvariant();
+            var a = await db.Accounts.FirstOrDefaultAsync(x => x.Email == email && !x.IsDemo);
+            if (a is null || a.ResetRequestedAt > DateTime.UtcNow - ResetRequestQuiet) return Results.NoContent();
+            a.ResetRequestedAt = DateTime.UtcNow;
+            var demo = Database.IsDemo(cfg);
+            var admins = await db.Accounts.Where(x => x.IsJuniaAdmin && x.Id != a.Id && (demo || !x.IsDemo)).OrderBy(x => x.Name).ToListAsync();
+            var page = $"{Mailing.BaseUrl(http.Request)}/admin/accounts";
+            foreach (var admin in admins)
+                Mailing.AddAccountMail(db, new MailEntity
+                {
+                    To = admin.Email,
+                    Subject = $"Urfair: {a.Name} bittet um ein neues Passwort",
+                    Body = $"Hallo {admin.Name}!\n\n{a.Name} ({a.Email}) hat bei Urfair „Passwort vergessen“ gewählt.\n\n" +
+                        $"Bitte melde dich an und schick unter „Konten“ mit „Link schicken“ einen neuen Einmal-Link:\n{page}\n\n" +
+                        "Kennst du die Anfrage nicht, kannst du sie ignorieren: Das bisherige Passwort bleibt gültig.",
+                }, a.Email);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         // One-time link to set (or reset) the password.
         auth.MapGet("/password/{token}", async (string token, AppDbContext db) =>
             await FindSetupAsync(db, token) is { } a ? Results.Ok(new { a.Name, a.Email }) : Results.NotFound());
@@ -141,7 +174,7 @@ public static class AuthEndpoints
             var a = await FindSetupAsync(db, token);
             if (a is null) return Results.NotFound();
             if (CheckPassword(req.Password) is { } weak) return weak;
-            (a.PasswordHash, a.SetupToken, a.SetupTokenExpires) = (Passwords.Hash(req.Password!), null, null);
+            (a.PasswordHash, a.SetupToken, a.SetupTokenExpires, a.ResetRequestedAt) = (Passwords.Hash(req.Password!), null, null, null);
             await db.SaveChangesAsync();
             await SignInAsync(http, a);
             return Results.Ok(ToDto(a));
@@ -154,9 +187,24 @@ public static class AuthEndpoints
         admin.MapGet("/accounts", async (AppDbContext db) =>
             (await db.Accounts.AsNoTracking().Where(a => !a.IsDemo).OrderBy(a => a.Name).ToListAsync())
                 .Select(a => new AccountListDto(a.Id, a.Email, a.Name, a.IsJuniaAdmin, a.Parishes, a.PasswordHash is not null,
-                    a.SetupTokenExpires > DateTime.UtcNow ? a.SetupToken : null)));
+                    a.SetupTokenExpires > DateTime.UtcNow ? a.SetupToken : null, a.ResetRequestedAt is { } r ? Utc(r) : null)));
 
-        admin.MapPost("/accounts", async (AccountRequest req, AppDbContext db) =>
+        // The account mails (access links, password requests), newest first: whether they went out, or to copy them by hand.
+        admin.MapGet("/accounts/mails", async (AppDbContext db) =>
+            (await db.Mails.AsNoTracking().Where(m => m.FairSlotId == null).ToListAsync())
+                .OrderByDescending(m => m.CreatedAt)
+                .Select(m => new MailDto(m.Id, m.To, m.Subject, m.Body, Utc(m.CreatedAt), Mailing.Status(m), m.SentAt is { } sent ? Utc(sent) : null, m.Error, m.ReplyTo)));
+
+        admin.MapPost("/accounts/mails/{mailId:guid}/retry", async (Guid mailId, AppDbContext db) =>
+        {
+            var mail = await db.Mails.SingleOrDefaultAsync(m => m.Id == mailId && m.FairSlotId == null);
+            if (mail is null) return Results.NotFound();
+            Mailing.Retry(mail);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        admin.MapPost("/accounts", async (AccountRequest req, HttpContext http, AppDbContext db) =>
         {
             if (CheckAccount(req.Email, req.Name, out var email, out var name) is { } error) return error;
             if (CheckParishes(req, out var parishes) is { } bad) return bad;
@@ -164,6 +212,7 @@ public static class AuthEndpoints
             var a = new AccountEntity { Email = email, Name = name, IsJuniaAdmin = req.IsJuniaAdmin, Parishes = parishes };
             NewSetupLink(a);
             db.Accounts.Add(a);
+            MailLink(db, http, a);
             await db.SaveChangesAsync();
             return Results.Ok(new { a.Id, a.SetupToken });
         });
@@ -180,12 +229,14 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
-        // New one-time link, e.g. for a forgotten password. The current password stays valid until a new one is set.
-        admin.MapPost("/accounts/{accountId:guid}/setup-link", async (Guid accountId, AppDbContext db) =>
+        // New one-time link, mailed to the person (e.g. after "forgot password"). The current password stays valid until a new one is set.
+        admin.MapPost("/accounts/{accountId:guid}/setup-link", async (Guid accountId, HttpContext http, AppDbContext db) =>
         {
             var a = await db.Accounts.FirstOrDefaultAsync(x => x.Id == accountId && !x.IsDemo);
             if (a is null) return Results.NotFound();
             NewSetupLink(a);
+            a.ResetRequestedAt = null;
+            MailLink(db, http, a);
             await db.SaveChangesAsync();
             return Results.Ok(new { a.SetupToken });
         });
@@ -196,10 +247,38 @@ public static class AuthEndpoints
             var a = await db.Accounts.FirstOrDefaultAsync(x => x.Id == accountId && !x.IsDemo);
             if (a is null) return Results.NotFound();
             db.Accounts.Remove(a);
+            db.Mails.RemoveRange(await db.Mails.Where(m => m.FairSlotId == null && (m.To == a.Email || m.ReplyTo == a.Email)).ToListAsync());
             await db.SaveChangesAsync();
             return Results.NoContent();
         });
     }
+
+    /// <summary>Mails the one-time link to the account: to set the first password, or a new one.</summary>
+    private static void MailLink(AppDbContext db, HttpContext http, AccountEntity a)
+    {
+        var by = Access.Account(http);
+        var baseUrl = Mailing.BaseUrl(http.Request);
+        var link = $"{baseUrl}/account/{a.SetupToken}";
+        var role = a.IsJuniaAdmin ? "Junia-Admin" : string.Join(", ", a.Parishes);
+        Mailing.AddAccountMail(db, a.PasswordHash is null
+            ? new MailEntity
+            {
+                To = a.Email,
+                Subject = "Dein Zugang zu Urfair",
+                Body = $"Hallo {a.Name}!\n\n{by.Name} hat dir ein Konto bei Urfair angelegt ({role}).\n\n" +
+                    $"Lege hier dein Passwort fest (der Link gilt 7 Tage und nur einmal):\n{link}\n\n" +
+                    $"Danach meldest du dich mit {a.Email} auf {baseUrl} an.",
+            }
+            : new MailEntity
+            {
+                To = a.Email,
+                Subject = "Neues Passwort für Urfair",
+                Body = $"Hallo {a.Name}!\n\nHier legst du ein neues Passwort für dein Konto {a.Email} fest (der Link gilt 7 Tage und nur einmal):\n{link}\n\n" +
+                    "Bis dahin gilt dein bisheriges Passwort. Hast du kein neues angefragt, kannst du diese Mail ignorieren.",
+            }, by.Email);
+    }
+
+    private static DateTime Utc(DateTime t) => DateTime.SpecifyKind(t, DateTimeKind.Utc);
 
     /// <summary>Creates the demo accounts if missing (demo mode).</summary>
     public static async Task SeedDemoAccountsAsync(AppDbContext db)
