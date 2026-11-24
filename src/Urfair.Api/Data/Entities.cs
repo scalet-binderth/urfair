@@ -186,7 +186,8 @@ public class ParticipantEntity
 public class MailEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid FairSlotId { get; set; }
+    /// <summary>Null for account mails (access links, password requests; see <see cref="Mailing.AddAccountMail"/>).</summary>
+    public Guid? FairSlotId { get; set; }
     public Guid? ParticipantId { get; set; }
     public string To { get; set; } = "";
     /// <summary>Replies go to the vote's person responsible.</summary>
@@ -319,6 +320,8 @@ public class AccountEntity
     /// <summary>One-time link to set the password, created by a Junia admin.</summary>
     public string? SetupToken { get; set; }
     public DateTime? SetupTokenExpires { get; set; }
+    /// <summary>The person asked for a new password ("forgot password"); cleared when a Junia admin sends a link or a password is set.</summary>
+    public DateTime? ResetRequestedAt { get; set; }
     /// <summary>Demo accounts sign in with a button, never with a password.</summary>
     public bool IsDemo { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

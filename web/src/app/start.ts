@@ -72,8 +72,18 @@ import { SessionService } from './session';
             <div class="field"><label for="a-mail">{{ i18n.t('participants.email') }}</label><input id="a-mail" name="email" type="email" autocomplete="username" [(ngModel)]="email" /></div>
             <div class="field"><label for="a-pw">{{ i18n.t('accounts.password') }}</label><input id="a-pw" name="password" type="password" autocomplete="current-password" [(ngModel)]="password" /></div>
             <button class="btn" type="submit" [disabled]="busy() || !email || !password">{{ i18n.t('start.adminGo') }}</button>
-            <p class="small muted">{{ i18n.t('start.forgot') }}</p>
           </form>
+          @if (forgotSent()) {
+            <p class="small good" role="status">{{ i18n.t('start.forgotSent') }}</p>
+          } @else if (showForgot()) {
+            <form class="stack recover" (submit)="$event.preventDefault(); forgot()">
+              <p class="small">{{ i18n.t('start.forgotText') }}</p>
+              <div class="field"><label for="f-mail">{{ i18n.t('participants.email') }}</label><input id="f-mail" name="fmail" type="email" autocomplete="username" [(ngModel)]="email" /></div>
+              <button class="btn ghost" type="submit" [disabled]="busy() || !email">{{ i18n.t('start.forgotGo') }}</button>
+            </form>
+          } @else {
+            <button class="linkish small" type="button" (click)="showForgot.set(true)">{{ i18n.t('start.forgot') }}</button>
+          }
           @if (showRecover()) {
             <form class="stack recover" (submit)="$event.preventDefault(); recover()">
               <p class="small">{{ i18n.t('start.recoverText') }}</p>
@@ -104,6 +114,7 @@ import { SessionService } from './session';
     .person:hover { border-color: var(--accent) }
     .linkish { justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline }
     .recover { border-top: 1px solid var(--line); padding-top: 12px }
+    .good { color: var(--good) }
     .person b { grid-row: span 2; color: var(--accent) }
     .try { margin: -2px 0 4px 30px }
     .try summary { cursor: pointer; color: var(--accent) }
@@ -130,6 +141,8 @@ export class StartPage {
   protected accountName = '';
   protected setupNeeded = signal(false);
   protected showRecover = signal(false);
+  protected showForgot = signal(false);
+  protected forgotSent = signal(false);
   protected recoverEmail = '';
   protected readonly demoAccounts = [{ key: 'junia', badge: 'J' }, { key: 'markus', badge: 'M' }, { key: 'geist', badge: 'G' }];
 
@@ -142,6 +155,20 @@ export class StartPage {
     this.api.setParticipantLink(null); // demo: sign in by name
     this.session.signIn({ kind: 'participant', name: this.name.trim() });
     this.router.navigate(['/slots']);
+  }
+
+  /** Forgot password: the Junia admins get a mail and send a new one-time link. */
+  protected async forgot(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.api.forgotPassword(this.email.trim());
+      this.forgotSent.set(true);
+    } catch (e) {
+      this.error.set(this.i18n.errors(e)[0]);
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Emergency access with Admin__Key: opens a fresh one-time link for an existing Junia admin. */

@@ -67,6 +67,9 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ResetRequestedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SetupToken")
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
@@ -399,7 +402,7 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("FairSlotId")
+                    b.Property<Guid?>("FairSlotId")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("NextAttemptAt")
@@ -717,8 +720,7 @@ namespace Urfair.Api.Data.Migrations.Sqlite
                     b.HasOne("Urfair.Api.Data.FairSlotEntity", null)
                         .WithMany()
                         .HasForeignKey("FairSlotId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Urfair.Api.Data.OriginalAssignmentEntity", b =>

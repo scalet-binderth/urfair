@@ -26,4 +26,14 @@ public static class Retention
 		await db.SaveChangesAsync();
 		return expired.Select(s => s.Name).ToList();
 	}
+
+	/// <summary>Account mails hold one-time links and are only needed for a while.</summary>
+	public const int AccountMailDays = 30;
+
+	public static async Task DeleteOldAccountMailsAsync(AppDbContext db)
+	{
+		var limit = DateTime.UtcNow.AddDays(-AccountMailDays);
+		db.Mails.RemoveRange(await db.Mails.Where(m => m.FairSlotId == null && m.CreatedAt < limit).ToListAsync());
+		await db.SaveChangesAsync();
+	}
 }
