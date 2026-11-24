@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { StartPage } from './start';
 import { PlanPage } from './plan';
 import { HomePage } from './home';
-import { VotePage } from './vote';
+import { VotePage, unsavedVoteGuard } from './vote';
 import { MyResultPage } from './my-result';
 import { LinkPage } from './link';
 import { AccountsPage } from './accounts';
@@ -18,7 +18,7 @@ export const routes: Routes = [
   { path: 'p/:token', component: LinkPage },
   { path: 'account/:token', component: SetPasswordPage },
   { path: 'slots', component: HomePage, canActivate: [participantGuard] },
-  { path: 's/:slotId', component: VotePage, canActivate: [participantGuard] },
+  { path: 's/:slotId', component: VotePage, canActivate: [participantGuard], canDeactivate: [unsavedVoteGuard] },
   { path: 's/:slotId/result', component: MyResultPage, canActivate: [participantGuard] },
   { path: 'admin', component: AdminListPage, canActivate: [adminGuard] },
   { path: 'admin/accounts', component: AccountsPage, canActivate: [adminGuard] },

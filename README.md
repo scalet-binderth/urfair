@@ -84,7 +84,8 @@ system assigns the seats:
   Only a wish: after the calculated allocation each group is moved into a shared date of an activity every member
   gave points to, by free seats or swaps; members may lose points, nobody else does. Moving up may separate a group
   again; lowering the group size dissolves groups that are now too large. Demo: in the "Firmvorbereitung" B and C
-  share the code `FIRM42`.
+  share the code `FIRM42`. The code only counts once the vote is submitted; the ballot marks changes not submitted yet
+  and asks before leaving.
 - **Legal notice and privacy policy** (`/impressum`, `/datenschutz`, links in the footer): texts from `Legal__Imprint`
   and `Legal__Privacy`; without them the pages show a marked German template with placeholders.
 - **Lists for leaders**: tab "Listen" of a vote, one list per date grouped by leader, to print, download as CSV or

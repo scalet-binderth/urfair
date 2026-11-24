@@ -153,7 +153,8 @@ and English; keep both in sync.
   each group, in lottery order, is moved into a shared date of an activity all members gave points to: by a free
   seat or by swapping with an outsider who does not lose points; members may give up a weaker seat. Limits: only in
   the calculated allocation; moving up may separate a group again; lowering the group size dissolves groups that are
-  too large. Demo: "Firmvorbereitung" allows groups up to 3, B and C share the code `FIRM42`
+  too large. Demo: "Firmvorbereitung" allows groups up to 3, B and C share the code `FIRM42`. The code only counts once
+  the vote is submitted: a changed code and other changes not submitted yet are marked, leaving the page asks first
 - **Undo for activities, the participant list and rules.** Every logged change to them (from registration on) keeps
   how the things it touched were before (new column `AllocationLog.Undo`, JSON); the log offers "Rückgängig machen"
   with a confirmation. Undoing sets exactly these back and overwrites later changes to them: a deleted activity comes

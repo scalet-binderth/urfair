@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { CanDeactivateFn, RouterLink } from '@angular/router';
 import { Activity, Api, Group, MyActivityStatus, MyMail, MyStatus, PreviousBallot, Slot } from './api';
 import { I18n } from './i18n';
 import { AppInfo } from './info';
@@ -11,6 +11,7 @@ import { Toast } from './toast';
   selector: 'app-vote',
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.Eager,
+  host: { '(window:beforeunload)': 'beforeUnload($event)' },
   template: `
     @if (slot(); as c) {
       <div class="head">
@@ -216,10 +217,12 @@ import { Toast } from './toast';
                 <input id="friends" maxlength="20" autocomplete="off" [disabled]="!canVote()" [value]="friends()" (input)="friends.set($any($event.target).value)" />
                 @if (canVote()) { <button class="btn ghost small" type="button" (click)="newCode()">{{ i18n.t('vote.friendsNew') }}</button> }
               </div>
+              @if (friendsUnsaved()) { <p class="small unsaved">{{ i18n.t('vote.friendsUnsaved') }}</p> }
               @if (friendNames().length) { <p class="small">{{ i18n.t('vote.friendsWith', { names: friendNames().join(', ') }) }}</p> }
               <p class="muted small">{{ i18n.t('vote.friendsHint') }}</p>
             }
             @if (errors().length) { <ul class="errors">@for (e of errors(); track $index) { <li>{{ e }}</li> }</ul> }
+            @if (unsaved()) { <p class="small unsaved">{{ i18n.t('vote.unsaved') }}</p> }
             <button class="btn" type="button" [disabled]="!canSubmit() || busy() || !canVote()" (click)="submit()">{{ i18n.t('vote.submit') }}</button>
             @if (canVote()) { <button class="btn ghost" type="button" (click)="fillExample()">{{ i18n.t('vote.example') }}</button> }
             <p class="muted small">{{ i18n.t('vote.note') }}</p>
@@ -277,6 +280,7 @@ import { Toast } from './toast';
     .extra { display: grid; gap: 4px }
     .code { display: flex; gap: 6px; align-items: center }
     .code input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: 1px }
+    .unsaved { margin: 0; color: var(--warn); font-weight: 600 }
     .stepper { display: flex; align-items: center; gap: 4px }
     .stepper button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 18px; line-height: 1 }
     .stepper button:hover:not(:disabled) { border-color: var(--accent) }
@@ -322,6 +326,26 @@ export class VotePage implements OnInit {
   protected friendNames = signal<string[]>([]);
   protected errors = signal<string[]>([]);
   protected busy = signal(false);
+
+  /** The vote as last loaded or submitted, to tell whether there are changes not submitted yet. */
+  private saved = signal<string | null>(null);
+  private savedFriends = signal('');
+  private friendCode = computed(() => (this.rules().friends ?? 0) >= 2 ? this.friends().trim().toUpperCase() : '');
+  private state = computed(() => JSON.stringify([
+    Object.entries(this.points()).filter(([, p]) => p > 0).sort(([a], [b]) => a.localeCompare(b)),
+    [...this.unavailable()].sort(), this.extra(), this.friendCode()]));
+  /** Changes that only count once the vote is submitted. */
+  readonly unsaved = computed(() => this.canVote() && this.saved() !== null && this.state() !== this.saved());
+  protected friendsUnsaved = computed(() => this.canVote() && this.saved() !== null && this.friendCode() !== this.savedFriends());
+
+  private markSaved(): void {
+    this.saved.set(this.state());
+    this.savedFriends.set(this.friendCode());
+  }
+
+  protected beforeUnload(event: BeforeUnloadEvent): void {
+    if (this.unsaved()) event.preventDefault();
+  }
 
   private rules = computed(() => this.slot()!.rules);
   protected spent = computed(() => Object.values(this.points()).reduce((a, b) => a + b, 0));
@@ -476,6 +500,7 @@ export class VotePage implements OnInit {
         this.showFriends(previous);
         this.loadedPrevious.set(true);
       }
+      this.markSaved();
       await this.loadStatus();
     } catch {
       this.loadError.set(true);
@@ -551,6 +576,7 @@ export class VotePage implements OnInit {
         const saved = await this.api.lookupBallot(this.slotId(), this.name());
         if (saved) this.showFriends(saved);
       }
+      this.markSaved();
       // The people still missing per date change with every ballot.
       if (this.rules().requiredStaffing) this.activities.set(await this.api.activities(this.slotId()));
       await this.loadStatus();
@@ -561,3 +587,7 @@ export class VotePage implements OnInit {
     }
   }
 }
+
+/** Leaving the vote page with changes that are not submitted asks first. */
+export const unsavedVoteGuard: CanDeactivateFn<VotePage> = page =>
+  !page.unsaved() || confirm(inject(I18n).t('vote.leaveUnsaved'));
