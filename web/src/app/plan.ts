@@ -93,7 +93,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     visibility: [
       { cells: ['Pfarrgemeinde intern', 'eigene Pfarrgemeinde', 'eigene Pfarrgemeinde'] },
       { cells: ['Junia gemeinsam', 'alle Pfarrgemeinden', 'alle Pfarrgemeinden'] },
-      { cells: ['Junia, nur lesen', 'alle Pfarrgemeinden', 'nur Junia-Admins'] },
+      { cells: ['Junia, nur lesen', 'alle Pfarrgemeinden', 'nur Junia-Admins; Teilnehmende pflegt jede Pfarrgemeinde selbst'] },
     ],
     visibilityNote: '„Sehen“ meint den Organisationsbereich. Welche Teilnehmenden eine Wahl sehen, regelt die Teilnehmerliste.',
     flowTitle: 'Neue Anforderungen zum Wahl-Ablauf',
@@ -113,7 +113,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     laterTitle: 'Später, wenn es sich bewährt',
     later: [],
     questionsTitle: 'Offene Fragen',
-    questions: ['Wer ist Ansprechperson für Hosting und Datenschutz in Pfarre und Diözese?', 'Dürfen Pfarrgemeinde-Admins bei „Junia, nur lesen“ die Teilnehmenden ihrer Pfarrgemeinde pflegen? (Vorschlag: ja, nur die eigenen Zeilen)', 'Probelauf mit 20 bis 30 Firmlingen oder gleich dem ganzen Jahrgang?'],
+    questions: ['Wer ist Ansprechperson für Hosting und Datenschutz in Pfarre und Diözese?', 'Probelauf mit 20 bis 30 Firmlingen oder gleich dem ganzen Jahrgang?'],
     back: '← Zur Startseite',
   },
   en: {
@@ -190,7 +190,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     visibility: [
       { cells: ['Parish community only', 'own parish community', 'own parish community'] },
       { cells: ['Junia shared', 'all parish communities', 'all parish communities'] },
-      { cells: ['Junia, read only', 'all parish communities', 'Junia admins only'] },
+      { cells: ['Junia, read only', 'all parish communities', 'Junia admins only; each parish community maintains its own participants'] },
     ],
     visibilityNote: '“See” refers to the organisation area. Which participants see a vote is set by the participant list.',
     flowTitle: 'New requirements for the voting flow',
@@ -210,7 +210,7 @@ const PLAN: Record<'de' | 'en', PlanText> = {
     laterTitle: 'Later, once it has proven itself',
     later: [],
     questionsTitle: 'Open questions',
-    questions: ['Who is the contact for hosting and data protection in the parish and diocese?', 'May parish community admins maintain their own participants in “Junia, read only” votes? (proposal: yes, only their own rows)', 'Pilot with 20 to 30 confirmands or the whole year group?'],
+    questions: ['Who is the contact for hosting and data protection in the parish and diocese?', 'Pilot with 20 to 30 confirmands or the whole year group?'],
     back: '← Back to the start page',
   },
 };
