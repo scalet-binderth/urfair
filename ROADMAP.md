@@ -279,7 +279,7 @@ original allocation so organisers can see and restore it; a log records every ch
   | Vote visibility | Junia admin | Pfarrgemeinde admin |
   |---|---|---|
   | Pfarrgemeinde only | everything | import and edit if it is their own Pfarrgemeinde |
-  | Junia shared | everything | import and edit, only rows of their own Pfarrgemeinde |
+  | Junia shared | everything | import and edit, only rows of their own Pfarrgemeinde; in the allocation only their own people (seat counts complete, decided 24 November 2026) |
   | Junia, read only | everything | only rows of their own Pfarrgemeinde (decided 24 November 2026); activities and rules not |
 
   Rows for another Pfarrgemeinde are rejected with their row number. The import was built in step 2, the permission checks in step 3.
@@ -289,5 +289,7 @@ original allocation so organisers can see and restore it; a log records every ch
 - Who is the contact for hosting and data protection in the parish and diocese?
 - ~~May one person be admin of several parishes?~~ Yes (an account can have several Pfarrgemeinden).
 - ~~May Pfarrgemeinde admins maintain their own participants in "Junia, read only" votes?~~ Yes, only rows of their own Pfarrgemeinde.
+- ~~May a personal link act in other votes?~~ Only in votes open to all that do not list the name; otherwise each vote has its own link (24 November 2026).
+- ~~Are excluded names copied with a vote?~~ No, they stay behind like the participants (24 November 2026).
 - Pilot with 20–30 confirmands or the whole year group right away?
 - ~~"Together with friends": pairs or small groups, how many, how strongly may it influence the allocation?~~ Decided, see requirement notes.

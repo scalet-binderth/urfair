@@ -5,7 +5,7 @@ namespace Urfair.Api;
 
 /// <summary>
 /// A new vote from an existing one (e.g. last year's) as a template: settings, rules, groups, activities and dates,
-/// the dates shifted by whole weeks (52 = the same weekday a year later). Participants, points, seats, mails and the log
+/// the dates shifted by whole weeks (52 = the same weekday a year later). Participants, excluded names, points, seats, mails and the log
 /// stay behind; the copy starts as a draft.
 /// </summary>
 public static class SlotCopy
@@ -21,7 +21,6 @@ public static class SlotCopy
             RegistrationDeadline = source.RegistrationDeadline + shift,
             Seed = source.Seed,
             OpenToAll = source.OpenToAll,
-            Excluded = source.Excluded.ToList(),
             ShowInterim = source.ShowInterim,
             AutoFill = source.AutoFill,
             Parish = source.Parish,

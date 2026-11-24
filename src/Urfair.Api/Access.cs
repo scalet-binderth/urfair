@@ -23,6 +23,9 @@ public static class Access
 {
     private const string AccountKey = "account", SlotKey = "slotAccess";
 
+    /// <summary>Name sent for a person of another Pfarrgemeinde; the UI shows "a person of another Pfarrgemeinde".</summary>
+    public const string HiddenName = "";
+
     public static AccountEntity Account(HttpContext http) => (AccountEntity)http.Items[AccountKey]!;
     public static SlotAccess Slot(HttpContext http) => (SlotAccess)http.Items[SlotKey]!;
 
@@ -81,6 +84,21 @@ public static class Access
             && !(HttpMethods.IsPut(http.Request.Method) && path == "/api/admin/slots/{id:guid}"))
             return Endpoints.Errors("slotEnded");
         return await next(ctx);
+    }
+
+    /// <summary>
+    /// Whether the account may see a person of the allocation by name: everyone without a scope; otherwise people listed
+    /// with one of the account's Pfarrgemeinden and the invented sample ballots. Seat counts stay complete for everyone.
+    /// </summary>
+    public static async Task<Func<string?, bool>> SeesPersonAsync(HttpContext http, AppDbContext db, Guid slotId)
+    {
+        var access = Slot(http);
+        if (access.Scope is null) return _ => true;
+        var listed = await db.Participants.Where(p => p.FairSlotId == slotId).Select(p => new { p.Name, p.Parish }).ToListAsync();
+        var samples = await db.Ballots.Where(b => b.FairSlotId == slotId && b.IsSample).Select(b => b.Name).ToListAsync();
+        var names = listed.Where(p => access.InScope(p.Parish)).Select(p => p.Name).Concat(samples)
+            .Select(n => n.ToLowerInvariant()).ToHashSet();
+        return name => name is null || names.Contains(name.ToLowerInvariant());
     }
 
     private static async Task<Guid?> SlotIdAsync(HttpContext http, AppDbContext db)

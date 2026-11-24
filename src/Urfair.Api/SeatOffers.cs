@@ -40,14 +40,15 @@ public static class SeatOffers
 
     public static void MapSeatOfferAdmin(this RouteGroupBuilder admin)
     {
-        admin.MapGet("/slots/{id:guid}/offers", async (Guid id, AppDbContext db) =>
+        admin.MapGet("/slots/{id:guid}/offers", async (Guid id, AppDbContext db, HttpContext http) =>
         {
             if (await db.FairSlots.FindAsync(id) is null) return Results.NotFound();
+            var sees = await Access.SeesPersonAsync(http, db, id);
             var names = await db.Ballots.Where(b => b.FairSlotId == id && !b.IsSample).ToDictionaryAsync(b => b.Id, b => b.Name);
             var activities = await Database.LoadActivitiesAsync(db, id);
             return Results.Ok((await db.SeatOffers.AsNoTracking().Where(o => o.FairSlotId == id).ToListAsync())
                 .OrderByDescending(o => o.CreatedAt)
-                .Select(o => new OfferDto(o.Id, o.SessionId, names.GetValueOrDefault(o.BallotId, "?"), o.Status.ToString().ToLowerInvariant(),
+                .Select(o => new OfferDto(o.Id, o.SessionId, names.GetValueOrDefault(o.BallotId, "?") is var n && sees(n) ? n : Access.HiddenName, o.Status.ToString().ToLowerInvariant(),
                     o.GivesUpSessionId is { } g ? AllocationEndpoints.SeatText(activities, [g]) : null, o.ExpiresAt,
                     Database.Utc(o.CreatedAt))));
         });
@@ -61,8 +62,13 @@ public static class SeatOffers
         });
 
         // Who would be asked next for each date with a free seat (not yet offered), so organisers see what a cancellation means.
-        admin.MapGet("/slots/{id:guid}/offers/next", async (Guid id, AppDbContext db) =>
-            await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await PreviewAsync(db, slot)) : Results.NotFound());
+        admin.MapGet("/slots/{id:guid}/offers/next", async (Guid id, AppDbContext db, HttpContext http) =>
+        {
+            if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
+            var sees = await Access.SeesPersonAsync(http, db, id);
+            return Results.Ok((await PreviewAsync(db, slot))
+                .Select(p => p with { Next = p.Next.Select(n => sees(n.Person) ? n : n with { Person = Access.HiddenName }).ToList() }));
+        });
     }
 
     /// <summary>Per date still offered and with a free seat nobody holds an offer for: the next people in offer order.</summary>

@@ -36,8 +36,8 @@ public static class AllocationEndpoints
 {
     public static void MapAllocationAdmin(this RouteGroupBuilder admin)
     {
-        admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db) =>
-            await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await AllocateAsync(db, slot)) : Results.NotFound());
+        admin.MapGet("/slots/{id:guid}/allocation", async (Guid id, AppDbContext db, HttpContext http) =>
+            await db.FairSlots.FindAsync(id) is { } slot ? Results.Ok(await ForAccountAsync(db, slot, http)) : Results.NotFound());
 
         // Fixed seats stay, everything else is allocated again. The original from freezing is kept. Only while internal:
         // once participants see the allocation, free seats move up instead (MovingUp).
@@ -51,7 +51,7 @@ public static class AllocationEndpoints
             var locked = await db.Assignments.Where(a => a.FairSlotId == id && a.Locked).ToListAsync();
             Log(db, http, id, "recalculated");
             await FreezeAsync(db, slot, locked.Select(a => a.ToModel()).ToList());
-            return Results.Ok(await AllocateAsync(db, slot));
+            return Results.Ok(await ForAccountAsync(db, slot, http));
         });
 
         // All seats of one participant, set by hand: move, add, remove, fix. Full sessions may be overbooked on purpose.
@@ -60,6 +60,7 @@ public static class AllocationEndpoints
             var slot = await db.FairSlots.FindAsync(id);
             var ballot = await db.Ballots.FirstOrDefaultAsync(b => b.Id == ballotId && b.FairSlotId == id);
             if (slot is null || ballot is null) return Results.NotFound();
+            if (!(await Access.SeesPersonAsync(http, db, id))(ballot.Name)) return Results.NotFound();
             if (slot.FrozenAt is null) return Endpoints.Errors("notFrozen");
             var activities = await Database.LoadActivitiesAsync(db, id);
             var activityOf = activities.SelectMany(a => a.Sessions).ToDictionary(s => s.Id, s => s.ActivityId);
@@ -81,18 +82,19 @@ public static class AllocationEndpoints
                 await SeatsChangedMailAsync(db, slot, ballot, activities, old.Select(a => a.SessionId).ToHashSet(), seats.Select(s => s.SessionId).ToHashSet(), http);
             await db.SaveChangesAsync();
             await MovingUp.FillAsync(db, slot);
-            return Results.Ok(await AllocateAsync(db, slot));
+            return Results.Ok(await ForAccountAsync(db, slot, http));
         });
 
         // Changes to the frozen allocation, newest first. Entries with a save point can be gone back to (SavePoints),
         // changes to activities, participants and rules can be undone (Undo).
-        admin.MapGet("/slots/{id:guid}/allocation/log", async (Guid id, AppDbContext db) =>
+        admin.MapGet("/slots/{id:guid}/allocation/log", async (Guid id, AppDbContext db, HttpContext http) =>
         {
             if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
+            var sees = await Access.SeesPersonAsync(http, db, id);
             var restorable = await SavePoints.RestorableAsync(db, slot);
             return Results.Ok((await db.AllocationLog.AsNoTracking().Where(l => l.FairSlotId == id)
                     .Select(l => new { l.Id, l.At, l.Actor, l.Kind, l.Person, l.Before, l.After, CanUndo = l.Undo != null }).ToListAsync())
-                .OrderByDescending(l => l.At).Take(300)
+                .OrderByDescending(l => l.At).Where(l => sees(l.Person)).Take(300)
                 .Select(l => new LogDto(Database.Utc(l.At), l.Actor, l.Kind, l.Person, l.Before, l.After, l.Id, restorable.Contains(l.Id), l.CanUndo)));
         });
         admin.MapSavePoints();
@@ -283,6 +285,14 @@ public static class AllocationEndpoints
         db.OriginalAssignments.RemoveRange(await db.OriginalAssignments.Where(a => a.FairSlotId == slot.Id).ToListAsync());
         slot.FrozenAt = null;
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>The allocation as the signed-in account may see it: people of other Pfarrgemeinden left out, seat counts complete.</summary>
+    public static async Task<AllocationDto> ForAccountAsync(AppDbContext db, FairSlotEntity slot, HttpContext http)
+    {
+        var result = await AllocateAsync(db, slot);
+        var sees = await Access.SeesPersonAsync(http, db, slot.Id);
+        return result with { Participants = result.Participants.Where(p => sees(p.Name)).ToList() };
     }
 
     /// <summary>The valid allocation shaped for the UI, compared with "first come, first served" on the same ballots.</summary>

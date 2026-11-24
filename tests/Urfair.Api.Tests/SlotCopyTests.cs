@@ -37,10 +37,18 @@ public class SlotCopyTests
         body["phase"] = "Ended";
         Assert.Equal(HttpStatusCode.NoContent, (await organiser.PutAsJsonAsync($"/api/admin/slots/{source}", body)).StatusCode);
 
+        using (var setup = app.Services.CreateScope())
+        {
+            var sourceDb = setup.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await sourceDb.FairSlots.SingleAsync(s => s.Id == source)).Excluded = ["Max Muster"];
+            await sourceDb.SaveChangesAsync();
+        }
+
         var copy = await NewIdAsync(await CopyAsync(organiser, source, "Ferienprogramm 2028"));
 
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty((await db.FairSlots.SingleAsync(s => s.Id == copy)).Excluded); // names of last year stay behind
         var (old, created) = (await db.FairSlots.SingleAsync(s => s.Id == source), await db.FairSlots.SingleAsync(s => s.Id == copy));
         Assert.Equal("Ferienprogramm 2028", created.Name);
         Assert.Equal(Phase.Draft, created.Phase);

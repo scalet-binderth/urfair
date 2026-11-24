@@ -131,7 +131,8 @@ In demo mode the organisation area has a button to reset the whole demo.
 
 The participant list of a vote is maintained by hand or imported from CSV (`Name` or `Vorname`+`Nachname`, `E-Mail`,
 `Geburtsdatum`, `Taufdatum`, `Pfarrgemeinde`; known names are completed, nobody is deleted). Everyone gets a personal link `/p/{token}`;
-if a date of birth and/or baptism is stored it is asked after the click. Invitations with the link are prepared in the vote's
+if a date of birth and/or baptism is stored it is asked after the click. A link belongs to its vote: elsewhere it only counts in
+votes open to all that do not list the name (a person listed in two votes uses the link of each). Invitations with the link are prepared in the vote's
 "Einladungen" tab: in demo mode as a demo mailbox with the whole mail traffic or one mailbox (organisers, leaders,
 participants) with inbox and sent; the demo starts with invitations, results and leader lists already sent (participants
 also see the mails addressed to them on their own page, "Deine Mails (Demo)"); on a real instance the app sends them itself if a mail server is

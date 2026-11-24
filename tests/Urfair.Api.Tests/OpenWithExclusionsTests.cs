@@ -54,7 +54,7 @@ public class OpenWithExclusionsTests
     }
 
     [Fact]
-    public async Task The_list_is_kept_without_a_new_one_checked_and_copied_with_the_vote()
+    public async Task The_list_is_kept_without_a_new_one_checked_and_not_copied_with_the_vote()
     {
         using var app = new DemoApp();
         var organiser = await app.OrganiserAsync();
@@ -71,6 +71,6 @@ public class OpenWithExclusionsTests
 
         var copy = await organiser.PostAsJsonAsync("/api/admin/slots", new { name = "Pfarrfest 2028", withSampleData = false, copyFrom = festival, shiftWeeks = 52 });
         var id = (await copy.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        Assert.Equal([David], await ExcludedAsync(organiser, id));
+        Assert.Empty(await ExcludedAsync(organiser, id)); // names of last year stay behind (decided 24 November 2026)
     }
 }
