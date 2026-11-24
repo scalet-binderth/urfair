@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Activity, ActivityInput, Api, Group, fromLocalInput, toLocalInput } from './api';
 import { I18n } from './i18n';
@@ -40,10 +40,12 @@ interface SessionForm { id: string | null; start: string; end: string; location:
             @if (parish && !info.parishes().includes(parish)) { <option [value]="parish">{{ parish }}</option> }
           </select></div>
         <div class="field grow"><label [for]="uid + '-leader'">{{ i18n.t('editor.leader') }}</label>
-          <input [id]="uid + '-leader'" maxlength="120" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="leader" /></div>
-        <div class="field grow"><label [for]="uid + '-leader-mail'">{{ i18n.t('editor.leaderEmail') }}</label>
-          <input [id]="uid + '-leader-mail'" type="email" maxlength="200" [placeholder]="i18n.t('editor.leaderEmailHint')" [(ngModel)]="leaderEmail" /></div>
+          <input [id]="uid + '-leader'" maxlength="120" [attr.list]="uid + '-leaders'" [placeholder]="i18n.t('editor.inheritHint')" [(ngModel)]="leader" (ngModelChange)="leaderChanged()" />
+          <datalist [id]="uid + '-leaders'">@for (l of knownLeaders(); track l.name) { <option [value]="l.name"></option> }</datalist></div>
+        <div class="field grow"><label [for]="uid + '-leader-mail'">{{ i18n.t('editor.leaderEmail') }}@if (leader.trim()) { * }</label>
+          <input [id]="uid + '-leader-mail'" type="email" maxlength="200" [required]="!!leader.trim()" [placeholder]="i18n.t('editor.leaderEmailHint')" [(ngModel)]="leaderEmail" /></div>
       </div>
+      <p class="muted small">{{ i18n.t('editor.leaderNote') }}</p>
 
       <h3>{{ i18n.t('editor.sessions') }}</h3>
       @for (s of sessions; track $index; let i = $index) {
@@ -86,6 +88,8 @@ export class ActivityEditor implements OnInit {
   readonly activity = input<Activity | null>(null);
   /** Groups of the FairSlot; empty hides the group field. */
   readonly groups = input<Group[]>([]);
+  /** The vote's activities, for the leaders already known (name and address). */
+  readonly known = input<Activity[]>([]);
   readonly saved = output<void>();
   readonly cancelled = output<void>();
 
@@ -118,6 +122,24 @@ export class ActivityEditor implements OnInit {
     } else {
       this.addSession();
     }
+  }
+
+  protected knownLeaders = computed(() => {
+    const map = new Map<string, { name: string; email: string | null }>();
+    for (const a of this.known()) {
+      if (!a.leader) continue;
+      const key = a.leader.trim().toLowerCase();
+      const l = map.get(key) ?? { name: a.leader.trim(), email: null };
+      l.email ??= a.leaderEmail ?? null;
+      map.set(key, l);
+    }
+    return [...map.values()].sort((x, y) => x.name.localeCompare(y.name, this.i18n.locale(), { sensitivity: 'base' }));
+  });
+
+  /** A known leader brings their address along (one address per leader). */
+  protected leaderChanged(): void {
+    const known = this.knownLeaders().find(l => l.name.toLowerCase() === this.leader.trim().toLowerCase());
+    if (known?.email && !this.leaderEmail.trim()) this.leaderEmail = known.email;
   }
 
   protected addSession(): void {

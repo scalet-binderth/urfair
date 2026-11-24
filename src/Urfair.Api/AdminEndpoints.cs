@@ -14,8 +14,11 @@ public record SessionRequest(string? Id, DateTime Start, DateTime? End, string? 
 public record ActivityRequest(string Title, string? RestrictedTo, List<SessionRequest> Sessions, string? GroupId = null, string? Description = null, string? Parish = null, string? Leader = null, string? LeaderEmail = null);
 public record DemandDto(string ActivityId, string Title, int? Seats, int Interested, int TotalPoints, double AveragePoints);
 public record ResetRequest(int? SampleCount, bool NewSeed, bool RemoveRealBallots);
-public record ImportRequest(string? Csv, bool Replace, bool Commit);
-public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyList<ValidationError> Errors, bool Saved);
+/// <param name="LeaderEmails">Addresses for leaders the CSV names without one (leader name → address).</param>
+/// <param name="OrganiserEmail">The organiser's address, if the vote has none yet and activities have no leader.</param>
+public record ImportRequest(string? Csv, bool Replace, bool Commit, Dictionary<string, string>? LeaderEmails = null, string? OrganiserEmail = null);
+/// <param name="Leaders">Who leads the imported activities and where their mails go (<c>null</c> address: still missing).</param>
+public record ImportPreviewDto(IReadOnlyList<ActivityDto> Activities, IReadOnlyList<ValidationError> Errors, bool Saved, IReadOnlyList<LeaderDto>? Leaders = null);
 
 /// <summary>Endpoints for organisers (signed-in accounts; permissions in Access.cs).</summary>
 public static class AdminEndpoints
@@ -68,6 +71,8 @@ public static class AdminEndpoints
                     ? (own, slot.Visibility == Visibility.JuniaReadOnly ? Visibility.ParishOnly : slot.Visibility)
                     : (account.Parishes.FirstOrDefault(), Visibility.ParishOnly);
             if (db.Entry(slot).State == EntityState.Detached) db.FairSlots.Add(slot);
+            // Mails to the organiser, and to leaders of activities without a leader, go to the creator until changed.
+            if (slot.OrganiserEmail is null && ParticipantCsv.IsEmail(account.Email)) slot.OrganiserEmail = account.Email;
             await db.SaveChangesAsync();
             return Results.Ok(new { slot.Id });
         });
@@ -105,8 +110,8 @@ public static class AdminEndpoints
                 errors.Add(new ValidationError("visibilityNotAllowed"));
             if (Clean(req.Organiser) is { Length: > Validation.MaxShortText })
                 errors.Add(new ValidationError("textTooLong", new Dictionary<string, object> { ["max"] = Validation.MaxShortText }));
-            if (Clean(req.OrganiserEmail) is { } organiserEmail && !ParticipantCsv.IsEmail(organiserEmail))
-                errors.Add(new ValidationError("emailInvalid"));
+            if (Clean(req.OrganiserEmail) is not { } organiserEmail) errors.Add(new ValidationError("organiserEmailRequired"));
+            else if (!ParticipantCsv.IsEmail(organiserEmail)) errors.Add(new ValidationError("emailInvalid"));
             // Without a list (older clients) the exclusions stay as they are.
             var excluded = req.Excluded is null ? slot.Excluded
                 : req.Excluded.Select(x => (x ?? "").Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -186,10 +191,11 @@ public static class AdminEndpoints
 
         admin.MapPost("/slots/{id:guid}/activities", async (Guid id, ActivityRequest req, AppDbContext db, HttpContext http) =>
         {
-            if (!await db.FairSlots.AnyAsync(s => s.Id == id)) return Results.NotFound();
+            if (await db.FairSlots.FindAsync(id) is not { } slot) return Results.NotFound();
             var entity = new ActivityEntity { FairSlotId = id, SortOrder = await db.Activities.CountAsync(a => a.FairSlotId == id) };
-            if (Apply(entity, req) is { } error) return error;
+            if (Apply(entity, req, slot) is { } error) return error;
             db.Activities.Add(entity);
+            await Leaders.ShareEmailAsync(db, entity);
             await AllocationEndpoints.LogChangeAsync(db, http, id, "activityAdded", entity.Title, null, AllocationEndpoints.SeatsText(entity.Sessions),
                 Undo.Json(new(ActivityIds: [entity.Id])));
             await db.SaveChangesAsync();
@@ -200,13 +206,15 @@ public static class AdminEndpoints
         {
             var entity = await db.Activities.Include(a => a.Sessions).SingleOrDefaultAsync(a => a.Id == activityId);
             if (entity is null) return Results.NotFound();
+            var slot = await db.FairSlots.FindAsync(entity.FairSlotId);
             var seats = AllocationEndpoints.SeatsText(entity.Sessions);
             var undo = Undo.Json(new(await Undo.ActivitiesAsync(db, entity.FairSlotId, [activityId]), [activityId]));
-            if (Apply(entity, req) is { } error) return error;
+            if (Apply(entity, req, slot!) is { } error) return error;
+            await Leaders.ShareEmailAsync(db, entity);
             await AllocationEndpoints.LogChangeAsync(db, http, entity.FairSlotId, "activity", entity.Title, seats, AllocationEndpoints.SeatsText(entity.Sessions), undo);
             await db.SaveChangesAsync();
             // More seats while visible: they fill from the waiting list.
-            if (await db.FairSlots.FindAsync(entity.FairSlotId) is { } slot) await MovingUp.FillAsync(db, slot);
+            await MovingUp.FillAsync(db, slot!);
             return Results.NoContent();
         });
 
@@ -243,9 +251,14 @@ public static class AdminEndpoints
             var slot = await db.FairSlots.FindAsync(id);
             if (slot is null) return Results.NotFound();
             var result = ActivityCsv.Parse(req.Csv ?? "", slot.ToRules().GroupList);
+            var (activities, leaders) = await Leaders.ForImportAsync(db, slot, result.Activities, req.LeaderEmails, Clean(req.OrganiserEmail));
             if (!req.Commit || result.Errors.Count > 0 || result.Activities.Count == 0)
-                return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), result.Errors, false));
+                return Results.Ok(new ImportPreviewDto(activities.Select(Endpoints.ToAdminDto).ToList(), result.Errors, false, leaders));
             if (req.Replace && slot.FrozenAt is not null) return Endpoints.Errors("allocationFrozen");
+            if (leaders.FirstOrDefault(l => l.Email is null || !ParticipantCsv.IsEmail(l.Email)) is { } missing)
+                return Results.BadRequest(new ErrorsDto([new ValidationError(missing.Email is null ? "leaderEmailMissing" : "emailInvalid",
+                    new Dictionary<string, object> { ["name"] = missing.Name ?? "" })]));
+            if (leaders.FirstOrDefault(l => l.IsOrganiser) is { } organiser) slot.OrganiserEmail = organiser.Email;
 
             var order = await db.Activities.CountAsync(a => a.FairSlotId == id);
             var replaced = req.Replace ? await Undo.ActivitiesAsync(db, id) : [];
@@ -256,13 +269,14 @@ public static class AdminEndpoints
                 foreach (var b in await db.Ballots.Include(b => b.Points).Where(b => b.FairSlotId == id).ToListAsync()) b.Points.Clear();
                 order = 0;
             }
-            var added = result.Activities.Select(a => Database.ToEntity(a, id, order++)).ToList();
+            var added = activities.Select(a => Database.ToEntity(a, id, order++)).ToList();
             db.Activities.AddRange(added);
+            foreach (var a in added) await Leaders.ShareEmailAsync(db, a);
             await AllocationEndpoints.LogChangeAsync(db, http, id, req.Replace ? "activitiesReplaced" : "activitiesImported", null, null, result.Activities.Count.ToString(),
                 Undo.Json(new(replaced, added.Select(a => a.Id).ToList())));
             await db.SaveChangesAsync();
             if (req.Replace) await Database.ResetSamplesAsync(db, id); // sample ballots must refer to the new activities
-            return Results.Ok(new ImportPreviewDto(result.Activities.Select(Endpoints.ToAdminDto).ToList(), [], true));
+            return Results.Ok(new ImportPreviewDto(activities.Select(Endpoints.ToAdminDto).ToList(), [], true, leaders));
         });
 
         // ---------- Demand, demo data, allocation ----------
@@ -311,12 +325,13 @@ public static class AdminEndpoints
     private static string? ParishOf(string? text) => Parishes.Match(text) ?? Clean(text);
 
     /// <summary>Copies a request onto an activity entity (sessions are matched by id). Returns an error result if invalid.</summary>
-    private static IResult? Apply(ActivityEntity entity, ActivityRequest req)
+    private static IResult? Apply(ActivityEntity entity, ActivityRequest req, FairSlotEntity slot)
     {
         var restricted = string.IsNullOrWhiteSpace(req.RestrictedTo) ? null : req.RestrictedTo;
         var sessions = (req.Sessions ?? []).Select(s =>
             new Session(s.Id ?? "", entity.Id, s.Start, s.Flexible ? null : s.End, (s.Location ?? "").Trim(), s.Capacity, s.Flexible)).ToList();
         var errors = Validation.Check(new Activity(entity.Id, (req.Title ?? "").Trim(), sessions, restricted, Description: req.Description?.Trim(), Parish: ParishOf(req.Parish), Leader: Clean(req.Leader), LeaderEmail: Clean(req.LeaderEmail)));
+        errors.AddRange(Leaders.Check(Clean(req.Leader), Clean(req.LeaderEmail), slot));
         if (errors.Count > 0) return Results.BadRequest(new ErrorsDto(errors));
 
         entity.Title = req.Title!.Trim();

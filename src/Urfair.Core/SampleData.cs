@@ -36,11 +36,12 @@ public static class SampleData
         ["kitchen"] = (null, "Sarah Wimmer", "sarah.wimmer@example.org"),
         ["hochseil"] = (null, "Jungschar-Team", "jungschar@example.org"),
         ["kino"] = ("Pfarrgemeinde Urfahr-Christkönig", "Lukas Mayr", "lukas.mayr@example.org"),
-        ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner", null),
+        ["altenheim"] = ("Pfarrgemeinde Urfahr-St. Magdalena", "Theresa Ebner", "theresa.ebner@example.org"),
     };
 
     public const string FirmungParish = Parishes.Junia;
     public const string FirmungOrganiser = "Firmteam Urfahr";
+    public const string FirmungOrganiserEmail = "firmteam@example.org";
 
     public static IReadOnlyList<Activity> Activities()
     {

@@ -98,6 +98,7 @@ public static class AllocationEndpoints
 		admin.MapSavePoints();
 		admin.MapUndo();
 		admin.MapSeatOfferAdmin();
+		admin.MapLeaders();
 
 		// Who goes where, per activity and date, for the activity leaders.
 		admin.MapGet("/slots/{id:guid}/allocation/lists", async (Guid id, AppDbContext db, HttpContext http) =>
@@ -121,8 +122,8 @@ public static class AllocationEndpoints
 	}
 
 	/// <summary>
-	/// One mail per leader e-mail address with the lists of their activities; what they got is remembered, so later changes
-	/// are mailed to them (<see cref="LeaderNotices"/>). Saved by the caller.
+	/// One mail per leader e-mail address with the lists of their activities; what they got is remembered, so the organisers
+	/// see later changes and can mail them (<see cref="LeaderNotices"/>). Saved by the caller.
 	/// </summary>
 	public static async Task<int> LeaderMailsAsync(AppDbContext db, FairSlotEntity slot, List<ListActivityDto> chosen, LeaderMailRequest req)
 	{
@@ -136,7 +137,8 @@ public static class AllocationEndpoints
 
 	/// <summary>
 	/// The lists per activity and date. E-mail address and dates of birth and baptism only of participants in the account's own
-	/// Pfarrgemeinden (as in the participant list). Without a leader the vote's organiser is named, as on the activity.
+	/// Pfarrgemeinden (as in the participant list). Without a leader the vote's organiser is named, as on the activity, and
+	/// their address is used.
 	/// </summary>
 	public static async Task<LeaderListsDto> ListsAsync(AppDbContext db, FairSlotEntity slot, SlotAccess access)
 	{
@@ -151,7 +153,7 @@ public static class AllocationEndpoints
 			.SelectMany(kv => kv.Value.Select(x => (x.Session.Id, Person: person[kv.Key])))
 			.GroupBy(x => x.Id)
 			.ToDictionary(g => g.Key, g => (IReadOnlyList<ListPersonDto>)g.Select(x => x.Person).OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
-		return new LeaderListsDto(slot.FrozenAt is not null, activities.Select(a => new ListActivityDto(a.Id, a.Title, a.Leader ?? slot.Organiser, a.LeaderEmail, a.GroupId,
+		return new LeaderListsDto(slot.FrozenAt is not null, activities.Select(a => new ListActivityDto(a.Id, a.Title, a.Leader ?? slot.Organiser, Leaders.EmailOf(a.Leader, a.LeaderEmail, slot), a.GroupId,
 			a.Sessions.OrderBy(s => s.Start).Select(s => new ListSessionDto(s.Id, s.Start, s.End, s.Flexible, s.Location, s.Capacity,
 				bySession.GetValueOrDefault(s.Id, []))).ToList())).ToList());
 	}
@@ -180,7 +182,7 @@ public static class AllocationEndpoints
 				body.Append($"{i + 1,3}. {string.Join(", ", parts)}\n");
 			}
 		}
-		body.Append("\nÄndert sich noch etwas, bekommst du eine Mail mit den Änderungen.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
+		body.Append("\nÄndert sich noch etwas, melden wir uns mit den Änderungen.\n\n").Append(slot.Organiser ?? "Dein Organisationsteam");
 		return new MailEntity { FairSlotId = slot.Id, To = activities[0].LeaderEmail!, Subject = $"Teilnahmeliste: {slot.Name}", Body = body.ToString() };
 	}
 

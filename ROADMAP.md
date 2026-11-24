@@ -189,6 +189,15 @@ and English; keep both in sync.
   the old password stays valid until a new one is set. Account mails have no vote (`Mails.FairSlotId` may be empty,
   column `Accounts.ResetRequestedAt`), are listed under "Konten" (to copy without a mail server) and are deleted after
   30 days or with the account
+- **Leaders in one place, mails after a decision.** New tab "Leitungen": every leader with e-mail address and the
+  activities they lead; a change there counts for all their activities (one address per leader) and is logged. The
+  organisers come first and lead everything without a leader of its own; their name and address are the same as in
+  the settings, both ways. Addresses are required (organisers' address defaults to the creator's; a leader needs one);
+  the activity form suggests known leaders with their address. The CSV import lists the leaders, takes their address
+  from the CSV or the vote and asks for missing ones before taking over. Changes to a leader's list are no longer mailed
+  on their own: "Zuteilung" and "Listen" show who does not know yet and what changed (new, no longer there), with
+  "Mail the changed list" per leader or for all. Explanations of satisfaction (results) and demand (green: a seat for
+  everyone interested, orange: overbooked, red: from 2×)
 
 ## Next steps (each ends with a demo that can be shown)
 
